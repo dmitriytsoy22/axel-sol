@@ -148,6 +148,25 @@ Investors need a clear, trustworthy web interface to discover tokenized taxi ass
 
 ---
 
+#### US-F07b — Live Telemetry Widget
+
+> As an investor, I want to see today's real-time car status and earnings so that I can verify the asset is actually generating income.
+
+**Acceptance Criteria:**
+
+- Telemetry card displayed on the dashboard, sourced from `GET /telemetry/latest/:project_id`
+- Shows: car status badge (`In Service` / `Maintenance` / `Inactive`), today's revenue in tenge (e.g. **12 400 ₸**), mileage (e.g. **187 km**), trips count (e.g. **14 trips**)
+- Example display: *"Car is in service — earned 12 400 ₸ today · 187 km · 14 trips"*
+- "Verified on-chain ✓" link opens the Solana Explorer tx for the oracle record (from `solana_tx_signature` field)
+- If today's data is not yet ingested (cron hasn't run): shows yesterday's data with label "As of yesterday"
+- If car status is `Maintenance` or `Inactive`: shows amber/red badge with last active date
+- Loading skeleton while fetching; no error thrown if endpoint returns empty (shows "Data not available yet")
+
+**Priority:** Must Have
+**Phase:** 3
+
+---
+
 #### US-F08 — Claim Revenue
 > As an investor, I want to claim my share of deposited revenue so that I can receive my earnings in SOL.
 

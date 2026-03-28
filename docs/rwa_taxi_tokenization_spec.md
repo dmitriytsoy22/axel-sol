@@ -24,13 +24,14 @@
 ## 3. Архитектура
 
 ```text
-[Frontend] → [Backend API] → [Solana Program]
-                      ↓
-             [PostgreSQL DB]
-                      ↓
-             [Data Ingestion Layer]
-                      ↓
-              [Taxi / Operator APIs]
+[Frontend] → [Backend API] ──────────→ [Solana Program]
+                  ↓    ↑                      ↑
+           [PostgreSQL DB]          [Oracle TX (signed)]
+                  ↓                            ↑
+        [Data Ingestion Layer] ────────────────┘
+                  ↓
+         [Yandex Pro API]
+     (mileage, revenue, car status)
 ```
 
 ---
@@ -78,8 +79,46 @@
 - Asset Service
 - Investment Service
 - Payout Engine
-- Data Ingestion
+- **Yandex Pro Data Ingestion**
+- **Oracle Service** (подписывает и пушит данные в Solana)
 - Reporting
+
+### Yandex Pro Integration (Oracle)
+
+Ключевой механизм доказательства реальности актива — интеграция с Yandex Pro API.
+
+**Что забирается ежедневно:**
+
+- Пробег автомобиля за день (км)
+- Выручка за день (тенге / локальная валюта)
+- Статус автомобиля: активен / на ремонте / неактивен
+- Количество завершённых поездок
+
+**Как работает Oracle:**
+
+1. `@Cron` задача запускается раз в сутки (например, в 01:00)
+2. Backend делает запрос к Yandex Pro API с авторизацией по vehicle_id
+3. Данные валидируются и сохраняются в таблицу `telemetry_records`
+4. Backend подписывает пакет данных своим oracle keypair (Ed25519)
+5. Отправляет транзакцию в Solana — инструкция `record_telemetry` с хешем данных и подписью
+6. Транзакция создаёт неизменяемую on-chain запись: хеш + timestamp + oracle pubkey
+7. Полные данные хранятся off-chain в PostgreSQL; on-chain хранится только хеш (proof)
+
+**Что видят инвесторы на Dashboard:**
+
+> "Машина в пути — заработано сегодня: 12 400 ₸ · Пробег: 187 км · Поездок: 14"
+
+**Таблица `telemetry_records`:**
+
+- `date` — дата записи
+- `vehicle_id` — идентификатор авто в Yandex Pro
+- `daily_revenue` — выручка в тенге
+- `mileage_km` — пробег за день
+- `trips_count` — количество поездок
+- `car_status` — active / maintenance / inactive
+- `data_hash` — SHA-256 хеш пакета данных
+- `oracle_signature` — Ed25519 подпись backend'а
+- `solana_tx_signature` — подтверждение on-chain записи
 
 ### Database (PostgreSQL)
 
@@ -91,6 +130,7 @@
 - investments
 - revenue_periods
 - payouts
+- **telemetry_records**
 
 ---
 
@@ -119,7 +159,7 @@ Profit = Revenue - Expenses - Reserve
 - Каталог машин
 - Страница актива
 - Инвестирование
-- Dashboard
+- Dashboard (включая live-телеметрию: статус авто, выручка за сегодня, пробег)
 - История выплат
 
 ---
@@ -138,7 +178,8 @@ Profit = Revenue - Expenses - Reserve
 
 - 1 автомобиль
 - whitelist-only
-- централизованный oracle
+- централизованный oracle (backend keypair; не децентрализован)
+- Yandex Pro API как единственный источник данных (один провайдер)
 
 ---
 
@@ -150,12 +191,14 @@ On-chain:
 - Solana program
 - Transfer Hook program
 - payout logic
+- telemetry oracle records (хеш + подпись, ежедневно)
 
 Off-chain:
 
 - backend
 - база данных
-- ingestion
+- Yandex Pro ingestion
+- oracle signing service
 - payout engine
 
 Блокчейн управляет долями и выплатами,

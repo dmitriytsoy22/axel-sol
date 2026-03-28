@@ -62,6 +62,13 @@ ClaimRecord (PDA: ["claim", revenue_period, wallet])
 
 WhitelistEntry (PDA: ["whitelist", wallet])
   └── approved: bool                  ← read by Transfer Hook on every transfer
+
+TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
+  ├── project: Pubkey
+  ├── date: i64                        ← Unix timestamp (day-level granularity)
+  ├── data_hash: [u8; 32]              ← SHA-256 of the full Yandex Pro payload
+  ├── oracle_pubkey: Pubkey            ← backend oracle signing keypair
+  └── recorded_at: i64                ← block timestamp
 ```
 
 ---
@@ -268,7 +275,43 @@ WhitelistEntry (PDA: ["whitelist", wallet])
 
 ---
 
-### Epic 6: Developer SDK & Tooling
+### Epic 6: Telemetry Oracle
+
+**Business goal:** Create an immutable on-chain proof that real-world taxi data was recorded by an authorized oracle — connecting the physical asset to the blockchain and making it verifiable by any investor.
+
+#### US-O13 — Record Daily Telemetry
+
+> As the backend oracle, I want to push a daily signed hash of Yandex Pro data to Solana so that investors can independently verify that reported earnings are backed by real operator data.
+
+**Acceptance Criteria:**
+
+- New instruction `record_telemetry` added to the `rwa-taxi` program
+- Accepts: `date` (Unix day timestamp), `data_hash` ([u8; 32] — SHA-256 of the full Yandex Pro JSON payload)
+- Creates `TelemetryRecord` PDA with seeds `["telemetry", project, date]` — one record per project per day
+- Authority check: caller must be the registered `oracle_pubkey` stored in `ProjectState` (set during `initialize_project`)
+- Instruction is idempotent for the same day: second call with same date returns success without overwriting (prevents replay)
+- Emits structured log: `{ event: "record_telemetry", date, data_hash, oracle_pubkey }`
+- Anchor test: valid oracle can record; non-oracle authority rejected; duplicate date rejected; data_hash stored correctly
+
+**Priority:** Must Have | **Phase:** 2
+
+---
+
+#### US-O14 — Oracle Pubkey Registration
+
+> As the platform admin, I want to register the oracle public key during project initialization so that only the authorized backend can push telemetry data.
+
+**Acceptance Criteria:**
+
+- `initialize_project` accepts an `oracle_pubkey: Pubkey` parameter; stored in `ProjectState`
+- `oracle_pubkey` can be rotated by multisig via a new `update_oracle` instruction (for key rotation without redeploying)
+- `update_oracle` emits `{ event: "oracle_updated", old_pubkey, new_pubkey }`
+
+**Priority:** Must Have | **Phase:** 2
+
+---
+
+### Epic 7: Developer SDK & Tooling
 
 **Business goal:** Provide a TypeScript SDK so that Dev A (frontend) and Dev C (backend) can interact with the program without writing low-level Anchor client code.
 
