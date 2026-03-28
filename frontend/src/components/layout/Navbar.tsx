@@ -20,10 +20,9 @@ const Navbar: FC = () => {
   const router = useRouter();
   const locale = useLocale();
 
-  const toggleLocale = useCallback(() => {
-    const nextLocale = locale === 'en' ? 'ru' : locale === 'ru' ? 'kk' : 'en';
-    router.replace(pathname as any, { locale: nextLocale });
-  }, [locale, pathname, router]);
+  const switchLocale = useCallback((newLocale: string) => {
+    router.replace(pathname as any, { locale: newLocale });
+  }, [pathname, router]);
   const { select, wallets, wallet, disconnect, connected } = useWallet();
   const { truncatedAddress, balance, publicKey } = useWalletInfo();
 
@@ -116,26 +115,19 @@ const Navbar: FC = () => {
     <>
       <nav
         id="navbar"
-        className="fixed top-0 left-0 right-0 z-sticky h-[52px] flex items-center"
-        style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.72)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          borderBottom: scrolled ? '0.5px solid #D2D2D7' : '0.5px solid transparent',
-          transition: 'border-color 250ms ease',
-        }}
+        className={`fixed top-0 w-full h-[52px] z-sticky bg-white/80 backdrop-blur-xl shadow-[0_10px_40px_rgba(29,29,31,0.05)] border-b transition-colors duration-250 ${scrolled ? 'border-border-subtle' : 'border-transparent'}`}
       >
-        <div className="w-full max-w-page-wide mx-auto px-5 md:px-[80px] flex items-center justify-between">
+        <div className="flex justify-between items-center px-8 w-full max-w-[980px] mx-auto h-full">
           {/* Left — Brand */}
           <Link
             href="/"
-            className="text-[21px] font-semibold text-text-primary tracking-[0.011em] no-underline hover:opacity-80 transition-opacity duration-normal"
+            className="text-xl font-bold tracking-tighter text-text-primary no-underline hover:opacity-80 transition-opacity duration-normal"
           >
             AXEL
           </Link>
 
           {/* Center — Desktop Navigation */}
-          <div className="hidden sm:flex items-center gap-8">
+          <div className="hidden md:flex items-center space-x-8">
             {NAV_LINKS.map(({ href, labelKey }) => {
               const isActive = pathname === href || pathname.startsWith(href + '/');
               return (
@@ -143,9 +135,8 @@ const Navbar: FC = () => {
                   key={href}
                   href={href as any}
                   className={`
-                    text-[12px] uppercase tracking-[0.08em] font-normal no-underline
-                    transition-colors duration-fast
-                    ${isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}
+                    font-['Inter'] text-[12px] tracking-widest uppercase font-medium transition-colors duration-300 no-underline
+                    ${isActive ? 'text-text-primary font-bold' : 'text-text-secondary hover:text-brand-primary'}
                   `}
                 >
                   {tNav(labelKey)}
@@ -155,18 +146,31 @@ const Navbar: FC = () => {
           </div>
 
           {/* Right — Wallet + Mobile Hamburger */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center space-x-4">
             {/* Language Switcher — Desktop */}
-            <div className="hidden sm:block">
+            <div className="hidden sm:block relative group">
               <button
-                onClick={toggleLocale}
-                className="flex items-center justify-center w-[32px] h-[32px] rounded-full hover:bg-surface-secondary transition-colors duration-fast cursor-pointer border-none bg-transparent"
+                className="flex items-center space-x-2 px-3 py-1.5 rounded-full hover:bg-surface-secondary transition-colors duration-200 border border-transparent hover:border-border-subtle cursor-pointer bg-transparent"
                 title="Switch Language"
               >
-                <span className="text-[14px] font-medium text-text-secondary uppercase">
-                  {locale === 'en' ? 'RU' : locale === 'ru' ? 'KK' : 'EN'}
-                </span>
+                <span className="material-symbols-outlined text-[18px] text-text-secondary">language</span>
+                <span className="text-[13px] font-bold text-text-primary tracking-tight uppercase">{locale}</span>
+                <span className="material-symbols-outlined text-[16px] text-text-secondary">expand_more</span>
               </button>
+              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-border-subtle py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-dropdown">
+                <button onClick={() => switchLocale('en')} className="w-full flex items-center justify-between px-4 py-2 text-[13px] font-medium hover:bg-surface-secondary transition-colors border-none bg-transparent cursor-pointer">
+                  <span className={locale === 'en' ? 'text-text-primary' : 'text-text-secondary'}>English</span>
+                  {locale === 'en' && <span className="material-symbols-outlined text-[16px] text-brand-primary">check</span>}
+                </button>
+                <button onClick={() => switchLocale('ru')} className="w-full flex items-center justify-between px-4 py-2 text-[13px] font-medium hover:bg-surface-secondary transition-colors border-none bg-transparent cursor-pointer">
+                  <span className={locale === 'ru' ? 'text-text-primary' : 'text-text-secondary'}>Русский</span>
+                  {locale === 'ru' && <span className="material-symbols-outlined text-[16px] text-brand-primary">check</span>}
+                </button>
+                <button onClick={() => switchLocale('kk')} className="w-full flex items-center justify-between px-4 py-2 text-[13px] font-medium hover:bg-surface-secondary transition-colors border-none bg-transparent cursor-pointer">
+                  <span className={locale === 'kk' ? 'text-text-primary' : 'text-text-secondary'}>Қазақша</span>
+                  {locale === 'kk' && <span className="material-symbols-outlined text-[16px] text-brand-primary">check</span>}
+                </button>
+              </div>
             </div>
 
             {/* Wallet Section — Desktop */}
@@ -176,16 +180,12 @@ const Navbar: FC = () => {
                   <button
                     id="wallet-chip"
                     onClick={() => setChipDropdownOpen(!chipDropdownOpen)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-pill bg-surface-secondary hover:bg-surface-hover transition-colors duration-fast cursor-pointer border-none"
+                    className="bg-surface-secondary px-4 py-1.5 rounded-full flex items-center space-x-2 border border-border-subtle hover:bg-surface-hover transition-colors duration-200 cursor-pointer"
                   >
-                    <span className="font-mono text-[14px] font-medium text-text-primary">
-                      {truncatedAddress}
+                    <span className="font-mono text-[13px] font-medium text-text-primary">
+                      {truncatedAddress} {balance !== null && `· ${balance.toFixed(2)} SOL`}
                     </span>
-                    {balance !== null && (
-                      <span className="text-[13px] text-text-secondary font-normal">
-                        {balance.toFixed(2)} SOL
-                      </span>
-                    )}
+                    <div className="w-2 h-2 rounded-full bg-brand-primary"></div>
                   </button>
 
                   {/* Dropdown */}
@@ -313,12 +313,12 @@ const Navbar: FC = () => {
           <div className="h-px bg-border-subtle my-3" />
 
           {/* Language Switcher — Mobile */}
-          <button
-            onClick={toggleLocale}
-            className="text-left text-[17px] font-normal text-text-secondary hover:text-text-primary transition-colors duration-fast cursor-pointer border-none bg-transparent py-2"
-          >
-            {locale === 'en' ? 'Switch to Russian' : locale === 'ru' ? 'Қазақ тіліне ауысу' : 'Switch to English'}
-          </button>
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] uppercase tracking-widest text-text-tertiary">Language</span>
+            <button onClick={() => switchLocale('en')} className="text-left text-[17px] font-normal text-text-secondary hover:text-text-primary transition-colors cursor-pointer border-none bg-transparent py-1">{locale === 'en' && '✓ '}English</button>
+            <button onClick={() => switchLocale('ru')} className="text-left text-[17px] font-normal text-text-secondary hover:text-text-primary transition-colors cursor-pointer border-none bg-transparent py-1">{locale === 'ru' && '✓ '}Русский</button>
+            <button onClick={() => switchLocale('kk')} className="text-left text-[17px] font-normal text-text-secondary hover:text-text-primary transition-colors cursor-pointer border-none bg-transparent py-1">{locale === 'kk' && '✓ '}Қазақша</button>
+          </div>
 
           {/* Wallet — Mobile */}
           {connected && truncatedAddress ? (
