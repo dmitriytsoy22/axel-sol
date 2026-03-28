@@ -14,6 +14,7 @@
 | 1 | Scaffold Next.js + RPC Client | Phase 1 | — | ⬜ |
 | 2 | Wallet Adapter + Layout Shell | Phase 1 | US-F01 | ⬜ |
 | 3 | On-chain Client Layer + Types | Phase 1 | — | ⬜ |
+| 3.5 | Мультиязычность (i18n) | Phase 1 | — | ⬜ |
 | 4 | Каталог автомобилей | Phase 2 | US-F03 | ⬜ |
 | 5 | Страница актива | Phase 2 | US-F04 | ⬜ |
 | 6 | Whitelist Check + KYC CTA | Phase 2 | US-F02 | ⬜ |
@@ -32,9 +33,11 @@
 
 ---
 
-## Дизайн-контекст (вставлять НЕ НУЖНО — он уже в каждом промпте)
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.-контекст (вставлять НЕ НУЖНО — он уже в каждом промпте)
 
-Каждый промпт содержит блок `## Дизайн` со следующими ключевыми принципами:
+Каждый промпт содержит блок `## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк. + i18n` со следующими ключевыми принципами:
 - Apple-like минимализм, light theme по умолчанию
 - Primary: Cyan `#06B6D4`, text: `#1D1D1F`, secondary bg: `#F5F5F7`
 - Pill кнопки (980px radius), Inter font, 17px body, минимальные тени
@@ -133,7 +136,8 @@ src/
 AXEL — RWA токенизация такси на Solana. On-chain first: весь стейт в PDAs, frontend читает напрямую через RPC. Нет backend для данных.
 Проект инициализирован: Next.js 14, TypeScript, Tailwind. Структура: src/app/, src/components/, src/lib/solana/.
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple-like минимализм. Полная система в файле `frontend/DESIGN_SYSTEM.md`.
 - Light theme: bg #FFFFFF, text #1D1D1F, secondary bg #F5F5F7, border #D2D2D7
 - Primary: Cyan #06B6D4 (единственный акцентный цвет)
@@ -354,6 +358,45 @@ export interface TelemetryData {
 
 ---
 
+### Задача 3.5 — Мультиязычность (i18n) с next-intl
+
+```text
+Ты — Senior Frontend Developer, Next.js App Router expert.
+
+## Контекст проекта
+AXEL — RWA платформа на Solana. Мы внедряем строгую мультиязычность (i18n) с самого начала, так как интерфейс будет использоваться глобальными инвесторами (EN) и локальными пользователями (RU).
+Проект использует Next.js 14 App Router.
+
+## Задание
+Внедри `next-intl` для поддержки EN и RU локалей.
+
+### 1. Установка и структура:
+- Установи `next-intl`
+- Сдвинь все страницы в динамический сегмент `src/app/[locale]/...`
+- Настрой `src/middleware.ts` для авто-детекта языка (default: en, locales: ['en', 'ru'])
+- Создай файл `src/i18n.ts` (стандартный конфиг next-intl)
+
+### 2. Словари (`messages/en.json`, `messages/ru.json`):
+- Создай неймспейсы (минимум):
+  - `Common`: кнопки (Invest, Connect, Cancel), статусы загрузки
+  - `Navigation`: ссылки меню (Catalog, Dashboard, Payouts)
+  - `Web3Errors`: человекочитаемые переводы ошибок Anchor (например, "Per-investor cap reached" -> "Лимит инвестиций исчерпан", "Fundraising is closed" -> "Сбор средств завершен")
+  - `Dashboard`: метрики, статусы телеметрии ("In Service", "Maintenance")
+  - `Asset`: тексты страницы актива ("% funded", "Tokens remaining")
+
+### 3. Интеграция в App Router:
+- Оберни `src/app/[locale]/layout.tsx` в `NextIntlClientProvider`
+- Замени все строковые литералы в УЖЕ созданных компонентах (Navbar, Footer, WalletProvider) на вызовы `useTranslations()`.
+- Убедись, что валюта (SOL, ₸) и числа форматируются правильно (`t('format.number', ...)` и встроенные форматтеры).
+
+### ПРОМПТ ПРАВИЛО ДЛЯ ВСЕХ ПОСЛЕДУЮЩИХ ЗАДАЧ:
+Начиная с этого момента, ВЕСЬ новый UI должен писаться с использованием `next-intl`. Регулярно пополняй `ru.json` и `en.json`.
+
+Проверь что приложение собирается без ошибок маршрутизации и главная страница открывается по `/en` и `/ru` ; echo "DONE"
+```
+
+---
+
 ## Phase 2: Catalog + Asset Pages
 
 ---
@@ -369,7 +412,8 @@ AXEL — RWA токенизация на Solana. On-chain first.
 Данные каталога: читаются из ProjectState PDAs через getProgramAccounts (без backend).
 Хук useProjectState() уже есть. Типы в src/types/project.ts. Mock data в src/lib/mock-data.ts.
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple-like минимализм. Light theme: bg #FFFFFF, secondary #F5F5F7, text #1D1D1F, primary #06B6D4.
 Pill кнопки. Minimal shadows. Inter font (17px body). Подробности: frontend/DESIGN_SYSTEM.md
 
@@ -435,7 +479,8 @@ AXEL — RWA на Solana. On-chain first. Данные читаются из Pro
 Стек: Next.js 14, TypeScript, Tailwind, React Query, Wallet Adapter.
 Каталог готов, карточки кликают на /assets/[id]. Хуки useProjectState(), useWhitelistStatus() готовы.
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple минимализм. Light theme. Primary #06B6D4. Подробности: frontend/DESIGN_SYSTEM.md
 Все числа SOL — JetBrains Mono. Labels — #6E6E73. Values — #1D1D1F. Dividers — #E8E8ED.
 
@@ -504,7 +549,8 @@ AXEL — RWA на Solana. Whitelist проверяется ON-CHAIN: читае�
 
 Хук useWhitelistStatus(projectPda, wallet) уже готов. InvestButton уже проверяет статус.
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple минимализм. Pill кнопки. Primary #06B6D4. frontend/DESIGN_SYSTEM.md
 
 ## Задание
@@ -564,7 +610,8 @@ Anchor instruction: `invest` — принимает SOL, создаёт/обно
 - InvestorRecord.solInvested + amount <= per-investor cap
 - ProjectState.status === 'fundraising' && deadline не прошёл
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple минимализм. Pill buttons (980px), weight 400. frontend/DESIGN_SYSTEM.md
 
 ## Задание
@@ -622,7 +669,8 @@ Apple минимализм. Pill buttons (980px), weight 400. frontend/DESIGN_SY
 ## Контекст
 AXEL — Next.js 14 на Solana. Invest и Claim отправляют on-chain tx. Нужна unified feedback-система.
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple notifications style. Toasts: top center (не top-right). Slide down, spring easing.
 Primary #06B6D4. Success #34C759. Error #FF3B30. frontend/DESIGN_SYSTEM.md
 
@@ -677,7 +725,8 @@ AXEL — RWA на Solana. Dashboard читает ВСЁ on-chain:
 - ClaimRecord PDAs → which periods already claimed
 Единственный backend call: GET /telemetry/latest (задача 10, пока заглушка)
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple минимализм. Light theme. Метрики: крупные числа (Headline 28px, JetBrains Mono), labels мелко (#6E6E73).
 White cards на #F5F5F7 bg. Pill badges. frontend/DESIGN_SYSTEM.md
 
@@ -735,7 +784,8 @@ AXEL — RWA такси на Solana. Инвесторы видят живую с
 Тип TelemetryData (уже в src/types/telemetry.ts):
 { dailyRevenue (тенге), mileageKm, tripsCount, carStatus, solanaTxSignature, stale, available }
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple минимализм. frontend/DESIGN_SYSTEM.md
 
 ## Задание
@@ -861,7 +911,8 @@ AXEL читает ВСЁ из Solana RPC. RPC может быть медленн
 AXEL — RWA на Solana. Payout history = чисто on-chain. Читаем RevenuePeriod PDAs + ClaimRecord PDAs.
 Нет backend вызова. useRevenuePeriods() и useClaimRecords() уже готовы.
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple минимализм. Light theme. frontend/DESIGN_SYSTEM.md
 
 ## Задание
@@ -901,7 +952,8 @@ AXEL — RWA на Solana. Admin = wallet address === ProjectState.admin (чит�
 Admin actions = on-chain transactions отправляемые НАПРЯМУЮ из браузера через connected wallet.
 НЕТ backend для admin. Все действия — Anchor instructions.
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple минимализм. frontend/DESIGN_SYSTEM.md
 
 ## Задание
@@ -955,7 +1007,8 @@ Apple минимализм. frontend/DESIGN_SYSTEM.md
 ## Контекст
 AXEL — Next.js 14, Tailwind. Apple-inspired дизайн. Все страницы готовы.
 
-## Дизайн
+## Дизайн + i18n
+> **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк.
 Apple breakpoints: Compact < 734px | Medium 734–1068px | Large 1068px+
 Touch targets: min 44px. Подробности: frontend/DESIGN_SYSTEM.md
 
@@ -1132,5 +1185,7 @@ AXEL — Next.js 14. Всё готово.
 
 > **Ключевое отличие v2:** Нет backend API кроме телеметрии. Все данные из on-chain PDAs.
 > Это значит: нет React Query для REST endpoints (кроме telemetry), но есть React Query для RPC calls.
+
+> **Мультиязычность (i18n):** Начиная с Задачи 3.5, проект переходит на `next-intl`. ВСЕ тексты во всех последующих фичах (модалки, тосты, дашборд) должны локализовываться! Не хардкодить строки "в лоб"!
 
 > **Как обновлять статус:** Меняй ⬜ на ✅ в таблице наверху.

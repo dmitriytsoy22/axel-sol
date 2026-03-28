@@ -1,6 +1,14 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import '@/styles/globals.css';
+import WalletProvider from '@/providers/WalletProvider';
+import { Navbar } from '@/components/layout';
+import { Footer } from '@/components/layout';
+
+import { NextIntlClientProvider } from 'next-intl';
+import { getMessages } from 'next-intl/server';
+import { notFound } from 'next/navigation';
+import { routing } from '@/i18n/routing';
 
 const inter = Inter({
   subsets: ['latin', 'cyrillic'],
@@ -27,15 +35,29 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
+  params: { locale }
 }: {
   children: React.ReactNode;
+  params: { locale: string };
 }) {
+  if (!routing.locales.includes(locale as any)) {
+    notFound();
+  }
+
+  const messages = await getMessages();
+
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang={locale} className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="font-sans bg-white text-text-primary min-h-screen flex flex-col">
-        <main className="flex-1">{children}</main>
+        <NextIntlClientProvider messages={messages}>
+          <WalletProvider>
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </WalletProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

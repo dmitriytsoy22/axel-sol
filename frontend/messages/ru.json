@@ -1,0 +1,24 @@
+{
+  "Common": {
+    "connect": "Подключить",
+    "installPhantom": "Установить Phantom",
+    "disconnect": "Отключить",
+    "copy": "Копировать",
+    "copied": "✓ Скопировано",
+    "copyAddress": "Копировать адрес"
+  },
+  "Navigation": {
+    "catalog": "Каталог",
+    "dashboard": "Дашборд",
+    "payouts": "Выплаты"
+  },
+  "HomePage": {
+    "title": "Инвестируйте в Реальные Активы",
+    "subtitle": "Токенизированные таксопарки на Solana. Прозрачно. На блокчейне.",
+    "explore": "Изучить активы"
+  },
+  "Footer": {
+    "builtOnSolana": "Построено на Solana",
+    "docs": "Документация"
+  }
+}

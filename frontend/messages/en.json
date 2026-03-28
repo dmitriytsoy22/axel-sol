@@ -1,0 +1,24 @@
+{
+  "Common": {
+    "connect": "Connect",
+    "installPhantom": "Install Phantom",
+    "disconnect": "Disconnect",
+    "copy": "Copy",
+    "copied": "✓ Copied",
+    "copyAddress": "Copy address"
+  },
+  "Navigation": {
+    "catalog": "Catalog",
+    "dashboard": "Dashboard",
+    "payouts": "Payouts"
+  },
+  "HomePage": {
+    "title": "Invest in Real-World Assets",
+    "subtitle": "Tokenized taxi assets on Solana. Transparent. On-chain.",
+    "explore": "Explore Assets"
+  },
+  "Footer": {
+    "builtOnSolana": "Built on Solana",
+    "docs": "Docs"
+  }
+}

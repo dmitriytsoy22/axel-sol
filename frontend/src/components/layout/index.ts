@@ -1,2 +1,2 @@
-// Layout components: Navbar, Footer
-// Will be implemented in Task 2 (Wallet Adapter + Layout Shell).
+export { default as Navbar } from './Navbar';
+export { default as Footer } from './Footer';
