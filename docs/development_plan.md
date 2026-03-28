@@ -1,283 +1,306 @@
 # RWA Taxi Tokenization — Development Plan
 
+## Architectural Principle
+
+**The blockchain is the only source of truth.** There is no off-chain database. The frontend reads all state (investments, payouts, whitelist, project status) directly from Solana PDAs via RPC. The backend exists only to protect two secrets: the Yandex Pro API key and the oracle signing keypair.
+
 ## Team Roles
 
-- **Dev A — Frontend** (Next.js, Wallet Adapter, UI/UX)
-- **Dev B — On-chain / Solana** (Anchor/Rust, Token-2022, Transfer Hook program, deployment)
-- **Dev C — Backend** (NestJS, PostgreSQL, business logic, integrations)
+- **Dev A — Frontend** (Next.js, Wallet Adapter, direct RPC reads)
+- **Dev B — On-chain / Solana** (Anchor/Rust, Token-2022, Transfer Hook, deployment)
+- **Dev C — Backend** (NestJS, no DB — oracle cron + KYC webhook only)
 
 ---
 
 ## Phase 1: Foundation and Project Scaffolding
-**Duration: Days 1–5**
-**Goal: All three workstreams have running skeletons; shared contracts are agreed upon.**
 
-### Dev A — Frontend
+**Duration: Days 1–5**
+**Goal: All three workstreams have running skeletons; PDA layouts and on-chain interfaces agreed.**
+
+**Dev A — Frontend**
+
 - Initialize Next.js project with TypeScript, Tailwind CSS, ESLint
 - Integrate `@solana/wallet-adapter-react` with Phantom and Backpack support
-- Build global layout shell: navbar, wallet connect button, empty route placeholders for catalog, asset page, dashboard, payout history
-- Set up environment variable structure for RPC endpoint and backend API base URL
-- Establish shared API client layer (axios/ky) with typed request/response interfaces
+- Build global layout shell: navbar, wallet connect button, route placeholders for catalog, asset page, dashboard, payout history, admin
+- Set up RPC client helper (`@solana/web3.js` `Connection`) with configurable endpoint and commitment level
+- Establish lightweight API client (axios/ky) for the single backend base URL — only needed for telemetry endpoint
 
-**Deliverables:** Running Next.js app, wallet connection working on devnet, all page routes scaffolded
+**Deliverables:** Running Next.js app, wallet connection working on devnet, RPC helper reading a test account
 
-### Dev B — On-chain
+**Dev B — On-chain**
 
-- Initialize Anchor workspace with `anchor init rwa-taxi`; add a second program `anchor new transfer-hook` for the Token-2022 Transfer Hook
-- Define all program account structs: `ProjectState`, `InvestorRecord`, `RevenuePeriod`, `WhitelistEntry`
-- Define all 9 instruction stubs with context structs (no logic yet): `initialize_project`, `start_raise`, `invest`, `finalize_raise`, `refund`, `deposit_revenue`, `claim_revenue`, `pause_project`, `close_project`
-- Define Transfer Hook program stub: `execute` instruction (called by Token-2022 on every token transfer to enforce whitelist)
-- Plan Token-2022 mint extensions to enable at initialization: Transfer Hook, Default Account State (Frozen), Permanent Delegate, Transfer Fee, Token Metadata + Metadata Pointer, Memo Transfer
-- Configure devnet deployment keypairs and a Squads multisig wallet for upgrade authority
-- Write Anchor test scaffolds (empty stubs for each instruction)
-- Define and document the shared TypeScript IDL interface for Dev A and Dev C
+- Initialize Anchor workspace with `anchor init rwa-taxi`; add second program `anchor new transfer-hook`
+- Define all program account structs: `ProjectState`, `InvestorRecord`, `RevenuePeriod`, `ClaimRecord`, `WhitelistEntry`, `TelemetryRecord`
+- Define all 11 instruction stubs (no logic yet): `initialize_project`, `start_raise`, `invest`, `finalize_raise`, `refund`, `deposit_revenue`, `claim_revenue`, `pause_project`, `close_project`, `add_to_whitelist`, `remove_from_whitelist`, `record_telemetry`
+- Define Transfer Hook program stub: `execute` instruction
+- Plan Token-2022 mint extensions: Transfer Hook, Default Account State (Frozen), Permanent Delegate, Transfer Fee, Token Metadata + Metadata Pointer, Memo Transfer
+- Configure devnet deployment keypairs and Squads multisig for upgrade authority
+- Write Anchor test scaffolds
+- **Export and document IDL JSON and all PDA seeds** — critical dependency for Dev A and Dev C
 
-**Deliverables:** Compilable Anchor workspace (main program + transfer hook program) deployed to devnet, IDL JSON exported, all account layouts documented, Token-2022 extension plan agreed
+**Deliverables:** Compilable Anchor workspace deployed to devnet, IDL JSON exported, all PDA seeds documented
 
-### Dev C — Backend
-- Initialize NestJS monorepo with modules: `users`, `assets`, `projects`, `investments`, `payouts`, `ingestion`
-- Set up PostgreSQL with TypeORM/Prisma; write migrations for all 6 core tables: `users`, `assets`, `projects`, `investments`, `revenue_periods`, `payouts`
-- Set up environment configuration module (dotenv, Joi validation)
-- Scaffold Swagger/OpenAPI documentation endpoint
-- Agree with Dev B on data contract: which on-chain account fields the backend mirrors off-chain
+**Dev C — Backend**
 
-**Deliverables:** NestJS app running locally, all DB tables created via migrations, Swagger UI accessible
+- Initialize minimal NestJS project: two modules only — `ingestion` and `kyc`
+- Set up env config module (dotenv, Joi validation) for all required secrets (no DB connection string)
+- Load oracle keypair at startup from secrets path; verify it loads correctly; fail fast if missing
+- Connect `@solana/web3.js` to devnet RPC
+- Scaffold `GET /health` endpoint
+
+**Deliverables:** NestJS app starts cleanly, oracle keypair loads, RPC connected to devnet, health endpoint responds
 
 **Dependencies:**
-- Dev B must export IDL JSON before Dev A or Dev C can call program instructions
-- Dev C schema decisions (especially `investments` columns) must align with Dev B's on-chain `InvestorRecord`
+
+- Dev B must document PDA seeds before Dev A can derive whitelist/investor PDAs client-side
+- Dev B must expose `record_telemetry` and `add_to_whitelist` instruction signatures before Dev C can call them
 
 ---
 
-## Phase 2: Core On-chain Logic
+## Phase 2: Core On-chain Logic + Backend
+
 **Duration: Days 6–12**
-**Goal: All on-chain instructions implemented, tested, and auditable.**
+**Goal: All on-chain instructions implemented and tested; backend oracle and KYC webhook working end-to-end on devnet.**
 
-### Dev A — Frontend
-- Build Car Catalog page: data from backend API, card layout per asset, status badges (fundraising / active / closed)
-- Build Asset Detail page: car metadata, funding progress bar, share price, min/max investment, countdown timer
-- Integrate wallet SOL balance display
-- Build invest flow UI: SOL amount input, confirmation modal (no on-chain call yet)
+**Dev A — Frontend**
 
-**Deliverables:** Catalog and Asset pages rendering with mock/seeded backend data, invest modal UI complete
+- Build Car Catalog page: reads all `ProjectState` PDAs via `getProgramAccounts`, renders asset cards with status badges
+- Build Asset Detail page: reads `ProjectState` PDA + Token-2022 `TokenMetadata` extension; funding progress bar; countdown timer
+- Implement whitelist status check: derives `WhitelistEntry PDA` for connected wallet; shows KYC CTA if not found
+- Build invest flow UI: SOL amount input, token count preview, client-side preflight validation against on-chain state (no backend call)
 
-### Dev B — On-chain
+**Deliverables:** Catalog and Asset pages reading real on-chain data on devnet; whitelist gate working
 
-- Implement `initialize_project`: create `ProjectState` PDA, set admin, mint authority, fundraising params (min_raise, max_raise, price_per_share in lamports, token_supply derived from car_cost / price_per_share, deadline)
-- Implement `start_raise`: transition state, validate authority
-- Implement `invest`: accept SOL transfer (lamports) into escrow vault PDA; create/update `InvestorRecord`; validate whitelist; enforce min/max per investor
-- Implement `finalize_raise`: validate min_raise reached, close fundraising window, mint Token-2022 tokens to investors proportional to SOL invested (accounts start frozen per Default Account State)
-- Implement `refund`: if min_raise not reached by deadline, use Permanent Delegate to burn any minted tokens, then return SOL from escrow to investor
-- Implement `deposit_revenue`: admin deposits SOL into revenue vault; creates `RevenuePeriod` with total deposited and total supply snapshot
-- Implement `claim_revenue`: calculate share = (investor_tokens / total_supply) × period_revenue; transfer SOL; mark claim as used per period
-- Implement `pause_project` and `close_project` with authority checks
-- Write comprehensive Anchor tests for all happy paths and key failure cases (non-whitelisted invest, double-claim, refund after finalize)
+**Dev B — On-chain**
 
-**Deliverables:** All 9 instructions implemented and passing tests on devnet
+- Implement all Token-2022 mint setup with correct extension order
+- Implement `initialize_project`, `start_raise`
+- Implement `invest`: SOL transfer to escrow, `InvestorRecord` PDA create/update, whitelist check
+- Implement `finalize_raise`: mint Token-2022 tokens to investors (accounts start frozen)
+- Implement `refund`: Permanent Delegate burns tokens, SOL returned from escrow
+- Implement `deposit_revenue`: creates `RevenuePeriod` PDA, transfers SOL to revenue vault
+- Implement `claim_revenue`: calculates share, transfers SOL, creates `ClaimRecord` PDA atomically
+- Implement `pause_project`, `close_project`
+- Implement `add_to_whitelist`, `remove_from_whitelist`
+- Implement Transfer Hook `execute`: checks `WhitelistEntry` for both sides of every transfer
+- Implement `record_telemetry`: creates `TelemetryRecord` PDA; validates oracle authority
+- Write full Anchor test suite
 
-### Dev C — Backend
-- Implement `POST /users/register` and `POST /users/kyc-submit`
-- Implement KYC status flow: `pending → approved → rejected`
-- Implement whitelist management: `POST /admin/whitelist/add`, `DELETE /admin/whitelist/:address` — updates the whitelist PDA read by the Transfer Hook program; after KYC approval, also calls Freeze Authority to unfreeze the investor's token account
-- Implement `GET /projects` and `GET /projects/:id`; seed the single MVP car record
-- Implement `GET /projects/:id/investments` per user
-- Begin on-chain event listener: subscribe to program logs via `@solana/web3.js` `onLogs` to index `invest`, `refund`, `claim_revenue` events into PostgreSQL
+**Deliverables:** All instructions passing tests on devnet; Transfer Hook enforcing whitelist; oracle instruction verified
 
-**Deliverables:** User registration, KYC, whitelist endpoints live; project read endpoints live; on-chain event indexer running
+**Dev C — Backend**
+
+- Implement `@Cron` Yandex Pro ingestion: fetch API → validate → SHA-256 hash → Ed25519 sign → call `record_telemetry` on-chain
+- Implement in-memory cache for last 30 telemetry records (no DB)
+- Implement `GET /telemetry/latest/:project_id`
+- Implement `POST /kyc/webhook`: verify Sumsub signature → call `add_to_whitelist` → call Freeze Authority to unfreeze token account
+- Implement retry logic and Sentry error reporting on all on-chain calls
+
+**Deliverables:** Oracle cron running on devnet; KYC webhook tested with Sumsub mock; all 3 endpoints live
 
 **Dependencies:**
-- Dev B must expose the whitelist PDA instruction before Dev C can implement the whitelist endpoint
-- Dev B's `InvestorRecord` layout determines what Dev C's event indexer parses
+
+- Dev B's `record_telemetry` and `add_to_whitelist` instructions must be deployed before Dev C can call them
+- Dev B's final account struct layouts determine how Dev A derives PDAs client-side
 
 ---
 
-## Phase 3: Integration Layer
+## Phase 3: Integration
+
 **Duration: Days 13–18**
-**Goal: Frontend calls backend and on-chain; end-to-end investment flow works on devnet.**
+**Goal: Full investor journey works end-to-end on devnet; frontend reads all state from chain.**
 
-### Dev A — Frontend
-- Wire invest flow: call backend `POST /investments/prepare` for pre-validation (KYC, whitelist, limits), then construct and send `invest` Anchor instruction client-side
-- Implement transaction status feedback: spinner, success/error toasts, Solana Explorer link
-- Build Dashboard page: user holdings (tokens owned, current value), active revenue periods, claimable SOL
-- Implement Claim button: calls `claim_revenue` on-chain; shows pending/confirmed state
-- Add whitelist-gate UI: if wallet is not whitelisted, show KYC CTA instead of invest button
+**Dev A — Frontend**
 
-**Deliverables:** Full invest flow working end-to-end on devnet; dashboard showing real on-chain data; claim working
+- Wire invest flow: send `invest` Anchor instruction on-chain; show confirmation states
+- Build Dashboard: reads `InvestorRecord` PDA + token balance + `RevenuePeriod` PDAs + `ClaimRecord` PDAs — all from RPC
+- Add live telemetry widget: calls `GET /telemetry/latest`; shows earnings + "Verified on Solana ✓" link
+- Implement claim flow: per-period claim button → `claim_revenue` on-chain tx → ClaimRecord confirmed
+- Implement RPC error handling: loading states, retry buttons, timeout messages
 
-### Dev B — On-chain
+**Deliverables:** Full invest → finalize → deposit revenue → claim flow working on devnet with real wallets
+
+**Dev B — On-chain**
+
 - Deploy final instruction set to devnet with multisig as upgrade authority
-- Run full integration test scenario: initialize project → whitelist 3 wallets → all 3 invest → finalize raise → deposit revenue → all 3 claim
-- Fix edge cases found during integration (overflow checks, clock/timestamp handling, account reinitialization guards)
-- Export final versioned IDL; share with Dev A and Dev C
-- Document all PDAs: seeds, bump storage, account size for rent calculation
+- Run full integration scenario: init project → whitelist 3 wallets → all invest → finalize → deposit revenue → all claim → verify telemetry record
+- Export final versioned IDL; freeze and share with Dev A and Dev C
+- Document all PDAs with seeds, bump storage, rent-exempt sizes
 
-**Deliverables:** Stable devnet deployment; integration test script passing; PDA documentation complete
+**Deliverables:** Stable devnet deployment; integration test script passing; final IDL frozen
 
-### Dev C — Backend
-- Implement `POST /investments/prepare`: validate KYC status, whitelist status, amount range; return validation token for frontend
-- Implement `POST /investments/confirm`: called after on-chain tx confirms; records investment from indexed event
-- Implement Payout Engine: `POST /admin/revenue/deposit` triggers admin to call `deposit_revenue` on-chain with SOL; records `revenue_period` in DB with revenue, expenses, reserve, computed profit
-- Implement `GET /payouts/history/:address`: return all past claim events for a wallet
-- Implement Data Ingestion stub: `@Cron` job calling mock taxi operator API; stores raw revenue data into `revenue_periods`
+**Dev C — Backend**
 
-**Deliverables:** Investment prepare/confirm API live; payout engine depositing revenue on-chain; payout history endpoint live; ingestion cron running
+- Integration test: Sumsub mock webhook → `add_to_whitelist` on-chain → verify `WhitelistEntry` PDA exists
+- Integration test: cron trigger → Yandex Pro mock → `record_telemetry` on-chain → verify `TelemetryRecord` PDA
+- Confirm `GET /telemetry/latest` returns correct data after cron run
+- Harden: Sumsub webhook signature verification, idempotent `add_to_whitelist`
+
+**Deliverables:** Both integration scenarios pass on devnet; webhook signature validation confirmed
 
 **Dependencies:**
-- Dev B's final IDL must be frozen before Dev A finalizes client-side instruction calls
-- Dev C's `POST /investments/prepare` must be ready before Dev A can wire the invest button
-- Dev C's event indexer (Phase 2) must be confirmed working before `POST /investments/confirm` is reliable
+
+- Dev B's final IDL must be frozen before Dev A finalizes client-side tx construction
+- Dev C's `GET /telemetry/latest` must be live before Dev A's telemetry widget works
 
 ---
 
-## Phase 4: Admin, Reporting, and Polish
+## Phase 4: Admin Panel, Payout History, Polish
+
 **Duration: Days 19–23**
-**Goal: Operational completeness — admin can manage the car, payout history visible, reporting works.**
+**Goal: Admin can manage the project from the browser; payout history visible on-chain.**
 
-### Dev A — Frontend
-- Build Payout History page: paginated table of revenue periods, per-period profit, user's claimed amount and date
-- Build Admin Panel (whitelist-only access): project state, fundraising totals, investor count, revenue deposited, button to trigger revenue deposit
-- Add error boundary and wallet disconnect/reconnect handling
-- Implement transaction confirmation polling: show "confirming..." while waiting for finality
-- Mobile-responsive pass over all pages
+**Dev A — Frontend**
 
-**Deliverables:** Payout history page functional; admin panel operational; responsive layout
+- Build Admin Panel: reads `ProjectState` PDA; sends `deposit_revenue`, `pause_project`, `close_project` txs directly from admin wallet
+- Build Payout History page: reads all `RevenuePeriod` + `ClaimRecord` PDAs; no backend call
+- Add mobile responsive pass over all pages
+- Handle admin identification: `wallet === ProjectState.admin` checked on-chain; redirect non-admins
+- Write `RwaClient` helper class: wraps common PDA derivations and `getProgramAccounts` calls used across pages
 
-### Dev B — On-chain
+**Deliverables:** Admin panel sending real on-chain txs; payout history page reading chain; responsive layout
 
-- Write TypeScript `RwaClient` SDK wrapper: `invest()`, `claimRevenue()`, `getInvestorRecord()`, `getProjectState()`, `harvestTransferFees()` — shared by Dev A and Dev C; wrap Token-2022 extension calls (`unfreezeAccount`, `harvestWithheldTokensToMint`) behind clean methods
-- Add compute budget instructions to all client-side transaction builders to avoid CU exhaustion
+**Dev B — On-chain**
+
+- Write TypeScript `RwaClient` SDK: `invest()`, `claimRevenue()`, `depositRevenue()`, `getProjectState()`, `getInvestorRecord()`, `harvestTransferFees()`, `unfreezeAccount()` — shared with Dev A
+- Add ComputeBudget instructions to all transaction builders (avoid CU exhaustion)
 - Write devnet reset/seed script for QA runs
-- Audit all authority checks; verify `pause_project` correctly blocks `invest` and `claim_revenue`
+- Audit all authority checks; verify `pause_project` blocks all financial instructions
 
-**Deliverables:** `RwaClient` SDK package; devnet seed script; pause/close state machine verified
+**Deliverables:** `RwaClient` SDK package; devnet seed script; state machine verified
 
-### Dev C — Backend
-- Implement `GET /admin/reports/summary`: total raised, investors, revenue deposited, total claimed, unclaimed balance
-- Implement `GET /admin/reports/revenue-periods`: list all periods with profit breakdown (Revenue − Expenses − Reserve = Profit)
-- Implement rate limiting and class-validator DTOs on all endpoints
-- Add JWT authentication; admin role guard on all `/admin/*` routes
-- Set up Bull queue for async on-chain transactions (revenue deposit is async — return job ID, poll for status)
+**Dev C — Backend**
 
-**Deliverables:** Reporting endpoints live; auth and rate-limiting hardened; async job queue for on-chain operations
+- Performance: ensure `GET /telemetry/latest` responds in < 100ms (in-memory cache, no I/O)
+- Add structured logging (Pino) with request correlation IDs
+- Document all 3 endpoints in OpenAPI (inline NestJS decorators — no Swagger UI needed)
 
-**Dependencies:**
-- Dev B's `RwaClient` SDK reduces boilerplate for Dev A's transaction construction
-- Admin panel (Dev A) calls Dev C's admin endpoints which call Dev B's program — all three must be integrated and tested together
+**Deliverables:** Fast telemetry endpoint; structured logs; endpoint documentation
 
 ---
 
 ## Phase 5: Security Hardening and QA
+
 **Duration: Days 24–29**
-**Goal: Production-ready security posture for MVP; full E2E QA scenario passes.**
+**Goal: Production-ready security posture; full E2E QA scenario passes.**
 
-### Dev A — Frontend
-- Add Content Security Policy headers, sanitize all user-facing text fields, validate wallet address format before any API call
-- Run full investor journey with a fresh wallet: register → KYC mock approval → whitelist → invest → finalize → claim
-- Fix all UI feedback gaps: loading states, empty states, on-chain error messages decoded into human-readable strings
+**Dev A — Frontend**
+
+- Add Content Security Policy headers; sanitize all user-facing text; validate wallet addresses before on-chain calls
 - Accessibility pass: keyboard navigation, ARIA labels
-- Write component tests for invest flow and dashboard (Vitest / React Testing Library)
+- Run full E2E investor journey with a fresh wallet: KYC mock → whitelist → invest → finalize → claim
+- Decode all on-chain error codes into readable messages
+- Write component tests for invest flow and claim flow (Vitest / React Testing Library)
 
-**Deliverables:** Security-hardened frontend; full E2E investor journey confirmed; component test suite
+**Deliverables:** Security-hardened frontend; E2E journey confirmed; component test suite
 
-### Dev B — On-chain
-- Security audit checklist:
+**Dev B — On-chain**
+
+- Security audit:
   - All authority checks use `has_one` or `constraint` in Anchor contexts
-  - No integer overflow — use `checked_add`, `checked_mul` throughout token math
-  - Whitelist PDA cannot be spoofed (seed derivation deterministic and non-guessable)
-  - Transfer Hook `execute` instruction validates caller is the Token-2022 program (not callable directly)
-  - Permanent Delegate authority is held by the multisig, not a hot key
-  - Transfer Fee harvest authority is held by the multisig
-  - `claim_revenue` marks claim per-period-per-investor atomically
-  - `pause_project` correctly halts all financial instructions
-- Run program through `cargo clippy`; address all warnings
-- Deploy release build to devnet; document final program ID
+  - All arithmetic uses `checked_add`, `checked_mul`, `checked_div`
+  - `claim_revenue` creates `ClaimRecord` atomically with SOL transfer
+  - Transfer Hook `execute` validates caller is Token-2022 program
+  - `record_telemetry` validates caller is registered `oracle_pubkey`
+  - `PermanentDelegate` and `TransferFee` harvest authority held by multisig
+- Run `cargo clippy`; address all warnings
+- Deploy release build to devnet; document final program IDs
 - Prepare mainnet deployment checklist
 
-**Deliverables:** Security audit report (internal checklist); release build on devnet; program ID documented; mainnet checklist
+**Deliverables:** Security audit checklist signed off; release build on devnet; mainnet checklist
 
-### Dev C — Backend
-- Implement input sanitization on all DTOs; add Helmet.js headers; configure CORS to frontend domain only
-- Implement idempotency keys on investment and payout endpoints (use Solana tx signature as idempotency key)
-- Add structured logging (Winston/Pino) with correlation IDs on all requests
-- Set up `GET /health` endpoint checking DB and RPC connectivity
-- Write integration tests for the full payout engine flow (mock on-chain calls)
-- Ensure data ingestion cron handles taxi API failures gracefully (retry with backoff, dead letter queue)
+**Dev C — Backend**
 
-**Deliverables:** Hardened backend; idempotency on financial endpoints; integration test suite; health check endpoint
+- Confirm oracle keypair is loaded from secrets manager (not env var)
+- Add startup validation: fail fast if `ORACLE_KEYPAIR_PATH`, `YANDEX_PRO_API_KEY`, `SUMSUB_WEBHOOK_SECRET` are missing
+- Verify Sentry alerts on: Yandex Pro API failure after retries, on-chain call failure, invalid webhook signature
+- Load test `GET /telemetry/latest`: must handle 100 concurrent requests without issue (in-memory cache)
 
-**Dependencies:**
-- All three developers run the full E2E scenario together before sign-off
-- Dev B's security audit findings may require small on-chain changes — Dev A and Dev C must re-test affected flows
+**Deliverables:** Hardened backend; startup validation; Sentry alerts confirmed working
 
 ---
 
 ## Phase 6: Staging Deployment and Launch Readiness
+
 **Duration: Days 30–34**
-**Goal: Deployed to staging, documentation complete, launch checklist signed off.**
+**Goal: Deployed to staging, all smoke tests pass, launch checklist signed off.**
 
-### Dev A — Frontend
-- Deploy frontend to Vercel; configure staging RPC and backend URL env vars
-- Final content pass: car metadata, legal disclaimer, FAQ placeholder
-- Smoke test all user flows on staging with real wallets and devnet SOL
-- Prepare short user onboarding guide (KYC flow, wallet connection, how to invest)
+**Dev A — Frontend**
 
-**Deliverables:** Frontend live on staging URL; onboarding guide; smoke test sign-off
+- Deploy frontend to Vercel; configure staging RPC endpoint and backend URL
+- Smoke test full investor journey on staging with real devnet wallets
+- Smoke test admin panel: deposit revenue, check payout history updates on-chain
+- Prepare user onboarding guide (wallet setup, KYC flow, how to invest)
 
-### Dev B — On-chain
-- Confirm program ID is consistent across all environments
-- Confirm multisig upgrade authority is set and original keypairs removed from hot storage
-- Run final devnet scenario confirming SOL escrow, token minting, and claim flows end-to-end
-- Produce deployment artifact: program ID, IDL JSON, deployment tx signature, block height
-- Document emergency procedures: how to `pause_project` and `close_project` in case of critical bug
+**Deliverables:** Frontend on staging URL; smoke test sign-off; onboarding guide
 
-**Deliverables:** Deployment artifact document; multisig authority locked; emergency runbook
+**Dev B — On-chain**
 
-### Dev C — Backend
-- Deploy NestJS backend to staging (Railway/Render/Docker on VPS); configure managed PostgreSQL
-- Run migrations on staging; seed the single MVP car asset record
-- Set up monitoring: Sentry for errors, UptimeRobot for uptime
-- Configure data ingestion cron against stable mock API endpoint
-- Final API contract review: compare Swagger output against what Dev A's client expects; resolve mismatches
+- Confirm multisig upgrade authority is set; original keypairs removed from hot storage
+- Run final devnet scenario: SOL escrow → Token-2022 minting → Transfer Hook enforced → telemetry record verified
+- Produce deployment artifact: program IDs, IDL JSON, deployment tx signatures, block heights
+- Write emergency runbook: how to `pause_project` and `close_project` if critical bug found post-launch
 
-**Deliverables:** Backend live on staging; monitoring configured; final API contract verified
+**Deliverables:** Deployment artifact; multisig confirmed; emergency runbook
 
-**Dependencies:**
-- Dev C's staging backend must be up before Dev A can run staging smoke tests
-- Dev B's final program ID must be propagated to Dev A's and Dev C's environment configs before staging deploy
+**Dev C — Backend**
+
+- Deploy to staging (Railway or Render); configure all environment secrets via platform secrets manager
+- Confirm cron job fires on schedule and `TelemetryRecord` PDA appears on-chain
+- Test Sumsub webhook with real Sumsub test applicant; confirm `WhitelistEntry` PDA created on-chain
+- Confirm `GET /health` returns `200` on staging
+- Set up UptimeRobot monitoring on `/health`
+
+**Deliverables:** Backend on staging; cron confirmed; webhook tested with real Sumsub flow; monitoring active
 
 ---
 
 ## Summary Table
 
-| Phase | Duration | Dev A (Frontend) | Dev B (On-chain) | Dev C (Backend) |
-|-------|----------|-----------------|-----------------|-----------------|
-| 1: Foundation | Days 1–5 | Next.js scaffold, wallet adapter, route shells | Anchor workspace, account structs, instruction stubs | NestJS scaffold, DB schema, migrations |
-| 2: Core On-chain | Days 6–12 | Catalog + asset pages, invest UI (not wired) | All 9 instructions implemented and tested | Users, KYC, whitelist, project endpoints, event indexer |
-| 3: Integration | Days 13–18 | Wire invest flow, dashboard, claim button | Stable devnet deploy, integration tests, IDL frozen | Invest prepare/confirm, payout engine, ingestion cron |
-| 4: Admin + Reporting | Days 19–23 | Payout history, admin panel, mobile responsive | RwaClient SDK, devnet seed script, pause/close audit | Reporting endpoints, auth/rate-limit, async job queue |
-| 5: Security + QA | Days 24–29 | Security headers, E2E journey, component tests | On-chain security audit, release build, mainnet checklist | Idempotency, structured logging, integration tests |
-| 6: Staging + Launch | Days 30–34 | Staging deploy, smoke tests, onboarding guide | Multisig lock-down, deployment artifact, emergency runbook | Staging deploy, monitoring, final API contract review |
+| Phase | Days | Dev A (Frontend) | Dev B (On-chain) | Dev C (Backend) |
+| --- | --- | --- | --- | --- |
+| 1: Foundation | Days 1–5 | Next.js scaffold, RPC helper, route shells | Anchor workspace, all structs + stubs, IDL exported | NestJS scaffold, oracle keypair loaded, health endpoint |
+| 2: Core | Days 6–12 | Catalog + asset pages reading on-chain; whitelist check | All instructions + Transfer Hook implemented and tested | Oracle cron + KYC webhook working on devnet |
+| 3: Integration | Days 13–18 | Invest flow wired; dashboard from PDAs; telemetry widget | Stable devnet deploy; IDL frozen; integration test passes | Integration tests; webhook signature verified |
+| 4: Admin + Polish | Days 19–23 | Admin panel sends txs; payout history from PDAs; mobile | RwaClient SDK; devnet seed script; authority audit | Fast telemetry cache; structured logs |
+| 5: Security + QA | Days 24–29 | CSP headers; E2E journey; component tests | On-chain security audit; release build; mainnet checklist | Startup validation; Sentry alerts; load test |
+| 6: Staging + Launch | Days 30–34 | Staging deploy; smoke tests; onboarding guide | Deployment artifact; multisig locked; emergency runbook | Staging deploy; cron + webhook confirmed; monitoring |
 
 ---
 
 ## Key Cross-Team Dependencies
 
-1. **IDL JSON** (Dev B → Dev A + Dev C): hard blocker for client-side instruction calls and event parsing. Must be stable by end of Phase 2, frozen by Phase 3.
-2. **Whitelist instruction signature** (Dev B → Dev C): must be agreed upon before Dev C implements the whitelist management endpoint in Phase 2.
-3. **`POST /investments/prepare`** (Dev C → Dev A): must be live before Dev A can wire the invest button in Phase 3.
-4. **`RwaClient` SDK** (Dev B → Dev A + Dev C): shared dependency in Phase 4; significantly reduces transaction boilerplate.
-5. **Event indexer accuracy** (Dev C Phase 2): foundation for all reporting and payout history — gaps here compound in later phases.
-6. **Staging backend URL** (Dev C → Dev A): must be provided before Dev A can run Phase 6 smoke tests.
+1. **PDA seeds + IDL JSON** (Dev B → Dev A): Dev A derives all PDAs client-side — needs seeds documented by end of Phase 1, IDL frozen by end of Phase 3.
+2. **`record_telemetry` instruction** (Dev B → Dev C): deployed before Dev C's cron can push telemetry. Phase 2.
+3. **`add_to_whitelist` instruction** (Dev B → Dev C): deployed before Dev C's webhook can whitelist. Phase 2.
+4. **`GET /telemetry/latest`** (Dev C → Dev A): must be live before Dev A's telemetry widget. Phase 3.
+5. **`RwaClient` SDK** (Dev B → Dev A): Phase 4; reduces PDA derivation boilerplate for Dev A.
+
+---
+
+## What Was Deliberately Removed
+
+| Removed | Reason |
+| --- | --- |
+| PostgreSQL database | All state lives on-chain |
+| Event indexer | Frontend reads PDAs directly |
+| Investment pre-validation API | On-chain enforces all rules; preflight done client-side |
+| Payout engine API | Admin sends `deposit_revenue` tx from browser |
+| Reporting endpoints | Admin reads PDAs directly from admin panel |
+| JWT authentication | Sign-In with Solana (wallet signature) in browser |
+| User registration | Wallet address is identity; whitelist check is on-chain |
+| Asset registry API | Metadata in Token-2022 `TokenMetadata` extension |
 
 ---
 
 ## Critical Files to Create
 
 | File | Owner | Phase |
-|------|-------|-------|
+| --- | --- | --- |
 | `programs/rwa-taxi/src/lib.rs` | Dev B | 1–3 |
 | `programs/transfer-hook/src/lib.rs` | Dev B | 1–2 |
-| `src/payouts/payout.service.ts` | Dev C | 3 |
-| `src/hooks/useInvest.ts` | Dev A | 3 |
-| DB migration: `investments`, `revenue_periods` | Dev C | 1 |
 | `sdk/src/rwa-client.ts` | Dev B | 4 |
+| `src/ingestion/ingestion.service.ts` | Dev C | 2 |
+| `src/kyc/kyc.controller.ts` | Dev C | 2 |
+| `src/lib/rpc.ts` (PDA helpers) | Dev A | 1 |
+| `src/hooks/useInvest.ts` | Dev A | 3 |

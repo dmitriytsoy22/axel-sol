@@ -8,6 +8,8 @@
 - получения дохода от эксплуатации автомобиля
 - прозрачного учета и распределения прибыли через Solana
 
+**Ключевой принцип архитектуры:** вся бизнес-логика и состояние хранятся on-chain. Фронтенд читает данные напрямую из Solana RPC. Backend существует только для двух задач, которые физически невозможно перенести в браузер: подписание oracle-данных и получение webhook от KYC-провайдера.
+
 ---
 
 ## 2. Цели MVP
@@ -17,22 +19,28 @@
 - Организовать сбор средств (fundraising)
 - Реализовать распределение дохода (claim model)
 - Ограничить доступ через whitelist (KYC)
-- Обеспечить прозрачность выплат
+- Обеспечить прозрачность выплат и телеметрии через Yandex Pro
 
 ---
 
 ## 3. Архитектура
 
 ```text
-[Frontend] → [Backend API] ──────────→ [Solana Program]
-                  ↓    ↑                      ↑
-           [PostgreSQL DB]          [Oracle TX (signed)]
-                  ↓                            ↑
-        [Data Ingestion Layer] ────────────────┘
-                  ↓
-         [Yandex Pro API]
-     (mileage, revenue, car status)
+[Frontend (Next.js)]
+  │  читает PDAs напрямую      отправляет транзакции
+  ├──────────────────────────────────────→ [Solana Program]
+  │                                               ↑
+  │  GET /telemetry/latest                        │ record_telemetry
+  └──────────→ [Minimal Backend] ────────────────┘
+                     │
+             [Yandex Pro API]
+          (cron: ежедневный сбор данных)
+                     │
+          [KYC Provider (Sumsub)]
+          (webhook → add_to_whitelist)
 ```
+
+**Нет базы данных. Нет сервера состояния. Состояние = on-chain.**
 
 ---
 
@@ -50,12 +58,23 @@
 
 | Расширение | Уровень | Применение в проекте |
 | --- | --- | --- |
-| **Transfer Hook** | Mint | При каждом переводе токенов вызывается отдельная on-chain программа — проверяет, что оба адреса (отправитель и получатель) есть в whitelist. Без KYC — перевод невозможен на уровне протокола |
-| **Default Account State (Frozen)** | Mint | Новый токен-аккаунт инвестора создаётся в состоянии `frozen`. Токены получить можно, но перевести — нет до прохождения KYC. Разморозка через Freeze Authority после одобрения |
-| **Permanent Delegate** | Mint | Платформа всегда может перевести или сжечь токены любого держателя. Необходимо для сценария `refund`: токены изымаются, SOL возвращается. Также для принудительного выкупа при нарушении условий |
-| **Transfer Fee** | Mint | При каждом вторичном переводе токенов автоматически удерживается fee (например 1%). Комиссия накапливается и может направляться в резервный фонд или распределяться между держателями |
-| **Token Metadata + Metadata Pointer** | Mint | Метаданные автомобиля хранятся прямо на минте: VIN, марка, год, стоимость, страховка, лицензия такси. Не требует отдельной программы метаданных (Metaplex) |
-| **Memo Transfer** | Account | Все входящие переводы на токен-аккаунт обязаны содержать memo. Создаёт on-chain аудиторский след: "Revenue Q1 2025", "Refund", "Token Sale" |
+| **Transfer Hook** | Mint | При каждом переводе токенов вызывается отдельная on-chain программа — проверяет, что оба адреса есть в whitelist. Без KYC — перевод невозможен на уровне протокола |
+| **Default Account State (Frozen)** | Mint | Новый токен-аккаунт создаётся frozen. Разморозка — только после KYC через Freeze Authority |
+| **Permanent Delegate** | Mint | Платформа может изъять и сжечь токены при refund или нарушении условий |
+| **Transfer Fee** | Mint | 1% fee при вторичных переводах; накапливается в резервный фонд |
+| **Token Metadata + Metadata Pointer** | Mint | Метаданные авто прямо на минте: VIN, марка, год, стоимость, лицензия |
+| **Memo Transfer** | Account | Все переводы содержат memo — on-chain аудиторский след |
+
+### On-chain аккаунты (PDAs)
+
+Весь стейт проекта хранится в PDAs, доступных для чтения напрямую с фронтенда:
+
+- `ProjectState` — параметры проекта, статус, суммы
+- `InvestorRecord` — сколько SOL вложил и токенов получил каждый инвестор
+- `RevenuePeriod` — каждый период выплат: сумма, snapshot supply
+- `ClaimRecord` — факт выплаты конкретному инвестору за период
+- `WhitelistEntry` — одобренные KYC кошельки
+- `TelemetryRecord` — ежедневный хеш данных Yandex Pro + oracle-подпись
 
 ### Основные инструкции
 
@@ -68,69 +87,36 @@
 - claim_revenue
 - pause_project
 - close_project
+- add_to_whitelist / remove_from_whitelist
+- record_telemetry
 
 ---
 
 ## 5. Off-chain компоненты
 
-### Backend (Node.js / NestJS)
+### Minimal Backend (Node.js / NestJS)
 
-- Users + KYC
-- Asset Service
-- Investment Service
-- Payout Engine
-- **Yandex Pro Data Ingestion**
-- **Oracle Service** (подписывает и пушит данные в Solana)
-- Reporting
+**Только то, что физически не может быть в браузере:**
 
-### Yandex Pro Integration (Oracle)
+- **Yandex Pro ingestion** — cron-задача: запрашивает API с приватными credentials, вычисляет SHA-256 хеш, подписывает oracle keypair, отправляет `record_telemetry` в Solana
+- **KYC webhook** — один endpoint, принимает одобрение от Sumsub; вызывает `add_to_whitelist` on-chain + Freeze Authority для размораживания token account
+- **Telemetry read endpoint** — `GET /telemetry/latest/:project_id` отдаёт сырые цифры (выручка, пробег) для дашборда
 
-Ключевой механизм доказательства реальности актива — интеграция с Yandex Pro API.
+**Нет базы данных. Нет сессий. Нет бизнес-логики.**
 
-**Что забирается ежедневно:**
+### KYC Provider (Sumsub / Veriff)
 
-- Пробег автомобиля за день (км)
-- Выручка за день (тенге / локальная валюта)
-- Статус автомобиля: активен / на ремонте / неактивен
-- Количество завершённых поездок
+Внешний сервис полностью берёт на себя верификацию личности. Backend получает только webhook с результатом.
 
-**Как работает Oracle:**
+### Frontend (Next.js) как основной источник состояния
 
-1. `@Cron` задача запускается раз в сутки (например, в 01:00)
-2. Backend делает запрос к Yandex Pro API с авторизацией по vehicle_id
-3. Данные валидируются и сохраняются в таблицу `telemetry_records`
-4. Backend подписывает пакет данных своим oracle keypair (Ed25519)
-5. Отправляет транзакцию в Solana — инструкция `record_telemetry` с хешем данных и подписью
-6. Транзакция создаёт неизменяемую on-chain запись: хеш + timestamp + oracle pubkey
-7. Полные данные хранятся off-chain в PostgreSQL; on-chain хранится только хеш (proof)
+Фронтенд читает всё напрямую из Solana:
 
-**Что видят инвесторы на Dashboard:**
-
-> "Машина в пути — заработано сегодня: 12 400 ₸ · Пробег: 187 км · Поездок: 14"
-
-**Таблица `telemetry_records`:**
-
-- `date` — дата записи
-- `vehicle_id` — идентификатор авто в Yandex Pro
-- `daily_revenue` — выручка в тенге
-- `mileage_km` — пробег за день
-- `trips_count` — количество поездок
-- `car_status` — active / maintenance / inactive
-- `data_hash` — SHA-256 хеш пакета данных
-- `oracle_signature` — Ed25519 подпись backend'а
-- `solana_tx_signature` — подтверждение on-chain записи
-
-### Database (PostgreSQL)
-
-Основные таблицы:
-
-- users
-- assets
-- projects
-- investments
-- revenue_periods
-- payouts
-- **telemetry_records**
+- `getAccountInfo(ProjectState PDA)` — статус проекта, параметры, суммы
+- `getAccountInfo(InvestorRecord PDA)` — позиция инвестора
+- `getProgramAccounts` — все периоды выплат, все claimы конкретного кошелька
+- `getTokenAccountBalance` — баланс токенов
+- `getAccountInfo(WhitelistEntry PDA)` — статус KYC/whitelist кошелька
 
 ---
 
@@ -139,8 +125,9 @@
 ### Fundraising
 
 - инвесторы отправляют SOL
-- если достигнут min_raise → finalize
-- иначе → refund
+- on-chain валидирует: whitelist, лимиты, дедлайн
+- если достигнут min_raise → finalize (admin вызывает инструкцию напрямую с фронтенда)
+- иначе → refund (инвесторы вызывают сами)
 
 ### Формула прибыли
 
@@ -148,58 +135,65 @@ Profit = Revenue - Expenses - Reserve
 
 ### Выплаты
 
-- backend считает прибыль
-- депонирует SOL
-- инвесторы делают claim
+- admin считает прибыль и вызывает `deposit_revenue` напрямую с фронтенда (admin panel)
+- инвесторы делают claim самостоятельно, вызывая `claim_revenue`
+- on-chain хранит полную историю периодов и claim-записей
+
+### KYC / Whitelist flow
+
+1. Инвестор проходит KYC через Sumsub (внешняя форма)
+2. Sumsub вызывает `POST /kyc/webhook` на minimal backend
+3. Backend вызывает `add_to_whitelist` и размораживает token account
+4. Инвестор может инвестировать
 
 ---
 
 ## 7. Frontend
 
-- Каталог машин
-- Страница актива
-- Инвестирование
-- Dashboard (включая live-телеметрию: статус авто, выручка за сегодня, пробег)
-- История выплат
+- Каталог машин (читает ProjectState PDAs через RPC)
+- Страница актива (читает ProjectState + телеметрию)
+- Инвестирование (preflight на клиенте → on-chain tx)
+- Dashboard (токены + RevenuePeriod PDAs + live-телеметрия: «Машина в пути — 12 400 ₸ · 187 км»)
+- История выплат (ClaimRecord PDAs напрямую)
+- Admin panel (отправляет admin-инструкции прямо из браузера)
 
 ---
 
 ## 8. Безопасность
 
-- Multisig
-- Whitelist (enforced on-chain via Transfer Hook)
-- Default Account State (Frozen) — защита до прохождения KYC
-- Permanent Delegate — возможность изъятия токенов при нарушении условий
-- Валидация данных
+- Multisig — все privileged authority (Upgrade, PermanentDelegate, TransferFee harvest, Freeze)
+- Whitelist — enforced on-chain via Transfer Hook на каждый перевод
+- Default Account State (Frozen) — защита до KYC
+- Permanent Delegate — изъятие токенов при нарушении
+- Oracle keypair хранится в secrets manager, недоступен из браузера
+- KYC credentials (Sumsub API key) — только на minimal backend
 
 ---
 
 ## 9. Ограничения MVP
 
 - 1 автомобиль
-- whitelist-only
+- whitelist-only (KYC через Sumsub)
 - централизованный oracle (backend keypair; не децентрализован)
-- Yandex Pro API как единственный источник данных (один провайдер)
+- Yandex Pro API как единственный источник телеметрии
+- нет off-chain базы данных — весь стейт on-chain
 
 ---
 
 ## 10. Итог
 
-On-chain:
+On-chain (Solana):
 
 - Token-2022 токен с расширениями
-- Solana program
-- Transfer Hook program
-- payout logic
-- telemetry oracle records (хеш + подпись, ежедневно)
+- rwa-taxi program (все инструкции)
+- transfer-hook program (whitelist enforcement)
+- Весь стейт: проект, инвесторы, выплаты, whitelist, телеметрия
 
-Off-chain:
+Off-chain (Minimal Backend):
 
-- backend
-- база данных
-- Yandex Pro ingestion
-- oracle signing service
-- payout engine
+- Yandex Pro cron + oracle signing
+- KYC webhook receiver (1 endpoint)
+- Telemetry read endpoint (1 endpoint)
 
-Блокчейн управляет долями и выплатами,
-реальный доход формируется off-chain.
+Блокчейн является единственным источником истины.
+Backend существует только как защищённый proxy для внешних API.

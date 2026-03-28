@@ -1,6 +1,6 @@
 # Backend Developer Plan — RWA Taxi Tokenization
 
-**Role:** Dev C — Backend (NestJS, PostgreSQL, integrations)
+**Role:** Dev C — Backend (NestJS, minimal — no database)
 **Prepared by:** Product Owner / System Analyst
 **Last updated:** 2026-03-28
 
@@ -8,39 +8,51 @@
 
 ## Product Context
 
-The backend is the authoritative off-chain layer between the frontend, the Solana program, and the taxi operator data. It owns business logic that cannot or should not live on-chain: KYC verification, profit calculation, data ingestion from taxi operators, reporting, and async job orchestration.
+The backend exists for **one reason only**: there are two operations that physically cannot run in a browser — keeping Yandex Pro API credentials secret and holding an oracle signing keypair. Everything else (investment state, payout history, project status, whitelist) is read directly from the Solana blockchain by the frontend.
 
-**Consumers of the backend API:**
+**This is not a traditional backend service. It is a secure proxy for two external systems.**
 
-- Frontend (Dev A) — investor-facing and admin-facing UX
-- On-chain indexer (internal) — mirrors on-chain events into PostgreSQL for fast querying
+**What the backend does NOT do:**
 
-**Key constraints:**
+- Store user data or investment records
+- Validate investments (on-chain enforces all rules)
+- Track payout history (on-chain stores all ClaimRecords)
+- Provide reporting (frontend reads PDAs directly)
+- Authenticate users (Sign-In with Solana in the browser)
+- Manage sessions or JWT tokens
 
-- Financial endpoints must be idempotent (no double-processing of investments or payouts)
-- All on-chain actions initiated by the backend must be async (queue-based, not synchronous HTTP)
-- KYC data must never be stored on-chain — backend is the sole custodian
+**What the backend DOES:**
+
+| Responsibility | Why it must be server-side |
+| --- | --- |
+| Yandex Pro API calls + oracle signing | API credentials and signing keypair must never reach the browser |
+| KYC webhook receiver | Sumsub/Veriff needs an HTTPS endpoint to call; triggers on-chain whitelist update |
+| Telemetry read endpoint | Serves the daily Yandex Pro figures to the frontend (no DB — served from memory/cache) |
 
 ---
 
 ## North Star Metric
 
-> Every SOL invested and every SOL claimed can be traced back to an exact on-chain transaction with a matching backend record — zero discrepancies.
+> The backend has zero knowledge of investment amounts, token balances, or payout history — all of that lives on-chain. The backend only knows about Yandex Pro data and KYC events.
 
 ---
 
-## Database Schema
+## Architecture
 
 ```text
-users             — wallet address, KYC status, role
-assets            — car metadata (VIN, make, model, year, valuation)
-projects          — links asset → on-chain program; fundraising params; status
-investments       — investor wallet, project, amount (lamports), tx signature, timestamp
-revenue_periods   — project, gross revenue, expenses, reserve, profit, on-chain deposit tx
-payouts           — investor wallet, revenue_period, amount claimed, claim tx signature
-telemetry_records — date, vehicle_id, daily_revenue, mileage_km, trips_count, car_status,
-                    data_hash, oracle_signature, solana_tx_signature, onchain_status
+Sumsub (KYC provider)
+  └── POST /kyc/webhook ──→ [Minimal Backend] ──→ add_to_whitelist (on-chain)
+                                                   unfreeze token account
+
+Yandex Pro API
+  └── @Cron (daily) ──────→ [Minimal Backend] ──→ record_telemetry (on-chain)
+                                    │
+                            GET /telemetry/latest
+                                    │
+                              [Frontend]
 ```
+
+**No database. No ORM. No migrations. No auth module. No event indexer.**
 
 ---
 
@@ -48,307 +60,112 @@ telemetry_records — date, vehicle_id, daily_revenue, mileage_km, trips_count, 
 
 ---
 
-### Epic 1: User Registration & KYC
+### Epic 1: Yandex Pro Data Ingestion & Oracle
 
-**Business goal:** Build a compliant identity layer — only KYC-approved wallets may invest or hold tokens.
+**Business goal:** Daily proof that the tokenized taxi is actually operating — verifiable on-chain by any investor.
 
-#### US-B01 — User Registration
+#### US-B01 — Yandex Pro Daily Ingestion
 
-> As a new investor, I want to register my wallet so that the platform knows who I am.
-
-**Acceptance Criteria:**
-
-- `POST /users/register` accepts `{ wallet_address }`, creates a user record with status `pending_kyc`
-- Returns `201` on success; `409` if wallet already registered
-- Wallet address validated as valid base58 Solana public key
-- No duplicate users for the same wallet address
-
-**Priority:** Must Have | **Phase:** 2
-
----
-
-#### US-B02 — KYC Submission
-
-> As an investor, I want to submit my KYC information so that I can be approved to invest.
+> As the platform oracle, I want to automatically fetch daily taxi earnings from Yandex Pro API and push a cryptographic proof to Solana so that investors can verify the asset is generating real income.
 
 **Acceptance Criteria:**
 
-- `POST /users/kyc-submit` accepts KYC data payload; stores off-chain only (never logged to on-chain)
-- Status transitions: `pending_kyc → under_review → approved | rejected`
-- `GET /users/kyc-status/:wallet` returns current status and rejection reason if applicable
-- Admin can manually approve/reject via `PATCH /admin/users/:wallet/kyc-status`
-
-**Priority:** Must Have | **Phase:** 2
-
----
-
-#### US-B03 — Whitelist Management
-
-> As an admin, I want to add and remove wallets from the investment whitelist so that only verified investors can participate.
-
-**Acceptance Criteria:**
-
-- `POST /admin/whitelist/add` — validates KYC is `approved`, then calls on-chain whitelist PDA instruction (coordinate address with Dev B); also calls Freeze Authority to unfreeze the investor's token account if tokens have been minted
-- `DELETE /admin/whitelist/:address` — removes from on-chain whitelist PDA
-- `GET /admin/whitelist` — returns paginated list of all whitelisted wallets with KYC status
-- If on-chain call fails, the DB record is not updated — operation is atomic
-- Both endpoints require admin JWT role
-
-**Priority:** Must Have | **Phase:** 2
-
----
-
-### Epic 2: Asset & Project Management
-
-**Business goal:** Maintain the authoritative off-chain registry of tokenized assets and their on-chain project state.
-
-#### US-B04 — Asset Registry
-
-> As the platform, I want to store car metadata off-chain so that the frontend can display rich asset information without querying the blockchain.
-
-**Acceptance Criteria:**
-
-- `GET /assets` — returns list of all assets (pagination: `limit`, `offset` query params)
-- `GET /assets/:id` — returns full asset detail including on-chain mint address and program address
-- `POST /admin/assets` — creates a new asset record (admin only); validates required fields: VIN, make, model, year, valuation_sol
-- Asset record mirrors metadata stored in Token-2022 Token Metadata extension
-
-**Priority:** Must Have | **Phase:** 2
-
----
-
-#### US-B05 — Project Tracking
-
-> As a frontend consumer, I want to query project fundraising state so that I can display accurate progress to investors.
-
-**Acceptance Criteria:**
-
-- `GET /projects` — returns all projects with current status (derived from on-chain event indexer)
-- `GET /projects/:id` — returns project detail: asset, fundraising params, tokens sold, SOL raised, deadline
-- Status field reflects latest on-chain state: `fundraising | finalized | active | paused | closed`
-- On-chain event indexer (Phase 2) keeps status in sync automatically
-
-**Priority:** Must Have | **Phase:** 2
-
----
-
-### Epic 3: Investment Management
-
-**Business goal:** Validate investment intent off-chain before the investor signs a transaction, and record confirmed investments for reporting.
-
-#### US-B06 — Investment Pre-Validation
-
-> As a frontend, I want to validate an investment request before the user signs so that on-chain transactions are never sent for obviously invalid inputs.
-
-**Acceptance Criteria:**
-
-- `POST /investments/prepare` — accepts `{ wallet_address, project_id, amount_lamports }`
-- Validates:
-  - Wallet is registered and KYC `approved`
-  - Wallet is whitelisted on-chain
-  - `amount_lamports` ≥ `min_investment` and ≤ `max_investment`
-  - Project status is `fundraising`
-  - Investor has not exceeded per-investor cap
-- Returns `200 { valid: true, validation_token }` or `400 { valid: false, reason: "..." }`
-- Validation token expires in 5 minutes (prevents stale submissions)
-
-**Priority:** Must Have | **Phase:** 3
-
----
-
-#### US-B07 — Investment Confirmation
-
-> As the platform, I want to record a confirmed on-chain investment so that reporting and payout calculations are accurate.
-
-**Acceptance Criteria:**
-
-- `POST /investments/confirm` — accepts `{ tx_signature, wallet_address, project_id }`
-- Verifies tx signature on-chain before recording (waits for `confirmed` commitment)
-- Idempotent: second call with same `tx_signature` returns `200` without creating duplicate record
-- Records: wallet, project, amount_lamports, tx_signature, confirmed_at timestamp
-- Triggers update to project's `sol_raised` aggregate
-
-**Priority:** Must Have | **Phase:** 3
-
----
-
-#### US-B08 — On-chain Event Indexer
-
-> As the platform, I want to automatically mirror on-chain events into the database so that backend state stays in sync without polling.
-
-**Acceptance Criteria:**
-
-- Subscribes to program logs via `@solana/web3.js` `onLogs` for events: `invest`, `refund`, `finalize_raise`, `deposit_revenue`, `claim_revenue`
-- Parses event fields from program log output (coordinate log format with Dev B)
-- Upserts records into `investments`, `revenue_periods`, `payouts` tables
-- On RPC connection drop: reconnects with exponential backoff; logs gap in coverage
-- Indexer state (last processed slot) persisted to DB; resumes from last slot on restart
-
-**Priority:** Must Have | **Phase:** 2
-
----
-
-### Epic 4: Payout Engine
-
-**Business goal:** Accurately calculate investor profit shares and orchestrate the on-chain revenue deposit lifecycle.
-
-#### US-B09 — Revenue Deposit
-
-> As an admin, I want to trigger a SOL revenue deposit to the on-chain vault so that investors can claim their share.
-
-**Acceptance Criteria:**
-
-- `POST /admin/revenue/deposit` — accepts `{ project_id, gross_revenue_sol, expenses_sol, reserve_sol, period_label }`
-- Backend calculates: `profit = gross_revenue - expenses - reserve`
-- Enqueues an async Bull job to call `deposit_revenue` on-chain (does NOT block the HTTP response)
-- Returns `202 { job_id }` immediately
-- `GET /admin/revenue/jobs/:job_id` — returns job status: `queued | processing | confirmed | failed`
-- On-chain deposit tx signature recorded in `revenue_periods` table when confirmed
-- If on-chain call fails, job status set to `failed` with error reason; no DB record created
-
-**Priority:** Must Have | **Phase:** 3
-
----
-
-#### US-B10 — Payout History
-
-> As a frontend, I want to retrieve all revenue periods and claim events for a wallet so that investors can see their full earnings history.
-
-**Acceptance Criteria:**
-
-- `GET /payouts/history/:wallet_address` — returns all revenue periods the investor is eligible for, with: period label, profit (SOL), investor share (SOL), claimed amount, claim tx signature, claim date
-- Eligibility: investor held tokens at the time of the revenue period snapshot
-- Empty array returned (not 404) if no history exists
-- Sorted by period date descending
-
-**Priority:** Must Have | **Phase:** 3
-
----
-
-### Epic 5: Yandex Pro Data Ingestion & Oracle
-
-**Business goal:** Automatically pull real taxi operation data from Yandex Pro API, prove it on-chain with a signed hash, and surface live telemetry to investors. This is the "proof of reality" layer that connects the physical asset to the blockchain.
-
-#### US-B11 — Yandex Pro Daily Ingestion
-
-> As the platform, I want to automatically fetch daily earnings and mileage data from Yandex Pro API so that revenue figures are sourced from the real operator, not entered manually.
-
-**Acceptance Criteria:**
-
-- Scheduled `@Cron` job runs daily at 01:00 (configurable via env)
-- Authenticates with Yandex Pro API using `vehicle_id` and API credentials stored in secrets manager (never in code)
+- Scheduled `@Cron` job runs daily at 01:00 (configurable via env var)
+- Authenticates with Yandex Pro API using `vehicle_id` and `api_key` from environment secrets (never hardcoded)
 - Fetches for previous calendar day: `daily_revenue` (tenge), `mileage_km`, `trips_count`, `car_status` (active / maintenance / inactive)
-- Validates response: rejects if any required field is missing or revenue is negative
-- Stores record in `telemetry_records` table: `date`, `vehicle_id`, `daily_revenue`, `mileage_km`, `trips_count`, `car_status`, `raw_payload_json`
-- On API failure: logs structured error, retries up to 3× with exponential backoff; after 3 failures sends Sentry alert and enqueues to dead letter queue
-- `GET /telemetry/latest/:project_id` — returns the most recent telemetry record for the frontend dashboard
+- Validates response: logs and retries if fields missing or revenue is negative; alerts Sentry after 3 consecutive failures
+- Computes SHA-256 hash of canonical JSON: `{ date, vehicle_id, daily_revenue, mileage_km, trips_count, car_status }`
+- Signs hash with oracle Ed25519 keypair (loaded from secrets manager at startup, never from env var directly)
+- Calls `record_telemetry` on-chain via `@solana/web3.js`; stores the resulting tx signature in memory (last 30 days rolling, no DB)
+- On RPC failure: retries once with backoff; logs warning but does not throw — oracle failure should not crash the service
 
-**Priority:** Must Have | **Phase:** 3
-
----
-
-#### US-B12 — Oracle Signing & On-chain Push
-
-> As the platform oracle, I want to sign daily telemetry data and push a hash to Solana so that investors can independently verify that reported figures come from Yandex Pro.
-
-**Acceptance Criteria:**
-
-- Runs immediately after successful US-B11 ingestion (chained in the same Bull job)
-- Computes SHA-256 hash of the canonical JSON payload: `{ date, vehicle_id, daily_revenue, mileage_km, trips_count, car_status }`
-- Signs the hash with the oracle Ed25519 keypair (stored in secrets manager, never in env vars directly)
-- Calls `record_telemetry` instruction on the `rwa-taxi` Solana program (via `RwaClient` SDK or direct `@solana/web3.js` call)
-- Stores `data_hash`, `oracle_signature`, and `solana_tx_signature` in the `telemetry_records` row
-- `GET /telemetry/:project_id/:date` — returns full telemetry record including on-chain tx link for investor verification
-- If on-chain push fails: logs warning, retries once; if still failing, stores record with `onchain_status: failed` and alerts Sentry — does NOT block the ingestion record itself
-
-**Priority:** Must Have | **Phase:** 3
+**Priority:** Must Have | **Phase:** 2
 
 ---
 
-### Epic 6: Reporting & Admin
+#### US-B02 — Telemetry Read Endpoint
 
-**Business goal:** Give platform operators visibility into the full financial state of the project.
-
-#### US-B13 — Summary Report
-
-> As an admin, I want a summary of platform financials so that I can report on project health at any time.
+> As a frontend consumer, I want to fetch today's car telemetry figures so that investors can see live earnings on the dashboard.
 
 **Acceptance Criteria:**
 
-- `GET /admin/reports/summary` returns:
-  - Total SOL raised
-  - Total investors
-  - Total tokens issued
-  - Total revenue deposited (SOL)
-  - Total claimed (SOL)
-  - Unclaimed balance (SOL)
-- All values cross-referenced between on-chain event index and DB records
-- Returns `200` even if all values are zero (not 404)
+- `GET /telemetry/latest/:project_id` returns the most recent ingested record:
+  `{ date, daily_revenue, mileage_km, trips_count, car_status, solana_tx_signature }`
+- Response served from in-memory cache (last result of cron job); no DB query
+- If no data ingested yet today: returns yesterday's record with `{ stale: true }`
+- If no records at all: returns `{ available: false }`
+- `solana_tx_signature` allows frontend to link to Solana Explorer for verification
 
-**Priority:** Must Have | **Phase:** 4
+**Priority:** Must Have | **Phase:** 2
 
 ---
 
-#### US-B14 — Revenue Period Report
+### Epic 2: KYC Webhook
 
-> As an admin, I want a breakdown of each revenue period so that I can verify profit calculations.
+**Business goal:** When a KYC provider approves an investor, automatically whitelist them on-chain so they can invest without any manual admin action.
+
+#### US-B03 — KYC Approval Webhook
+
+> As the platform, I want to receive KYC approval events from Sumsub and immediately whitelist the approved wallet on-chain so that investors can invest as soon as they pass KYC.
 
 **Acceptance Criteria:**
 
-- `GET /admin/reports/revenue-periods` returns paginated list: period label, gross revenue, expenses, reserve, profit, deposit tx, total claimed, unclaimed
-- Each period includes per-investor claim status (optional `?detail=true` query param)
-- Profit formula shown: `Profit = Gross Revenue − Expenses − Reserve`
+- `POST /kyc/webhook` receives Sumsub webhook payload
+- Verifies request signature using Sumsub webhook secret (reject with `401` if invalid)
+- Extracts `wallet_address` from the applicant's `externalUserId` field (wallet address is passed to Sumsub at KYC initiation)
+- On `applicantReviewed` event with `reviewResult.reviewAnswer = GREEN`:
+  - Calls `add_to_whitelist` instruction on-chain (whitelist PDA)
+  - Calls Freeze Authority to unfreeze the investor's token account (if tokens exist)
+  - Logs success with wallet address and Solana tx signature
+- On `RED` result or any other event: logs and returns `200` (webhook must always return 200 to Sumsub)
+- If on-chain call fails: retries once; if still failing, logs to Sentry with full context for manual resolution
+- Idempotent: calling twice for the same wallet is safe (on-chain `add_to_whitelist` is a no-op if already whitelisted)
 
-**Priority:** Must Have | **Phase:** 4
+**Priority:** Must Have | **Phase:** 2
 
 ---
 
-### Epic 7: Security & Infrastructure
+### Epic 3: Operations & Health
 
-#### US-B15 — Authentication & Authorization
+#### US-B04 — Health Check
 
-> As the platform, I want protected endpoints secured by JWT so that only authorized actors can perform admin operations.
+> As the DevOps operator, I want a health check endpoint so that I can monitor that the service is running and connected to Solana RPC.
 
 **Acceptance Criteria:**
 
-- `POST /auth/login` — accepts wallet signature (prove ownership); returns JWT
-- JWT contains `wallet_address` and `role` (`investor` | `admin`)
-- All `/admin/*` routes require `admin` role (403 otherwise)
-- Token expiry: 24h; refresh token: 7 days
-- Invalid or expired tokens return `401` with clear error message
+- `GET /health` returns `{ status: "ok", rpc: "connected", oracle: "loaded" }` (503 if RPC unreachable or oracle keypair failed to load)
+- `oracle: "loaded"` confirms the signing keypair was loaded successfully at startup — does NOT expose the key
+- Response time < 200ms
 
-**Priority:** Must Have | **Phase:** 4
+**Priority:** Must Have | **Phase:** 2
 
 ---
 
-#### US-B16 — Idempotency & Rate Limiting
+## Endpoints Summary
 
-> As the platform, I want financial endpoints to be idempotent and rate-limited so that double-submissions and abuse are prevented.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Service health + RPC connectivity |
+| `GET` | `/telemetry/latest/:project_id` | Latest Yandex Pro figures for dashboard |
+| `POST` | `/kyc/webhook` | Sumsub KYC approval → on-chain whitelist |
 
-**Acceptance Criteria:**
-
-- `POST /investments/confirm` is idempotent on `tx_signature` (second call: no duplicate DB record)
-- `POST /admin/revenue/deposit` is idempotent on `period_label + project_id`
-- All public endpoints: max 60 requests/minute per IP
-- All authenticated endpoints: max 200 requests/minute per wallet
-- Rate limit exceeded returns `429` with `Retry-After` header
-
-**Priority:** Must Have | **Phase:** 5
+**Total: 3 endpoints.**
 
 ---
 
-#### US-B17 — Health & Observability
+## Environment Variables
 
-> As the DevOps operator, I want a health check endpoint and structured logs so that I can monitor the service in production.
-
-**Acceptance Criteria:**
-
-- `GET /health` returns `{ status: "ok", db: "connected", rpc: "connected" }` (503 if either is down)
-- All requests logged with correlation ID (traceable across services)
-- Sentry integration: uncaught exceptions and failed Bull jobs reported
-- Winston/Pino structured JSON logs in production
-
-**Priority:** Must Have | **Phase:** 5
+| Variable | Description |
+| --- | --- |
+| `SOLANA_RPC_URL` | RPC endpoint (Helius / QuickNode) |
+| `ORACLE_KEYPAIR_PATH` | Path to oracle keypair file in secrets manager |
+| `YANDEX_PRO_API_KEY` | Yandex Pro API key |
+| `YANDEX_PRO_VEHICLE_ID` | Vehicle identifier in Yandex Pro |
+| `SUMSUB_WEBHOOK_SECRET` | For verifying Sumsub webhook signatures |
+| `PROGRAM_ID` | rwa-taxi Solana program ID |
+| `FREEZE_AUTHORITY_KEYPAIR_PATH` | Path to freeze authority keypair |
+| `SENTRY_DSN` | Error tracking |
+| `CRON_SCHEDULE` | Cron expression for ingestion (default: `0 1 * * *`) |
 
 ---
 
@@ -356,12 +173,13 @@ telemetry_records — date, vehicle_id, daily_revenue, mileage_km, trips_count, 
 
 | Phase | Days | Stories | Key Deliverable |
 | --- | --- | --- | --- |
-| 1 | 1–5 | Setup | NestJS scaffold, all 7 DB tables migrated (incl. telemetry_records), Swagger UI |
-| 2 | 6–12 | US-B01–B05, US-B08 | Registration, KYC, whitelist, project endpoints, event indexer |
-| 3 | 13–18 | US-B06, US-B07, US-B09, US-B10, US-B11, US-B12 | Invest prepare/confirm, payout engine, Yandex Pro ingestion, oracle push |
-| 4 | 19–23 | US-B13, US-B14, US-B15 | Reporting endpoints, JWT auth, admin role guard |
-| 5 | 24–29 | US-B16, US-B17 | Idempotency, rate limiting, health check, integration tests |
-| 6 | 30–34 | — | Staging deploy, monitoring setup, final API contract review |
+| 1 | 1–5 | Setup | NestJS scaffold, env config module, `@solana/web3.js` connected to devnet |
+| 2 | 6–12 | US-B01, US-B02, US-B03, US-B04 | All 3 endpoints + oracle cron working on devnet |
+| 3 | 13–18 | Integration | End-to-end: Sumsub mock → webhook → on-chain whitelist; cron → record_telemetry verified on Explorer |
+| 5 | 24–29 | Hardening | Sentry alerts, retry logic, startup keypair validation, health check |
+| 6 | 30–34 | Deploy | Staging deploy (Railway/Render), smoke test webhook + cron |
+
+**Phases 4 is skipped** — no reporting, no auth, no admin endpoints to build.
 
 ---
 
@@ -369,12 +187,26 @@ telemetry_records — date, vehicle_id, daily_revenue, mileage_km, trips_count, 
 
 | Dependency | Provider | Needed By | Blocking? |
 | --- | --- | --- | --- |
-| Whitelist PDA instruction address & seeds | Dev B (On-chain) | Phase 2 | Yes — whitelist endpoint calls on-chain |
-| On-chain event log format (invest, refund, etc.) | Dev B (On-chain) | Phase 2 | Yes — indexer can't parse without it |
-| Freeze Authority keypair / multisig | Dev B (On-chain) | Phase 2 | Yes — KYC approval unfreezes token accounts |
-| Transfer Hook program ID | Dev B (On-chain) | Phase 2 | Yes — whitelist PDA seeds are shared with hook |
-| `record_telemetry` instruction signature | Dev B (On-chain) | Phase 3 | Yes — oracle push calls this instruction |
-| Oracle keypair registered in ProjectState | Dev B (On-chain) | Phase 3 | Yes — `initialize_project` must include oracle_pubkey |
+| `record_telemetry` instruction + program ID | Dev B (On-chain) | Phase 2 | Yes — oracle cron calls this |
+| `add_to_whitelist` instruction signature | Dev B (On-chain) | Phase 2 | Yes — KYC webhook calls this |
+| Freeze Authority keypair / multisig interface | Dev B (On-chain) | Phase 2 | Yes — unfreeze after KYC |
+| Sumsub account + webhook secret | Platform ops | Phase 2 | Yes — webhook can't be tested without it |
+
+---
+
+## What Dev C Does NOT Build
+
+This is explicit — these were in the previous plan and are now removed:
+
+- ~~User registration endpoints~~ — not needed; wallet address is the identity
+- ~~KYC status DB storage~~ — Sumsub holds the KYC records
+- ~~Investment pre-validation API~~ — on-chain enforces all rules
+- ~~On-chain event indexer~~ — frontend reads PDAs directly
+- ~~Payout engine endpoints~~ — admin sends `deposit_revenue` tx from the frontend admin panel
+- ~~Reporting endpoints~~ — frontend reads on-chain accounts
+- ~~JWT authentication~~ — Sign-In with Solana in the browser
+- ~~PostgreSQL / any database~~ — no persistent storage
+- ~~Asset registry~~ — metadata lives in Token-2022 Token Metadata extension
 
 ---
 
@@ -382,9 +214,8 @@ telemetry_records — date, vehicle_id, daily_revenue, mileage_km, trips_count, 
 
 A user story is complete when:
 
-- [ ] Endpoint documented in Swagger with request/response schemas
-- [ ] Input validated via `class-validator` DTOs (no raw `any` types)
-- [ ] Returns correct HTTP status codes for all success and error cases
-- [ ] Integration test covers happy path and at least one failure case
-- [ ] On-chain calls go through the Bull job queue (not synchronous)
+- [ ] Endpoint or cron job works end-to-end on devnet
+- [ ] On-chain calls are retried once on failure; errors reported to Sentry
+- [ ] Webhook signature verification in place before any on-chain action
+- [ ] No secrets in code, logs, or HTTP responses
 - [ ] Reviewed by one other team member
