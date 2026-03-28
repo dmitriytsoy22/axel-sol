@@ -6,9 +6,9 @@
 
 ## Team Roles
 
-- **Dev A — Frontend** (Next.js, Wallet Adapter, direct RPC reads)
-- **Dev B — On-chain / Solana** (Anchor/Rust, Token-2022, Transfer Hook, deployment)
-- **Dev C — Backend** (NestJS, no DB — oracle cron + KYC webhook only)
+- **dimagonedone (Frontend)** (Next.js, Wallet Adapter, direct RPC reads)
+- **ndrkbrg (On-chain)** (Anchor/Rust, Token-2022, Transfer Hook, deployment)
+- **russh (Backend)** (NestJS, no DB — oracle cron + KYC webhook only)
 
 ---
 
@@ -17,7 +17,7 @@
 **Duration: Days 1–5**
 **Goal: All three workstreams have running skeletons; PDA layouts and on-chain interfaces agreed.**
 
-**Dev A — Frontend**
+**dimagonedone (Frontend)**
 
 - Initialize Next.js project with TypeScript, Tailwind CSS, ESLint
 - Integrate `@solana/wallet-adapter-react` with Phantom and Backpack support
@@ -27,7 +27,7 @@
 
 **Deliverables:** Running Next.js app, wallet connection working on devnet, RPC helper reading a test account
 
-**Dev B — On-chain**
+**ndrkbrg (On-chain)**
 
 - Initialize Anchor workspace with `anchor init rwa-taxi`; add second program `anchor new transfer-hook`
 - Define all program account structs: `ProjectState`, `InvestorRecord`, `RevenuePeriod`, `ClaimRecord`, `WhitelistEntry`, `TelemetryRecord`
@@ -36,11 +36,12 @@
 - Plan Token-2022 mint extensions: Transfer Hook, Default Account State (Frozen), Permanent Delegate, Transfer Fee, Token Metadata + Metadata Pointer, Memo Transfer
 - Configure devnet deployment keypairs and Squads multisig for upgrade authority
 - Write Anchor test scaffolds
-- **Export and document IDL JSON and all PDA seeds** — critical dependency for Dev A and Dev C
+- **Export and document IDL JSON and all PDA seeds** — critical dependency for dimagonedone and russh
+- Write `scripts/init-project.ts` CLI seed script — calls `initialize_project` with devnet test params so dimagonedone and russh can bootstrap a project without waiting for the admin panel UI (Phase 4)
 
-**Deliverables:** Compilable Anchor workspace deployed to devnet, IDL JSON exported, all PDA seeds documented
+**Deliverables:** Compilable Anchor workspace deployed to devnet, IDL JSON exported, all PDA seeds documented, `init-project.ts` seed script running on devnet
 
-**Dev C — Backend**
+**russh (Backend)**
 
 - Initialize minimal NestJS project: two modules only — `ingestion` and `kyc`
 - Set up env config module (dotenv, Joi validation) for all required secrets (no DB connection string)
@@ -52,8 +53,8 @@
 
 **Dependencies:**
 
-- Dev B must document PDA seeds before Dev A can derive whitelist/investor PDAs client-side
-- Dev B must expose `record_telemetry` and `add_to_whitelist` instruction signatures before Dev C can call them
+- ndrkbrg must document PDA seeds before dimagonedone can derive whitelist/investor PDAs client-side
+- ndrkbrg must expose `record_telemetry` and `add_to_whitelist` instruction signatures before russh can call them
 
 ---
 
@@ -62,7 +63,7 @@
 **Duration: Days 6–12**
 **Goal: All on-chain instructions implemented and tested; backend oracle and KYC webhook working end-to-end on devnet.**
 
-**Dev A — Frontend**
+**dimagonedone (Frontend)**
 
 - Build Car Catalog page: reads all `ProjectState` PDAs via `getProgramAccounts`, renders asset cards with status badges
 - Build Asset Detail page: reads `ProjectState` PDA + Token-2022 `TokenMetadata` extension; funding progress bar; countdown timer
@@ -71,7 +72,7 @@
 
 **Deliverables:** Catalog and Asset pages reading real on-chain data on devnet; whitelist gate working
 
-**Dev B — On-chain**
+**ndrkbrg (On-chain)**
 
 - Implement all Token-2022 mint setup with correct extension order
 - Implement `initialize_project`, `start_raise`
@@ -88,7 +89,7 @@
 
 **Deliverables:** All instructions passing tests on devnet; Transfer Hook enforcing whitelist; oracle instruction verified
 
-**Dev C — Backend**
+**russh (Backend)**
 
 - Implement `@Cron` Yandex Pro ingestion: fetch API → validate → SHA-256 hash → Ed25519 sign → call `record_telemetry` on-chain
 - Implement in-memory cache for last 30 telemetry records (no DB)
@@ -100,8 +101,8 @@
 
 **Dependencies:**
 
-- Dev B's `record_telemetry` and `add_to_whitelist` instructions must be deployed before Dev C can call them
-- Dev B's final account struct layouts determine how Dev A derives PDAs client-side
+- ndrkbrg's `record_telemetry` and `add_to_whitelist` instructions must be deployed before russh can call them
+- ndrkbrg's final account struct layouts determine how dimagonedone derives PDAs client-side
 
 ---
 
@@ -110,7 +111,7 @@
 **Duration: Days 13–18**
 **Goal: Full investor journey works end-to-end on devnet; frontend reads all state from chain.**
 
-**Dev A — Frontend**
+**dimagonedone (Frontend)**
 
 - Wire invest flow: send `invest` Anchor instruction on-chain; show confirmation states
 - Build Dashboard: reads `InvestorRecord` PDA + token balance + `RevenuePeriod` PDAs + `ClaimRecord` PDAs — all from RPC
@@ -120,16 +121,16 @@
 
 **Deliverables:** Full invest → finalize → deposit revenue → claim flow working on devnet with real wallets
 
-**Dev B — On-chain**
+**ndrkbrg (On-chain)**
 
 - Deploy final instruction set to devnet with multisig as upgrade authority
 - Run full integration scenario: init project → whitelist 3 wallets → all invest → finalize → deposit revenue → all claim → verify telemetry record
-- Export final versioned IDL; freeze and share with Dev A and Dev C
+- Export final versioned IDL; freeze and share with dimagonedone and russh
 - Document all PDAs with seeds, bump storage, rent-exempt sizes
 
 **Deliverables:** Stable devnet deployment; integration test script passing; final IDL frozen
 
-**Dev C — Backend**
+**russh (Backend)**
 
 - Integration test: Sumsub mock webhook → `add_to_whitelist` on-chain → verify `WhitelistEntry` PDA exists
 - Integration test: cron trigger → Yandex Pro mock → `record_telemetry` on-chain → verify `TelemetryRecord` PDA
@@ -140,8 +141,8 @@
 
 **Dependencies:**
 
-- Dev B's final IDL must be frozen before Dev A finalizes client-side tx construction
-- Dev C's `GET /telemetry/latest` must be live before Dev A's telemetry widget works
+- ndrkbrg's final IDL must be frozen before dimagonedone finalizes client-side tx construction
+- russh's `GET /telemetry/latest` must be live before dimagonedone's telemetry widget works
 
 ---
 
@@ -150,7 +151,7 @@
 **Duration: Days 19–23**
 **Goal: Admin can manage the project from the browser; payout history visible on-chain.**
 
-**Dev A — Frontend**
+**dimagonedone (Frontend)**
 
 - Build Admin Panel: reads `ProjectState` PDA; sends `deposit_revenue`, `pause_project`, `close_project` txs directly from admin wallet
 - Build Payout History page: reads all `RevenuePeriod` + `ClaimRecord` PDAs; no backend call
@@ -160,16 +161,16 @@
 
 **Deliverables:** Admin panel sending real on-chain txs; payout history page reading chain; responsive layout
 
-**Dev B — On-chain**
+**ndrkbrg (On-chain)**
 
-- Write TypeScript `RwaClient` SDK: `invest()`, `claimRevenue()`, `depositRevenue()`, `getProjectState()`, `getInvestorRecord()`, `harvestTransferFees()`, `unfreezeAccount()` — shared with Dev A
+- Write TypeScript `RwaClient` SDK: `invest()`, `claimRevenue()`, `depositRevenue()`, `getProjectState()`, `getInvestorRecord()`, `harvestTransferFees()`, `unfreezeAccount()` — shared with dimagonedone
 - Add ComputeBudget instructions to all transaction builders (avoid CU exhaustion)
 - Write devnet reset/seed script for QA runs
 - Audit all authority checks; verify `pause_project` blocks all financial instructions
 
 **Deliverables:** `RwaClient` SDK package; devnet seed script; state machine verified
 
-**Dev C — Backend**
+**russh (Backend)**
 
 - Performance: ensure `GET /telemetry/latest` responds in < 100ms (in-memory cache, no I/O)
 - Add structured logging (Pino) with request correlation IDs
@@ -184,7 +185,7 @@
 **Duration: Days 24–29**
 **Goal: Production-ready security posture; full E2E QA scenario passes.**
 
-**Dev A — Frontend**
+**dimagonedone (Frontend)**
 
 - Add Content Security Policy headers; sanitize all user-facing text; validate wallet addresses before on-chain calls
 - Accessibility pass: keyboard navigation, ARIA labels
@@ -194,7 +195,7 @@
 
 **Deliverables:** Security-hardened frontend; E2E journey confirmed; component test suite
 
-**Dev B — On-chain**
+**ndrkbrg (On-chain)**
 
 - Security audit:
   - All authority checks use `has_one` or `constraint` in Anchor contexts
@@ -209,7 +210,7 @@
 
 **Deliverables:** Security audit checklist signed off; release build on devnet; mainnet checklist
 
-**Dev C — Backend**
+**russh (Backend)**
 
 - Confirm oracle keypair is loaded from secrets manager (not env var)
 - Add startup validation: fail fast if `ORACLE_KEYPAIR_PATH`, `YANDEX_PRO_API_KEY`, `SUMSUB_WEBHOOK_SECRET` are missing
@@ -225,7 +226,7 @@
 **Duration: Days 30–34**
 **Goal: Deployed to staging, all smoke tests pass, launch checklist signed off.**
 
-**Dev A — Frontend**
+**dimagonedone (Frontend)**
 
 - Deploy frontend to Vercel; configure staging RPC endpoint and backend URL
 - Smoke test full investor journey on staging with real devnet wallets
@@ -234,7 +235,7 @@
 
 **Deliverables:** Frontend on staging URL; smoke test sign-off; onboarding guide
 
-**Dev B — On-chain**
+**ndrkbrg (On-chain)**
 
 - Confirm multisig upgrade authority is set; original keypairs removed from hot storage
 - Run final devnet scenario: SOL escrow → Token-2022 minting → Transfer Hook enforced → telemetry record verified
@@ -243,7 +244,7 @@
 
 **Deliverables:** Deployment artifact; multisig confirmed; emergency runbook
 
-**Dev C — Backend**
+**russh (Backend)**
 
 - Deploy to staging (Railway or Render); configure all environment secrets via platform secrets manager
 - Confirm cron job fires on schedule and `TelemetryRecord` PDA appears on-chain
@@ -257,7 +258,7 @@
 
 ## Summary Table
 
-| Phase | Days | Dev A (Frontend) | Dev B (On-chain) | Dev C (Backend) |
+| Phase | Days | dimagonedone (Frontend) | ndrkbrg (On-chain) | russh (Backend) |
 | --- | --- | --- | --- | --- |
 | 1: Foundation | Days 1–5 | Next.js scaffold, RPC helper, route shells | Anchor workspace, all structs + stubs, IDL exported | NestJS scaffold, oracle keypair loaded, health endpoint |
 | 2: Core | Days 6–12 | Catalog + asset pages reading on-chain; whitelist check | All instructions + Transfer Hook implemented and tested | Oracle cron + KYC webhook working on devnet |
@@ -270,11 +271,11 @@
 
 ## Key Cross-Team Dependencies
 
-1. **PDA seeds + IDL JSON** (Dev B → Dev A): Dev A derives all PDAs client-side — needs seeds documented by end of Phase 1, IDL frozen by end of Phase 3.
-2. **`record_telemetry` instruction** (Dev B → Dev C): deployed before Dev C's cron can push telemetry. Phase 2.
-3. **`add_to_whitelist` instruction** (Dev B → Dev C): deployed before Dev C's webhook can whitelist. Phase 2.
-4. **`GET /telemetry/latest`** (Dev C → Dev A): must be live before Dev A's telemetry widget. Phase 3.
-5. **`RwaClient` SDK** (Dev B → Dev A): Phase 4; reduces PDA derivation boilerplate for Dev A.
+1. **PDA seeds + IDL JSON** (ndrkbrg → dimagonedone): dimagonedone derives all PDAs client-side — needs seeds documented by end of Phase 1, IDL frozen by end of Phase 3.
+2. **`record_telemetry` instruction** (ndrkbrg → russh): deployed before russh's cron can push telemetry. Phase 2.
+3. **`add_to_whitelist` instruction** (ndrkbrg → russh): deployed before russh's webhook can whitelist. Phase 2.
+4. **`GET /telemetry/latest`** (russh → dimagonedone): must be live before dimagonedone's telemetry widget. Phase 3.
+5. **`RwaClient` SDK** (ndrkbrg → dimagonedone): Phase 4; reduces PDA derivation boilerplate for dimagonedone.
 
 ---
 
@@ -297,10 +298,11 @@
 
 | File | Owner | Phase |
 | --- | --- | --- |
-| `programs/rwa-taxi/src/lib.rs` | Dev B | 1–3 |
-| `programs/transfer-hook/src/lib.rs` | Dev B | 1–2 |
-| `sdk/src/rwa-client.ts` | Dev B | 4 |
-| `src/ingestion/ingestion.service.ts` | Dev C | 2 |
-| `src/kyc/kyc.controller.ts` | Dev C | 2 |
-| `src/lib/rpc.ts` (PDA helpers) | Dev A | 1 |
-| `src/hooks/useInvest.ts` | Dev A | 3 |
+| `programs/rwa-taxi/src/lib.rs` | ndrkbrg | 1–3 |
+| `programs/transfer-hook/src/lib.rs` | ndrkbrg | 1–2 |
+| `scripts/init-project.ts` | ndrkbrg | 1 |
+| `sdk/src/rwa-client.ts` | ndrkbrg | 4 |
+| `src/ingestion/ingestion.service.ts` | russh | 2 |
+| `src/kyc/kyc.controller.ts` | russh | 2 |
+| `src/lib/rpc.ts` (PDA helpers) | dimagonedone | 1 |
+| `src/hooks/useInvest.ts` | dimagonedone | 3 |

@@ -1,5 +1,5 @@
 # On-chain Developer Plan — RWA Taxi Tokenization
-**Role:** Dev B — On-chain / Solana (Anchor/Rust, Token-2022, Transfer Hook)
+**Role:** ndrkbrg (On-chain) (Anchor/Rust, Token-2022, Transfer Hook)
 **Prepared by:** Product Owner / System Analyst
 **Last updated:** 2026-03-28
 
@@ -141,7 +141,7 @@ TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
 - `add_to_whitelist` instruction: creates `WhitelistEntry` PDA with `approved = true`; authority check: only the program admin or multisig can call
 - `remove_from_whitelist` instruction: sets `approved = false` (does not close PDA — maintains audit trail)
 - Both instructions emit program log events parseable by the backend event indexer
-- Backend calls these instructions via CPI or direct transaction (coordinate with Dev C)
+- Backend calls these instructions via CPI or direct transaction (coordinate with russh)
 
 **Priority:** Must Have | **Phase:** 2
 
@@ -155,13 +155,35 @@ TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
 > As the platform admin, I want to initialize an on-chain project so that fundraising parameters are locked in immutably.
 
 **Acceptance Criteria:**
+
 - `initialize_project` creates `ProjectState` PDA with all fundraising parameters
 - Parameters set at init and immutable: `token_supply`, `price_per_share`, `min_raise`, `max_raise`, `deadline`
-- `token_supply` is derived from `car_cost_lamports / price_per_share` (validated: no remainder)
+- `token_supply` is derived from `car_cost_lamports / price_per_share` (validated: no remainder allowed)
 - Creates SOL escrow vault (system program account owned by PDA)
 - Creates revenue vault (system program account owned by PDA)
 - Project status set to `Fundraising`
 - Only callable by admin authority (multisig)
+
+**Token-2022 Mint Creation (Option A — CPI inside this instruction):**
+
+`initialize_project` is responsible for creating and fully configuring the Token-2022 mint via CPIs. dimagonedone sends **one instruction**; all mint setup is internal to the program. The admin never interacts with the Token-2022 program directly.
+
+CPI sequence inside `initialize_project`:
+
+1. `SystemProgram::create_account` — allocate mint account with **fixed 512 bytes** (covers base mint + all 6 extensions + metadata headroom; ~0.004 SOL rent)
+2. `token_2022::initialize_transfer_hook` — register `transfer-hook` program ID
+3. `token_2022::initialize_default_account_state` — set default state to `Frozen`
+4. `token_2022::initialize_permanent_delegate` — set to multisig authority
+5. `token_2022::initialize_transfer_fee_config` — set fee (100 bps), harvest authority = multisig
+6. `token_2022::initialize_metadata_pointer` — point to mint itself
+7. `token_2022::initialize_mint2` — set decimals = 0, mint authority = program PDA, freeze authority = multisig
+8. `token_2022::initialize_token_metadata` — write car metadata (name, symbol, uri, VIN, make, model, year)
+
+**Critical:** steps 1–7 must complete before step 8. Steps 2–6 must run before step 7 (`initialize_mint2`). This order is enforced by the Token-2022 program.
+
+`MemoTransfer` extension is account-level — enabled on each investor's ATA when first created, not on the mint.
+
+**Devnet seed script (Phase 1 deliverable):** ndrkbrg provides a CLI TypeScript script (`scripts/init-project.ts`) that calls `initialize_project` with test parameters. dimagonedone and russh use this script to bootstrap a project on devnet without waiting for the admin panel UI (Phase 4).
 
 **Priority:** Must Have | **Phase:** 2
 
@@ -313,7 +335,7 @@ TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
 
 ### Epic 7: Developer SDK & Tooling
 
-**Business goal:** Provide a TypeScript SDK so that Dev A (frontend) and Dev C (backend) can interact with the program without writing low-level Anchor client code.
+**Business goal:** Provide a TypeScript SDK so that dimagonedone (frontend) and russh (backend) can interact with the program without writing low-level Anchor client code.
 
 #### US-O13 — RwaClient SDK
 > As a frontend and backend developer, I want a TypeScript SDK wrapper so that I can call program instructions without managing raw transactions.
@@ -387,14 +409,14 @@ TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
 
 | Output | Consumer | Needed By |
 | --- | --- | --- |
-| IDL JSON (stable) | Dev A (Frontend), Dev C (Backend) | Phase 3 start |
-| IDL JSON (frozen) | Dev A (Frontend), Dev C (Backend) | Phase 3 end |
-| Whitelist PDA seeds + instruction signature | Dev C (Backend) | Phase 2 |
-| `ExtraAccountMetaList` PDA address for Transfer Hook | Dev C (Backend) | Phase 2 |
-| On-chain log event format (invest, refund, etc.) | Dev C (Backend) | Phase 2 |
-| Freeze Authority (multisig or intermediary) API | Dev C (Backend) | Phase 2 |
-| `RwaClient` SDK npm package | Dev A (Frontend), Dev C (Backend) | Phase 4 |
-| Final program ID | Dev A (Frontend), Dev C (Backend) | Phase 6 |
+| IDL JSON (stable) | dimagonedone (Frontend), russh (Backend) | Phase 3 start |
+| IDL JSON (frozen) | dimagonedone (Frontend), russh (Backend) | Phase 3 end |
+| Whitelist PDA seeds + instruction signature | russh (Backend) | Phase 2 |
+| `ExtraAccountMetaList` PDA address for Transfer Hook | russh (Backend) | Phase 2 |
+| On-chain log event format (invest, refund, etc.) | russh (Backend) | Phase 2 |
+| Freeze Authority (multisig or intermediary) API | russh (Backend) | Phase 2 |
+| `RwaClient` SDK npm package | dimagonedone (Frontend), russh (Backend) | Phase 4 |
+| Final program ID | dimagonedone (Frontend), russh (Backend) | Phase 6 |
 
 ---
 
@@ -404,7 +426,7 @@ A user story is complete when:
 
 - [ ] Instruction compiles and deploys to devnet
 - [ ] Anchor test covers: happy path, authority failure, wrong-state failure, arithmetic edge case
-- [ ] Emits correct structured log event parseable by Dev C's indexer
+- [ ] Emits correct structured log event parseable by russh's indexer
 - [ ] `cargo clippy` passes with zero warnings for the instruction
 - [ ] Documented in the PDA reference doc (seeds, size, account fields)
 - [ ] Reviewed by one other team member

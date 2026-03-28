@@ -1,6 +1,6 @@
 # Frontend Developer Plan — RWA Taxi Tokenization
 
-**Role:** Dev A — Frontend (Next.js, Wallet Adapter, direct RPC reads)
+**Role:** dimagonedone (Frontend) (Next.js, Wallet Adapter, direct RPC reads)
 **Prepared by:** Product Owner / System Analyst
 **Last updated:** 2026-03-28
 
@@ -322,10 +322,10 @@ Key reads the frontend performs directly against Solana RPC:
 
 | Dependency | Provider | Needed By | Blocking? |
 | --- | --- | --- | --- |
-| IDL JSON (stable) | Dev B (On-chain) | Phase 3 | Yes — needed to build invest/claim txs |
-| IDL JSON (frozen) | Dev B (On-chain) | Phase 3 end | Yes — final tx construction |
-| All PDA seeds documented | Dev B (On-chain) | Phase 2 | Yes — needed to derive PDAs client-side |
-| `GET /telemetry/latest` live on devnet | Dev C (Backend) | Phase 3 | Yes — telemetry widget blocked until this is up |
+| IDL JSON (stable) | ndrkbrg (On-chain) | Phase 3 | Yes — needed to build invest/claim txs |
+| IDL JSON (frozen) | ndrkbrg (On-chain) | Phase 3 end | Yes — final tx construction |
+| All PDA seeds documented | ndrkbrg (On-chain) | Phase 2 | Yes — needed to derive PDAs client-side |
+| `GET /telemetry/latest` live on devnet | russh (Backend) | Phase 3 | Yes — telemetry widget blocked until this is up |
 | Sumsub KYC form URL | Platform ops | Phase 2 | Yes — KYC CTA links to external form |
 
 ---

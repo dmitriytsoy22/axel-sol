@@ -1,6 +1,6 @@
 # Backend Developer Plan — RWA Taxi Tokenization
 
-**Role:** Dev C — Backend (NestJS, minimal — no database)
+**Role:** russh (Backend) (NestJS, minimal — no database)
 **Prepared by:** Product Owner / System Analyst
 **Last updated:** 2026-03-28
 
@@ -187,14 +187,14 @@ Yandex Pro API
 
 | Dependency | Provider | Needed By | Blocking? |
 | --- | --- | --- | --- |
-| `record_telemetry` instruction + program ID | Dev B (On-chain) | Phase 2 | Yes — oracle cron calls this |
-| `add_to_whitelist` instruction signature | Dev B (On-chain) | Phase 2 | Yes — KYC webhook calls this |
-| Freeze Authority keypair / multisig interface | Dev B (On-chain) | Phase 2 | Yes — unfreeze after KYC |
+| `record_telemetry` instruction + program ID | ndrkbrg (On-chain) | Phase 2 | Yes — oracle cron calls this |
+| `add_to_whitelist` instruction signature | ndrkbrg (On-chain) | Phase 2 | Yes — KYC webhook calls this |
+| Freeze Authority keypair / multisig interface | ndrkbrg (On-chain) | Phase 2 | Yes — unfreeze after KYC |
 | Sumsub account + webhook secret | Platform ops | Phase 2 | Yes — webhook can't be tested without it |
 
 ---
 
-## What Dev C Does NOT Build
+## What russh Does NOT Build
 
 This is explicit — these were in the previous plan and are now removed:
 
