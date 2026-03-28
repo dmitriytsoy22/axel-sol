@@ -1,7 +1,6 @@
-import { FC } from 'react';
 import { useTranslations } from 'next-intl';
 
-const Footer: FC = () => {
+const Footer = (): JSX.Element => {
   const t = useTranslations('Footer');
 
   return (

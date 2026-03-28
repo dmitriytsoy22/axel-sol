@@ -41,7 +41,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
   params: { locale: string };
-}) {
+}): Promise<JSX.Element> {
   if (!routing.locales.includes(locale as any)) {
     notFound();
   }

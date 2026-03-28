@@ -1,4 +1,4 @@
-export default function AssetDetailPage({ params }: { params: { id: string } }) {
+export default function AssetDetailPage({ params }: { params: { id: string } }): JSX.Element {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] px-5">
       <div className="max-w-page w-full animate-fade-in">

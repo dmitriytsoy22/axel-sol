@@ -1,6 +1,6 @@
 import { useTranslations } from 'next-intl';
 
-export default function HomePage() {
+export default function HomePage(): JSX.Element {
   const t = useTranslations('HomePage');
 
   return (
