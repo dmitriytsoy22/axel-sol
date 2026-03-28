@@ -150,14 +150,14 @@ const Navbar: FC = () => {
             {/* Language Switcher — Desktop */}
             <div className="hidden sm:block relative group">
               <button
-                className="flex items-center space-x-2 px-3 py-1.5 rounded-full hover:bg-surface-secondary transition-colors duration-200 border border-transparent hover:border-border-subtle cursor-pointer bg-transparent"
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-surface-secondary hover:bg-surface-hover transition-colors duration-200 border border-transparent cursor-pointer"
                 title="Switch Language"
               >
                 <span className="material-symbols-outlined text-[18px] text-text-secondary">language</span>
-                <span className="text-[13px] font-bold text-text-primary tracking-tight uppercase">{locale}</span>
-                <span className="material-symbols-outlined text-[16px] text-text-secondary">expand_more</span>
+                <span className="text-[12px] font-semibold text-text-secondary tracking-[0.05em] uppercase">{locale}</span>
+                <span className="material-symbols-outlined text-[16px] text-text-tertiary">keyboard_arrow_down</span>
               </button>
-              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-border-subtle py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-dropdown">
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.1)] border border-border-subtle py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible origin-top-right scale-95 group-hover:scale-100 transition-all duration-200 ease-out z-dropdown">
                 <button onClick={() => switchLocale('en')} className="w-full flex items-center justify-between px-4 py-2 text-[13px] font-medium hover:bg-surface-secondary transition-colors border-none bg-transparent cursor-pointer">
                   <span className={locale === 'en' ? 'text-text-primary' : 'text-text-secondary'}>English</span>
                   {locale === 'en' && <span className="material-symbols-outlined text-[16px] text-brand-primary">check</span>}
@@ -226,12 +226,16 @@ const Navbar: FC = () => {
                 <button
                   id="wallet-connect"
                   onClick={handleConnect}
-                  className="text-brand-primary hover:text-brand-primary-hover text-[14px] font-normal transition-colors duration-fast cursor-pointer border-none bg-transparent"
+                  className="flex items-center space-x-1.5 px-5 py-2 rounded-full bg-brand-primary-light text-brand-primary-active hover:bg-[#B5F5FC] transition-colors duration-200 font-medium text-[13px] border-none cursor-pointer"
                 >
-                  {hasPhantom ? tCommon('connect') : tCommon('installPhantom')}
+                  <span className="material-symbols-outlined text-[16px]">link</span>
+                  <span>{hasPhantom ? tCommon('connect') : tCommon('installPhantom')}</span>
                 </button>
               ) : (
-                <span className="text-brand-primary text-[14px] font-normal">{tCommon('connect')}</span>
+                <button className="flex items-center space-x-1.5 px-5 py-2 rounded-full bg-surface-secondary text-text-secondary font-medium text-[13px] border-none">
+                  <span className="material-symbols-outlined text-[16px]">link</span>
+                  <span>{tCommon('connect')}</span>
+                </button>
               )}
             </div>
 
@@ -349,12 +353,16 @@ const Navbar: FC = () => {
           ) : mounted ? (
             <button
               onClick={handleConnect}
-              className="text-left text-brand-primary hover:text-brand-primary-hover text-[17px] font-normal transition-colors duration-fast cursor-pointer border-none bg-transparent py-2"
+              className="flex items-center justify-center space-x-2 w-full mt-4 text-brand-primary-active bg-brand-primary-light hover:bg-[#B5F5FC] text-[16px] font-medium transition-colors duration-fast cursor-pointer border-none rounded-xl py-3"
             >
-              {hasPhantom ? tCommon('connect') : `${tCommon('installPhantom')} →`}
+              <span className="material-symbols-outlined text-[20px]">link</span>
+              <span>{hasPhantom ? tCommon('connect') : `${tCommon('installPhantom')} →`}</span>
             </button>
           ) : (
-            <span className="text-brand-primary text-[17px] font-normal py-2">{tCommon('connect')}</span>
+            <div className="flex items-center justify-center space-x-2 w-full mt-4 text-text-secondary bg-surface-secondary text-[16px] font-medium rounded-xl py-3">
+              <span className="material-symbols-outlined text-[20px]">link</span>
+              <span>{tCommon('connect')}</span>
+            </div>
           )}
         </div>
       </div>
