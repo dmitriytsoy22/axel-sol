@@ -25,5 +25,20 @@
     "description": "Invest in tokenized taxi assets on Solana. Transparent on-chain ownership, real revenue, and blockchain-verified telemetry.",
     "ogTitle": "AXEL — Real-World Asset Tokenization",
     "ogDescription": "Tokenized taxi assets on Solana. Transparent. On-chain."
+  },
+  "Catalog": {
+    "filterAll": "All",
+    "statusFundraising": "Fundraising",
+    "statusActive": "Active",
+    "statusPaused": "Paused",
+    "statusClosed": "Closed",
+    "statusFinalized": "Finalized",
+    "statusInitializing": "Initializing",
+    "emptyTitle": "No assets found",
+    "emptySubtitle": "We couldn't find any tokens matching your criteria.",
+    "raised": "Raised",
+    "pricePerToken": "Price per token",
+    "investBtn": "Invest Now",
+    "viewBtn": "View Details"
   }
 }

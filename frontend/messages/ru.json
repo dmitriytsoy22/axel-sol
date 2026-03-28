@@ -25,5 +25,20 @@
     "description": "Инвестируйте в токенизированные таксопарки на Solana. Прозрачное владение на блокчейне, реальный доход и верифицированная телеметрия.",
     "ogTitle": "AXEL — Токенизация Реальных Активов",
     "ogDescription": "Токенизированные таксопарки на Solana. Прозрачно. На блокчейне."
+  },
+  "Catalog": {
+    "filterAll": "Все",
+    "statusFundraising": "Сбор средств",
+    "statusActive": "Активен",
+    "statusPaused": "Пауза",
+    "statusClosed": "Закрыт",
+    "statusFinalized": "Завершен",
+    "statusInitializing": "Инициализация",
+    "emptyTitle": "Активы не найдены",
+    "emptySubtitle": "Мы не нашли токены по вашему запросу.",
+    "raised": "Собрано",
+    "pricePerToken": "Цена токена",
+    "investBtn": "Инвестировать",
+    "viewBtn": "Детали"
   }
 }
