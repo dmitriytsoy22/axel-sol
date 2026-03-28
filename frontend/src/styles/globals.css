@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── AXEL Global Styles ──────────────────────────────── */
+
+:root {
+  /* Brand */
+  --brand-primary: #06B6D4;
+  --brand-primary-hover: #0891B2;
+  --brand-primary-active: #0E7490;
+
+  /* Surfaces */
+  --bg: #FFFFFF;
+  --bg-secondary: #F5F5F7;
+  --bg-tertiary: #FBFBFD;
+  --surface: #FFFFFF;
+  --surface-hover: #F0F0F2;
+
+  /* Text */
+  --text-primary: #1D1D1F;
+  --text-secondary: #6E6E73;
+  --text-tertiary: #86868B;
+
+  /* Borders */
+  --border: #D2D2D7;
+  --border-subtle: #E8E8ED;
+
+  /* Semantic */
+  --success: #34C759;
+  --warning: #FF9F0A;
+  --error: #FF3B30;
+  --info: #007AFF;
+}
+
+/* ── Base resets ─────────────────────────────────────── */
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+  font-size: 17px;
+  line-height: 1.47;
+  letter-spacing: -0.022em;
+  color: var(--text-primary);
+  background-color: var(--bg);
+}
+
+/* ── Smooth scroll ───────────────────────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* ── Selection ───────────────────────────────────────── */
+
+::selection {
+  background: rgba(6, 182, 212, 0.20);
+  color: var(--text-primary);
+}
+
+/* ── Focus visible ───────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Skeleton shimmer ────────────────────────────────── */
+
+@layer utilities {
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      #E8E8ED 25%,
+      #F5F5F7 50%,
+      #E8E8ED 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+  }
+}
