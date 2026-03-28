@@ -1,0 +1,24 @@
+{
+  "Common": {
+    "connect": "Қосылу",
+    "installPhantom": "Phantom орнату",
+    "disconnect": "Ажырату",
+    "copy": "Көшіру",
+    "copied": "✓ Көшірілді",
+    "copyAddress": "Мекенжайды көшіру"
+  },
+  "Navigation": {
+    "catalog": "Каталог",
+    "dashboard": "Бақылау тақтасы",
+    "payouts": "Төлемдер"
+  },
+  "HomePage": {
+    "title": "Нақты активтерге инвестиция жасаңыз",
+    "subtitle": "Solana-дағы токенизацияланған такси парктері. Ашық. Блокчейнде.",
+    "explore": "Активтерді зерттеу"
+  },
+  "Footer": {
+    "builtOnSolana": "Solana негізінде жасалған",
+    "docs": "Құжаттар"
+  }
+}

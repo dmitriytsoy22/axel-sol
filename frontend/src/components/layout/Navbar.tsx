@@ -21,7 +21,7 @@ const Navbar: FC = () => {
   const locale = useLocale();
 
   const toggleLocale = useCallback(() => {
-    const nextLocale = locale === 'en' ? 'ru' : 'en';
+    const nextLocale = locale === 'en' ? 'ru' : locale === 'ru' ? 'kk' : 'en';
     router.replace(pathname as any, { locale: nextLocale });
   }, [locale, pathname, router]);
   const { select, wallets, wallet, disconnect, connected } = useWallet();
@@ -164,7 +164,7 @@ const Navbar: FC = () => {
                 title="Switch Language"
               >
                 <span className="text-[14px] font-medium text-text-secondary uppercase">
-                  {locale === 'en' ? 'RU' : 'EN'}
+                  {locale === 'en' ? 'RU' : locale === 'ru' ? 'KK' : 'EN'}
                 </span>
               </button>
             </div>
@@ -317,7 +317,7 @@ const Navbar: FC = () => {
             onClick={toggleLocale}
             className="text-left text-[17px] font-normal text-text-secondary hover:text-text-primary transition-colors duration-fast cursor-pointer border-none bg-transparent py-2"
           >
-            {locale === 'en' ? 'Switch to Russian' : 'Switch to English'}
+            {locale === 'en' ? 'Switch to Russian' : locale === 'ru' ? 'Қазақ тіліне ауысу' : 'Switch to English'}
           </button>
 
           {/* Wallet — Mobile */}
