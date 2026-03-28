@@ -53,6 +53,8 @@ AXEL — платформа токенизации реальных активо
 - Настрой `.env.local.example`.
 - Настрой Tailwind с палитрой из дизайн-системы (Light theme, Primary: Cyan #06B6D4).
 - Создай `src/lib/solana/connection.ts`.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - ОБЯЗАТЕЛЬНО: Настрой инфраструктуру для тестирования (Vitest, React Testing Library).
@@ -85,6 +87,8 @@ AXEL — RWA токенизация на Solana. On-chain first. Проект и
 3. Создай `Navbar` (Apple-style 52px, wallet chip с state: Connect / Address+SOL balance) и `Footer`.
 4. Обнови Root Layout (шрифты Inter, провайдеры).
 5. Создай хук `useWalletInfo` для вывода баланса и адреса.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - ОБЯЗАТЕЛЬНО НАПИШИ ТЕСТЫ для `Navbar`, `Footer`, `useWalletInfo` с моком Wallet Adapter!
@@ -115,6 +119,8 @@ AXEL — RWA токенизация на Solana. Весь стейт on-chain в
 5. Создай Telemetry API client (`src/lib/api/telemetry.ts`).
 6. Создай React Query хуки (`useProjectState`, `useInvestorRecord` и т.д.).
 7. Напиши mock data для разработки UI.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - НАПИШИ ТЕСТЫ: Unit-тесты для функций деривации PDA (`pda.ts`), читалок, и хуков React Query (мокая on-chain вызовы).
@@ -141,6 +147,8 @@ AXEL — RWA платформа на Solana. Внедряем строгую м�
 2. Создай словари (messages/en.json, messages/ru.json) с неймспейсами (Common, Navigation, Web3Errors, Dashboard, Asset).
 3. Интегрируй в App Router (оберни RootLayout в NextIntlClientProvider, переведи харкдод строки в `useTranslations()`).
 > **ПРАВИЛО ДЛЯ ВСЕХ ПОСЛЕДУЮЩИХ ЗАДАЧ:** ВЕСЬ новый UI должен писаться с использованием `next-intl`.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Напиши тесты: Проверь, что смена локалей отрабатывает корректно и словари загружаются.
@@ -173,6 +181,8 @@ AXEL — RWA платформа на Solana. Внедряем строгую м�
 3. `Card.tsx` и `Skeleton.tsx`.
 4. `AssetCard.tsx`: Рендерит данные Project, Badge статуса, ProgressBar, Цену.
 5. Страница каталога: Hero блок ("Invest in Real-World Assets"), Фильтрация (pill chips), Скилетоны для Loading, Empty state. Max-width 980px.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - НАПИШИ ТЕСТЫ для всех UI компонентов (`Badge`, `ProgressBar`, `Card`, `AssetCard`) используя RTL.
@@ -204,6 +214,8 @@ AXEL — RWA платформа на Solana. Внедряем строгую м�
 6. `RevenueProjection.tsx`: Horizontal CSS bars (Revenue - Expenses - Reserve = Profit).
 7. `InvestButton.tsx`: Интеграция с KYC и Wallet state (Connect Wallet / Complete KYC / Invest Now).
 8. Сборка страницы: 2 столбца десктоп, 1 на мобиле Sticky.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Unit-тесты для `CountdownTimer` (моковая дата), `AssetHeader`, `InvestButton` стейтов.
@@ -230,6 +242,8 @@ Whitelist проверяется ON-CHAIN (WhitelistEntry PDA). Если нет 
 1. `Modal.tsx`: Backdrop-blur(20px), scale animation, focus trap.
 2. `KycPrompt.tsx`: Inline компонент для Asset page. CTA "Start Verification" ссылается на внешний URL.
 3. `WhitelistGate.tsx`: Компонент-обертка. Проверяет Wallet, затем PDA. Показывает Skeleton, KycPrompt, или children (если whitelisted).
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Тесты для `WhitelistGate` с разными стейтами: (не подключен кошелек, не whitelist, whitelisted, загрузка).
@@ -257,6 +271,8 @@ Whitelist проверяется ON-CHAIN (WhitelistEntry PDA). Если нет 
 2. `useInvest.tsx` hook: Состояния (idle, preflight, awaiting_wallet, confirming, success, error).
 3. `errors.ts`: Декодер ошибок Anchor в i18n строки.
 4. Обнови InvestModal, чтобы отображать все стадии транзакции.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Тесты для `InvestModal` (валидация инпутов, disable кнопки).
@@ -284,6 +300,8 @@ Unified система обратной связи для транзакций �
 2. `TransactionStatus.tsx`: Inline фидбэк для модалок. (spinners, checkmarks).
 3. `useTransactionConfirmation.ts`: Поллинг `connection.confirmTransaction`.
 4. Интегрируй в Invest Flow.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Тест контекста тостов и их рендера, тест `TransactionStatus` визуальных состояний.
@@ -312,6 +330,8 @@ Dashboard читает ВСЁ on-chain из хуков.
 3. `RevenuePeriodsCard.tsx`: Список периодов, статус (Claimed/Unclaimed). Расчет claimable доли.
 4. `useDashboard.ts`: Собирает метрики из остальных хуков.
 5. Страница `/dashboard/page.tsx`: Пустое состояние (No investments), CTA коннекта.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Unit-тесты для таблиц, проверка рендеринга пустых и заполненных состояний, тесты математики `useDashboard`.
@@ -338,6 +358,8 @@ Dashboard читает ВСЁ on-chain из хуков.
 1. `TelemetryWidget.tsx`: Статусы (In Service / Maintenance / Inactive). Вывод Daily Revenue, Mileage, Trips.
 2. Отработка стейта `stale` и `available: false` (empty state).
 3. Интегрируй в `Dashboard` между метриками и payouts.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Напиши mock-тесты с помощью MSW или мокая `fetch` для телеметрии (успешный, stale, error состояния).
@@ -364,6 +386,8 @@ Claim = on-chain tx.
 2. `ClaimButton.tsx`: Кнопка клейма с конфирмом, статусами в процессе загрузки.
 3. `ClaimAllButton.tsx`: Последовательный claim всех доступных периодов.
 4. Внедрить в `RevenuePeriodsCard`.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Тесты хука клейма и кнопок состояний, UI тесты на ClaimAll (disable logic).
@@ -390,6 +414,8 @@ Claim = on-chain tx.
 2. Обнови все on-chain хуки (`useProjectState` и тд) добавив retry, timeout error messages.
 3. Оберни ключевые зоны (Catalog, Asset Details, Dashboard) в Error Boundary.
 4. Добавь Connection status indicator (green/red dot в Navbar).
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Протестируй рендеринг `RpcErrorBoundary` и вывод правильного UI при ошибке RPC.
@@ -416,6 +442,8 @@ Claim = on-chain tx.
 1. `DataTable.tsx`: Generic sortable таблица, client-side pagination.
 2. `PayoutHistoryTable.tsx`: Колонки (Period, Deposited, Share, Claim, Status, TX Link). Sort by descending.
 3. Страница `/payouts/page.tsx`: Summary cards (Total Claimed, Unclaimed, Periods) и таблица.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Тесты для `DataTable` (сортировка, пагинация). Тесты для `PayoutHistoryTable`.
@@ -444,6 +472,8 @@ Admin интерфейс = прямые транзакции с админско
 4. `DepositRevenueForm.tsx`: Форма Revenue/Expenses/Reserve, кнопка Deposit, tx sending.
 5. `ProjectControls.tsx`: Pause / Resume / Close (danger state) pills.
 6. Внедрить на `/admin/page.tsx`.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Тесты `AdminGuard` (допуск/недопуск). Тесты `DepositRevenueForm` на валидацию инпутов. 
@@ -469,6 +499,8 @@ Admin интерфейс = прямые транзакции с админско
 2. Catalog: Grid адаптация.
 3. Asset Detail: Sticky bottom bar для invest на мобиле.
 4. Dashboard & Payouts: Смена layout таблиц на карточки для компактных видов.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Отрендери RTL тесты с resize окна или проверь классы.
@@ -492,6 +524,8 @@ Admin интерфейс = прямые транзакции с админско
 1. `next.config.js`: Настрой CSP, X-Frame-Options, Permissions-Policy заголовки.
 2. `src/lib/security/sanitize.ts`: strip HTML, wallet validation, positive sols.
 3. Оберни парсинг on-chain стрингов в санитизатор.
+- ОБЯЗАТЕЛЬНО: Добавь переводы для 3х языков (EN, RU, KK) в `messages/`
+
 
 ## Тестирование
 - Тесты для всех утилит безопасности в `sanitize.ts`.
