@@ -40,5 +40,32 @@
     "pricePerToken": "Цена токена",
     "investBtn": "Инвестировать",
     "viewBtn": "Детали"
+  },
+  "Asset": {
+    "fundingProgress": "Прогресс сбора средств",
+    "tokensRemaining": "Осталось токенов",
+    "startsIn": "Начнется через",
+    "endsIn": "Закончится через",
+    "ended": "Завершено",
+    "investmentDetails": "Детали инвестиций",
+    "pricePerToken": "Цена за токен",
+    "minInvestment": "Минимальная инвестиция",
+    "maxInvestment": "Максимальная инвестиция",
+    "mintAddress": "Адрес токена (Mint)",
+    "vaultAddress": "Адрес хранилища (Vault)",
+    "revenueProjection": "Прогноз доходности",
+    "grossRevenue": "Валовая выручка",
+    "expenses": "Расходы",
+    "maintenanceReserve": "Резерв на обслуживание",
+    "netProfit": "Чистая прибыль",
+    "investNow": "Инвестировать сейчас",
+    "completeKyc": "Пройти верификацию KYC",
+    "connectWallet": "Подключить кошелек",
+    "carSpecs": "Характеристики автомобиля",
+    "vin": "VIN",
+    "licensePlate": "Госномер",
+    "status": "Статус",
+    "backToCatalog": "Вернуться в каталог",
+    "notFound": "Актив не найден"
   }
 }

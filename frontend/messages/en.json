@@ -40,5 +40,32 @@
     "pricePerToken": "Price per token",
     "investBtn": "Invest Now",
     "viewBtn": "View Details"
+  },
+  "Asset": {
+    "fundingProgress": "Funding Progress",
+    "tokensRemaining": "Tokens Remaining",
+    "startsIn": "Starts In",
+    "endsIn": "Ends In",
+    "ended": "Ended",
+    "investmentDetails": "Investment Details",
+    "pricePerToken": "Price Per Token",
+    "minInvestment": "Minimum Investment",
+    "maxInvestment": "Maximum Investment",
+    "mintAddress": "Mint Address",
+    "vaultAddress": "Vault Address",
+    "revenueProjection": "Revenue Projection",
+    "grossRevenue": "Gross Revenue",
+    "expenses": "Expenses",
+    "maintenanceReserve": "Maintenance Reserve",
+    "netProfit": "Net Profit",
+    "investNow": "Invest Now",
+    "completeKyc": "Complete KYC",
+    "connectWallet": "Connect Wallet to Invest",
+    "carSpecs": "Car Specifications",
+    "vin": "VIN",
+    "licensePlate": "License Plate",
+    "status": "Status",
+    "backToCatalog": "Back to Catalog",
+    "notFound": "Asset not found"
   }
 }

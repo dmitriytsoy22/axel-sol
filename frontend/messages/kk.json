@@ -40,5 +40,32 @@
     "pricePerToken": "Токен бағасы",
     "investBtn": "Инвестициялау",
     "viewBtn": "Толығырақ"
+  },
+  "Asset": {
+    "fundingProgress": "Қаражат жинау барысы",
+    "tokensRemaining": "Қалған токендер",
+    "startsIn": "Басталуына",
+    "endsIn": "Аяқталуына",
+    "ended": "Аяқталды",
+    "investmentDetails": "Инвестиция деректері",
+    "pricePerToken": "Бір токеннің бағасы",
+    "minInvestment": "Минималды инвестиция",
+    "maxInvestment": "Максималды инвестиция",
+    "mintAddress": "Токен мекенжайы (Mint)",
+    "vaultAddress": "Қойма мекенжайы (Vault)",
+    "revenueProjection": "Кірістілік болжамы",
+    "grossRevenue": "Жалпы кіріс",
+    "expenses": "Шығындар",
+    "maintenanceReserve": "Қызмет көрсету резерві",
+    "netProfit": "Таза пайда",
+    "investNow": "Қазір инвестициялау",
+    "completeKyc": "KYC верификациясынан өту",
+    "connectWallet": "Әмиян қосу",
+    "carSpecs": "Көлік сипаттамалары",
+    "vin": "VIN",
+    "licensePlate": "Мемнөмір",
+    "status": "Мәртебесі",
+    "backToCatalog": "Каталогқа қайту",
+    "notFound": "Актив табылмады"
   }
 }

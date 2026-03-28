@@ -14,8 +14,8 @@
 | 2 | Wallet Adapter + Layout Shell | US-F01 | ✅ |
 | 3 | On-chain Client Layer + Types | — | ✅ |
 | 4 | Мультиязычность (i18n) | — | ✅ |
-| 5 | Каталог автомобилей | US-F03 | ⬜ |
-| 6 | Страница актива | US-F04 | ⬜ |
+| 5 | Каталог автомобилей | US-F03 | ✅ |
+| 6 | Страница актива | US-F04 | ✅ |
 | 7 | Whitelist Check + KYC CTA | US-F02 | ⬜ |
 | 8 | Invest Flow | US-F05 | ⬜ |
 | 9 | TX Confirmation Feedback | US-F06 | ⬜ |
