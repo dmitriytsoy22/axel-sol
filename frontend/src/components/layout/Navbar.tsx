@@ -1,8 +1,8 @@
 'use client';
 
 import { FC, useState, useEffect, useRef, useCallback } from 'react';
-import { Link, usePathname } from '@/i18n/routing';
-import { useTranslations } from 'next-intl';
+import { Link, usePathname, useRouter } from '@/i18n/routing';
+import { useTranslations, useLocale } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletInfo } from '@/hooks/useWalletInfo';
 
@@ -17,6 +17,13 @@ const Navbar: FC = () => {
   const tCommon = useTranslations('Common');
   
   const pathname = usePathname();
+  const router = useRouter();
+  const locale = useLocale();
+
+  const toggleLocale = useCallback(() => {
+    const nextLocale = locale === 'en' ? 'ru' : 'en';
+    router.replace(pathname as any, { locale: nextLocale });
+  }, [locale, pathname, router]);
   const { select, wallets, wallet, disconnect, connected } = useWallet();
   const { truncatedAddress, balance, publicKey } = useWalletInfo();
 
@@ -149,6 +156,19 @@ const Navbar: FC = () => {
 
           {/* Right — Wallet + Mobile Hamburger */}
           <div className="flex items-center gap-3">
+            {/* Language Switcher — Desktop */}
+            <div className="hidden sm:block">
+              <button
+                onClick={toggleLocale}
+                className="flex items-center justify-center w-[32px] h-[32px] rounded-full hover:bg-surface-secondary transition-colors duration-fast cursor-pointer border-none bg-transparent"
+                title="Switch Language"
+              >
+                <span className="text-[14px] font-medium text-text-secondary uppercase">
+                  {locale === 'en' ? 'RU' : 'EN'}
+                </span>
+              </button>
+            </div>
+
             {/* Wallet Section — Desktop */}
             <div className="hidden sm:block">
               {connected && truncatedAddress ? (
@@ -291,6 +311,14 @@ const Navbar: FC = () => {
 
           {/* Divider */}
           <div className="h-px bg-border-subtle my-3" />
+
+          {/* Language Switcher — Mobile */}
+          <button
+            onClick={toggleLocale}
+            className="text-left text-[17px] font-normal text-text-secondary hover:text-text-primary transition-colors duration-fast cursor-pointer border-none bg-transparent py-2"
+          >
+            {locale === 'en' ? 'Switch to Russian' : 'Switch to English'}
+          </button>
 
           {/* Wallet — Mobile */}
           {connected && truncatedAddress ? (
