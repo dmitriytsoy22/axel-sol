@@ -1,0 +1,5 @@
+*.json
+*.config.js
+*.config.ts
+.next/
+node_modules/

@@ -6,6 +6,7 @@ import { NavDesktopLinks } from './NavDesktopLinks';
 import { NavLanguageSwitcher } from './NavLanguageSwitcher';
 import { NavWalletMenu } from './NavWalletMenu';
 import { NavMobileMenu } from './NavMobileMenu';
+import { Logo } from './Logo';
 
 export const Navbar = (): JSX.Element => {
   const [scrolled, setScrolled] = useState(false);
@@ -42,9 +43,9 @@ export const Navbar = (): JSX.Element => {
         <div className="flex justify-between items-center px-8 w-full max-w-[980px] mx-auto h-full">
           <Link
             href="/"
-            className="text-xl font-bold tracking-tighter text-text-primary no-underline hover:opacity-80 transition-opacity duration-normal"
+            className="no-underline hover:opacity-80 transition-opacity duration-normal"
           >
-            AXEL
+            <Logo />
           </Link>
 
           <NavDesktopLinks />

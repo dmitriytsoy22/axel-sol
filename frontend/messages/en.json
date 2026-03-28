@@ -18,7 +18,12 @@
     "explore": "Explore Assets"
   },
   "Footer": {
-    "builtOnSolana": "Built on Solana",
-    "docs": "Docs"
+    "builtOnSolana": "Built on Solana"
+  },
+  "Metadata": {
+    "title": "AXEL — Real-World Asset Tokenization on Solana",
+    "description": "Invest in tokenized taxi assets on Solana. Transparent on-chain ownership, real revenue, and blockchain-verified telemetry.",
+    "ogTitle": "AXEL — Real-World Asset Tokenization",
+    "ogDescription": "Tokenized taxi assets on Solana. Transparent. On-chain."
   }
 }
