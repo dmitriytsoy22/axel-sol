@@ -5,6 +5,7 @@ import { Link, usePathname, useRouter } from '@/i18n/routing';
 import { useTranslations, useLocale } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletInfo } from '@/hooks/useWalletInfo';
+import { Globe, ChevronDown, Check, Link as LinkIcon, Menu, X } from 'lucide-react';
 
 const NAV_LINKS = [
   { href: '/assets', labelKey: 'catalog' },
@@ -153,22 +154,22 @@ const Navbar: FC = () => {
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-surface-secondary hover:bg-surface-hover transition-colors duration-200 border border-transparent cursor-pointer"
                 title="Switch Language"
               >
-                <span className="material-symbols-outlined text-[18px] text-text-secondary">language</span>
+                <Globe size={18} className="text-text-secondary" strokeWidth={1.5} />
                 <span className="text-[12px] font-semibold text-text-secondary tracking-[0.05em] uppercase">{locale}</span>
-                <span className="material-symbols-outlined text-[16px] text-text-tertiary">keyboard_arrow_down</span>
+                <ChevronDown size={14} className="text-text-tertiary" strokeWidth={2} />
               </button>
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.1)] border border-border-subtle py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible origin-top-right scale-95 group-hover:scale-100 transition-all duration-200 ease-out z-dropdown">
                 <button onClick={() => switchLocale('en')} className="w-full flex items-center justify-between px-4 py-2 text-[13px] font-medium hover:bg-surface-secondary transition-colors border-none bg-transparent cursor-pointer">
                   <span className={locale === 'en' ? 'text-text-primary' : 'text-text-secondary'}>English</span>
-                  {locale === 'en' && <span className="material-symbols-outlined text-[16px] text-brand-primary">check</span>}
+                  {locale === 'en' && <Check size={16} className="text-brand-primary" strokeWidth={2.5} />}
                 </button>
                 <button onClick={() => switchLocale('ru')} className="w-full flex items-center justify-between px-4 py-2 text-[13px] font-medium hover:bg-surface-secondary transition-colors border-none bg-transparent cursor-pointer">
                   <span className={locale === 'ru' ? 'text-text-primary' : 'text-text-secondary'}>Русский</span>
-                  {locale === 'ru' && <span className="material-symbols-outlined text-[16px] text-brand-primary">check</span>}
+                  {locale === 'ru' && <Check size={16} className="text-brand-primary" strokeWidth={2.5} />}
                 </button>
                 <button onClick={() => switchLocale('kk')} className="w-full flex items-center justify-between px-4 py-2 text-[13px] font-medium hover:bg-surface-secondary transition-colors border-none bg-transparent cursor-pointer">
                   <span className={locale === 'kk' ? 'text-text-primary' : 'text-text-secondary'}>Қазақша</span>
-                  {locale === 'kk' && <span className="material-symbols-outlined text-[16px] text-brand-primary">check</span>}
+                  {locale === 'kk' && <Check size={16} className="text-brand-primary" strokeWidth={2.5} />}
                 </button>
               </div>
             </div>
@@ -228,12 +229,12 @@ const Navbar: FC = () => {
                   onClick={handleConnect}
                   className="flex items-center space-x-1.5 px-5 py-2 rounded-full bg-brand-primary-light text-brand-primary-active hover:bg-[#B5F5FC] transition-colors duration-200 font-medium text-[13px] border-none cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[16px]">link</span>
+                  <LinkIcon size={16} strokeWidth={2} />
                   <span>{hasPhantom ? tCommon('connect') : tCommon('installPhantom')}</span>
                 </button>
               ) : (
                 <button className="flex items-center space-x-1.5 px-5 py-2 rounded-full bg-surface-secondary text-text-secondary font-medium text-[13px] border-none">
-                  <span className="material-symbols-outlined text-[16px]">link</span>
+                  <LinkIcon size={16} strokeWidth={2} />
                   <span>{tCommon('connect')}</span>
                 </button>
               )}
@@ -243,29 +244,10 @@ const Navbar: FC = () => {
             <button
               id="mobile-menu-toggle"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="sm:hidden flex flex-col justify-center items-center w-[44px] h-[44px] cursor-pointer border-none bg-transparent"
+              className="sm:hidden flex flex-col justify-center items-center w-[44px] h-[44px] cursor-pointer border-none bg-transparent text-text-primary"
               aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
             >
-              <span
-                className="block w-[18px] h-[1.5px] bg-text-primary transition-all duration-normal"
-                style={{
-                  transform: mobileMenuOpen ? 'rotate(45deg) translateY(1.5px)' : 'none',
-                  transformOrigin: 'center',
-                }}
-              />
-              <span
-                className="block w-[18px] h-[1.5px] bg-text-primary mt-[5px] transition-all duration-normal"
-                style={{
-                  opacity: mobileMenuOpen ? 0 : 1,
-                }}
-              />
-              <span
-                className="block w-[18px] h-[1.5px] bg-text-primary mt-[5px] transition-all duration-normal"
-                style={{
-                  transform: mobileMenuOpen ? 'rotate(-45deg) translateY(-6.5px)' : 'none',
-                  transformOrigin: 'center',
-                }}
-              />
+              {mobileMenuOpen ? <X size={24} strokeWidth={1.5} /> : <Menu size={24} strokeWidth={1.5} />}
             </button>
           </div>
         </div>
@@ -355,12 +337,12 @@ const Navbar: FC = () => {
               onClick={handleConnect}
               className="flex items-center justify-center space-x-2 w-full mt-4 text-brand-primary-active bg-brand-primary-light hover:bg-[#B5F5FC] text-[16px] font-medium transition-colors duration-fast cursor-pointer border-none rounded-xl py-3"
             >
-              <span className="material-symbols-outlined text-[20px]">link</span>
+              <LinkIcon size={20} strokeWidth={2} />
               <span>{hasPhantom ? tCommon('connect') : `${tCommon('installPhantom')} →`}</span>
             </button>
           ) : (
-            <div className="flex items-center justify-center space-x-2 w-full mt-4 text-text-secondary bg-surface-secondary text-[16px] font-medium rounded-xl py-3">
-              <span className="material-symbols-outlined text-[20px]">link</span>
+            <div className="flex items-center justify-center space-x-2 w-full mt-4 text-text-secondary bg-surface-secondary text-[16px] font-medium rounded-xl py-3 border border-border-subtle">
+              <LinkIcon size={20} strokeWidth={2} />
               <span>{tCommon('connect')}</span>
             </div>
           )}
