@@ -1,0 +1,39 @@
+# Agents
+.agents/
+.agent/
+_agents/
+_agent/
+
+# Dependencies
+node_modules/
+
+# Build
+.next/
+out/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.staging
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc
+.vercel/
+*.tsbuildinfo

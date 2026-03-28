@@ -1,0 +1,222 @@
+{
+  "meta": {
+    "name": "AXEL Design System",
+    "version": "2.0.0",
+    "description": "Design tokens for AXEL — RWA Taxi Tokenization Platform on Solana. Apple-inspired minimalism with Cyan brand.",
+    "updatedAt": "2026-03-28"
+  },
+  "colorScheme": "light",
+  "supportedSchemes": ["light", "dark"],
+  "fonts": [
+    { "family": "Inter", "role": "body", "weights": [400, 500, 600], "source": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" },
+    { "family": "Inter", "role": "heading", "weights": [600, 700], "source": "same" },
+    { "family": "JetBrains Mono", "role": "mono", "weights": [400, 500], "source": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" }
+  ],
+  "colors": {
+    "brand": {
+      "primary": "#06B6D4",
+      "primaryHover": "#0891B2",
+      "primaryActive": "#0E7490",
+      "primaryLight": "#CFFAFE",
+      "primaryMuted": "rgba(6, 182, 212, 0.10)",
+      "primarySubtle": "rgba(6, 182, 212, 0.06)"
+    },
+    "semantic": {
+      "success": "#34C759",
+      "successLight": "#D1FAE5",
+      "successMuted": "rgba(52, 199, 89, 0.10)",
+      "warning": "#FF9F0A",
+      "warningLight": "#FFF4E0",
+      "warningMuted": "rgba(255, 159, 10, 0.10)",
+      "error": "#FF3B30",
+      "errorLight": "#FEE2E2",
+      "errorMuted": "rgba(255, 59, 48, 0.10)",
+      "info": "#007AFF",
+      "infoLight": "#DBEAFE",
+      "infoMuted": "rgba(0, 122, 255, 0.10)"
+    },
+    "statusMapping": {
+      "fundraising": "warning",
+      "active": "success",
+      "paused": "warning",
+      "closed": "neutral"
+    },
+    "light": {
+      "background": "#FFFFFF",
+      "backgroundSecondary": "#F5F5F7",
+      "backgroundTertiary": "#FBFBFD",
+      "surface": "#FFFFFF",
+      "surfaceSecondary": "#F5F5F7",
+      "surfaceHover": "#F0F0F2",
+      "textPrimary": "#1D1D1F",
+      "textSecondary": "#6E6E73",
+      "textTertiary": "#86868B",
+      "textOnBrand": "#FFFFFF",
+      "link": "#06B6D4",
+      "linkHover": "#0891B2",
+      "border": "#D2D2D7",
+      "borderSubtle": "#E8E8ED",
+      "borderLight": "#F5F5F7",
+      "divider": "#D2D2D7",
+      "overlay": "rgba(0, 0, 0, 0.4)",
+      "skeleton": "#E8E8ED"
+    },
+    "dark": {
+      "background": "#000000",
+      "backgroundSecondary": "#1C1C1E",
+      "backgroundTertiary": "#2C2C2E",
+      "surface": "#1C1C1E",
+      "surfaceSecondary": "#2C2C2E",
+      "surfaceHover": "#3A3A3C",
+      "textPrimary": "#F5F5F7",
+      "textSecondary": "#A1A1A6",
+      "textTertiary": "#6E6E73",
+      "textOnBrand": "#FFFFFF",
+      "link": "#06B6D4",
+      "linkHover": "#22D3EE",
+      "border": "#38383A",
+      "borderSubtle": "#2C2C2E",
+      "borderLight": "#1C1C1E",
+      "divider": "#38383A",
+      "overlay": "rgba(0, 0, 0, 0.6)",
+      "skeleton": "#2C2C2E"
+    }
+  },
+  "typography": {
+    "fontFamilies": {
+      "heading": "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif",
+      "body": "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif",
+      "mono": "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace"
+    },
+    "tokens": {
+      "displayLarge":  { "size": "56px", "lineHeight": "1.07", "weight": 700, "tracking": "-0.005em" },
+      "displayMedium": { "size": "48px", "lineHeight": "1.08", "weight": 700, "tracking": "-0.003em" },
+      "displaySmall":  { "size": "40px", "lineHeight": "1.1",  "weight": 600, "tracking": "-0.002em" },
+      "headline":      { "size": "28px", "lineHeight": "1.14", "weight": 600, "tracking": "0.007em" },
+      "title1":        { "size": "24px", "lineHeight": "1.17", "weight": 600, "tracking": "0.009em" },
+      "title2":        { "size": "21px", "lineHeight": "1.19", "weight": 600, "tracking": "0.011em" },
+      "title3":        { "size": "19px", "lineHeight": "1.21", "weight": 600, "tracking": "0.012em" },
+      "body":          { "size": "17px", "lineHeight": "1.47", "weight": 400, "tracking": "-0.022em" },
+      "bodyEmphasized":{ "size": "17px", "lineHeight": "1.47", "weight": 600, "tracking": "-0.022em" },
+      "callout":       { "size": "16px", "lineHeight": "1.38", "weight": 400, "tracking": "-0.016em" },
+      "subheadline":   { "size": "15px", "lineHeight": "1.33", "weight": 400, "tracking": "-0.009em" },
+      "footnote":      { "size": "13px", "lineHeight": "1.38", "weight": 400, "tracking": "-0.006em" },
+      "caption1":      { "size": "12px", "lineHeight": "1.33", "weight": 400, "tracking": "0" },
+      "caption2":      { "size": "11px", "lineHeight": "1.27", "weight": 500, "tracking": "0.006em" },
+      "walletAddress": { "size": "14px", "lineHeight": "1.43", "weight": 500, "family": "mono" }
+    }
+  },
+  "spacing": {
+    "baseUnit": 8,
+    "scale": { "0.5": "4px", "1": "8px", "2": "16px", "3": "24px", "4": "32px", "5": "40px", "6": "48px", "8": "64px", "10": "80px", "12": "96px", "16": "128px" },
+    "page": { "paddingX": "20px", "paddingXMd": "40px", "paddingXLg": "80px", "maxWidth": "980px", "maxWidthWide": "1200px" },
+    "section": { "gap": "80px", "gapSm": "48px" },
+    "card": { "padding": "20px", "paddingLg": "32px", "gap": "12px" }
+  },
+  "borderRadius": {
+    "none": "0px",
+    "sm": "4px",
+    "md": "8px",
+    "lg": "12px",
+    "xl": "18px",
+    "2xl": "22px",
+    "pill": "980px",
+    "components": {
+      "button": "980px",
+      "card": "18px",
+      "cardSmall": "12px",
+      "input": "12px",
+      "badge": "980px",
+      "modal": "22px",
+      "toast": "14px",
+      "progressBar": "980px",
+      "chip": "980px"
+    }
+  },
+  "shadows": {
+    "light": {
+      "none": "none",
+      "xs": "0 1px 2px rgba(0,0,0,0.04)",
+      "sm": "0 2px 8px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)",
+      "md": "0 4px 16px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04)",
+      "lg": "0 8px 30px rgba(0,0,0,0.08)",
+      "xl": "0 16px 48px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.04)"
+    },
+    "dark": {
+      "none": "none",
+      "xs": "0 1px 2px rgba(0,0,0,0.3)",
+      "sm": "0 2px 8px rgba(0,0,0,0.3)",
+      "md": "0 4px 16px rgba(0,0,0,0.4)",
+      "lg": "0 8px 30px rgba(0,0,0,0.5)",
+      "xl": "0 16px 48px rgba(0,0,0,0.6)"
+    }
+  },
+  "transitions": {
+    "fast": "150ms ease",
+    "normal": "250ms ease",
+    "slow": "350ms ease",
+    "spring": "500ms cubic-bezier(0.25, 1, 0.5, 1)"
+  },
+  "breakpoints": { "sm": "734px", "md": "1068px", "lg": "1440px" },
+  "zIndex": { "dropdown": 50, "sticky": 100, "modal": 200, "toast": 300, "tooltip": 400 },
+  "components": {
+    "buttonPrimary": {
+      "background": "#06B6D4",
+      "backgroundHover": "#0891B2",
+      "backgroundActive": "#0E7490",
+      "textColor": "#FFFFFF",
+      "borderRadius": "980px",
+      "paddingX": "24px",
+      "paddingY": "12px",
+      "fontSize": "17px",
+      "fontWeight": 400,
+      "minHeight": "44px"
+    },
+    "buttonSecondary": {
+      "background": "transparent",
+      "backgroundHover": "rgba(6, 182, 212, 0.06)",
+      "textColor": "#06B6D4",
+      "border": "none",
+      "borderRadius": "980px",
+      "paddingX": "24px",
+      "paddingY": "12px",
+      "fontSize": "17px"
+    },
+    "buttonGhost": {
+      "background": "transparent",
+      "textColor": "#06B6D4",
+      "borderRadius": "980px",
+      "fontSize": "17px"
+    },
+    "card": {
+      "borderRadius": "18px",
+      "padding": "20px",
+      "background": "var(--surface)",
+      "border": "none"
+    },
+    "input": {
+      "borderRadius": "12px",
+      "padding": "12px 16px",
+      "fontSize": "17px",
+      "border": "1px solid var(--border)",
+      "focusBorderColor": "#06B6D4"
+    },
+    "badge": {
+      "borderRadius": "980px",
+      "paddingX": "10px",
+      "paddingY": "4px",
+      "fontSize": "12px",
+      "fontWeight": 500
+    },
+    "modal": { "borderRadius": "22px", "padding": "32px", "backdropBlur": "20px", "maxWidth": "480px" },
+    "navbar": { "height": "52px", "backdropBlur": "20px", "backdropSaturation": "180%" },
+    "progressBar": { "height": "6px", "background": "#06B6D4", "borderRadius": "980px" }
+  },
+  "personality": {
+    "tone": "minimal-confident",
+    "energy": "calm-authoritative",
+    "targetAudience": "mainstream investors entering Web3 through RWA",
+    "keywords": ["clean", "trustworthy", "minimal", "premium", "transparent"],
+    "designPhilosophy": "Let content speak. Remove everything unnecessary. Typography and whitespace are the design."
+  }
+}
