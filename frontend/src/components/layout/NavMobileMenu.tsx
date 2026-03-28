@@ -9,11 +9,6 @@ import { useWalletInfo } from '@/hooks/useWalletInfo';
 import { Link as LinkIcon, Menu, X } from 'lucide-react';
 import { NAV_LINKS } from './constants';
 
-/**
- * Props for the NavMobileMenu component.
- * @property {boolean} isOpen - Whether the mobile menu is currently open.
- * @property {(isOpen: boolean) => void} setIsOpen - Callback to set the mobile menu open state.
- */
 interface NavMobileMenuProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;

@@ -10,12 +10,10 @@ const Footer = (): JSX.Element => {
       style={{ borderTop: '0.5px solid #E8E8ED' }}
     >
       <div className="max-w-page-wide mx-auto px-5 md:px-[80px] flex flex-col sm:flex-row items-center justify-between gap-4">
-        {/* Left — Built on Solana */}
         <span className="text-[13px] font-normal text-text-tertiary tracking-[-0.006em]">
           {t('builtOnSolana')}
         </span>
 
-        {/* Right — Links */}
         <div className="flex items-center gap-6">
           <a
             href="https://explorer.solana.com/?cluster=devnet"

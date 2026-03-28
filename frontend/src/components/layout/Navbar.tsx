@@ -57,7 +57,6 @@ export const Navbar = (): JSX.Element => {
         </div>
       </nav>
 
-      {/* Spacer to prevent content from going under fixed navbar */}
       <div className="h-[52px]" />
     </>
   );
