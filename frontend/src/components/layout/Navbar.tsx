@@ -136,7 +136,7 @@ const Navbar: FC = () => {
                   key={href}
                   href={href as any}
                   className={`
-                    font-['Inter'] text-[12px] tracking-widest uppercase font-medium transition-colors duration-300 no-underline
+                    font-['Inter'] text-[13px] tracking-widest uppercase font-semibold transition-colors duration-300 no-underline
                     ${isActive ? 'text-text-primary font-bold' : 'text-text-secondary hover:text-brand-primary'}
                   `}
                 >
@@ -285,9 +285,9 @@ const Navbar: FC = () => {
                 key={href}
                 href={href as any}
                 className={`
-                  text-[17px] font-normal no-underline py-3
+                  text-[17px] font-semibold no-underline py-3
                   transition-colors duration-fast
-                  ${isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}
+                  ${isActive ? 'text-text-primary font-bold' : 'text-text-secondary hover:text-text-primary'}
                 `}
               >
                 {tNav(labelKey)}
