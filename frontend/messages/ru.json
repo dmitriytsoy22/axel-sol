@@ -18,7 +18,8 @@
     "explore": "Изучить активы"
   },
   "Footer": {
-    "builtOnSolana": "Построено на Solana"
+    "builtOnSolana": "Построено на Solana",
+    "docs": "Документация"
   },
   "Metadata": {
     "title": "AXEL — Токенизация Реальных Активов на Solana",

@@ -18,7 +18,8 @@
     "explore": "Активтерді зерттеу"
   },
   "Footer": {
-    "builtOnSolana": "Solana негізінде жасалған"
+    "builtOnSolana": "Solana негізінде жасалған",
+    "docs": "Құжаттама"
   },
   "Metadata": {
     "title": "AXEL — Solana жүйесіндегі Нақты Активтерді Токенизациялау",

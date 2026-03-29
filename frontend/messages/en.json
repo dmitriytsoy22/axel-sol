@@ -18,7 +18,8 @@
     "explore": "Explore Assets"
   },
   "Footer": {
-    "builtOnSolana": "Built on Solana"
+    "builtOnSolana": "Built on Solana",
+    "docs": "Docs"
   },
   "Metadata": {
     "title": "AXEL — Real-World Asset Tokenization on Solana",
