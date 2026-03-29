@@ -130,5 +130,21 @@
     "connected": "RPC-ге қосылды",
     "disconnected": "RPC-ден ажыратылды",
     "connecting": "Қосылуда..."
+  },
+  "Payouts": {
+    "title": "Төлемдер Тарихы",
+    "description": "Блокчейндегі табыстарыңыздың толық тарихы.",
+    "totalClaimed": "Барлығы Алынды",
+    "unclaimed": "Алынбады",
+    "periods": "Кезеңдер",
+    "tablePeriod": "Кезең",
+    "tableDeposited": "Салынған",
+    "tableShare": "Үлес",
+    "tableClaim": "Алуға",
+    "tableStatus": "Мәртебесі",
+    "tableTxLink": "TX сілтемесі",
+    "noPayouts": "Төлемдер табылмады.",
+    "statusClaimed": "Алынды",
+    "statusAvailable": "Қолжетімді"
   }
 }

@@ -130,5 +130,21 @@
     "connected": "Connected to RPC",
     "disconnected": "Disconnected from RPC",
     "connecting": "Connecting..."
+  },
+  "Payouts": {
+    "title": "Payout History",
+    "description": "Full on-chain history of your revenue claims.",
+    "totalClaimed": "Total Claimed",
+    "unclaimed": "Unclaimed",
+    "periods": "Periods",
+    "tablePeriod": "Period",
+    "tableDeposited": "Deposited",
+    "tableShare": "Share",
+    "tableClaim": "Claim Amount",
+    "tableStatus": "Status",
+    "tableTxLink": "TX Link",
+    "noPayouts": "No payouts found.",
+    "statusClaimed": "Claimed",
+    "statusAvailable": "Available"
   }
 }

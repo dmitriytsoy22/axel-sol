@@ -5,18 +5,22 @@ import { NextIntlClientProvider } from 'next-intl';
 import messagesEn from '../../../../messages/en.json';
 import { describe, it, expect } from 'vitest';
 
+import { ToastProvider } from '@/components/ui/toast/ToastProvider';
+
 const renderWithTranslations = (component: React.ReactNode) => {
   return render(
-    <NextIntlClientProvider locale="en" messages={messagesEn}>
-      {component}
-    </NextIntlClientProvider>
+    <ToastProvider>
+      <NextIntlClientProvider locale="en" messages={messagesEn}>
+        {component}
+      </NextIntlClientProvider>
+    </ToastProvider>
   );
 };
 
 describe('RevenuePeriodsCard', () => {
   it('renders nothing when empty', () => {
-    const { container } = renderWithTranslations(<RevenuePeriodsCard periods={[]} />);
-    expect(container).toBeEmptyDOMElement();
+    renderWithTranslations(<RevenuePeriodsCard periods={[]} />);
+    expect(screen.queryByText('Revenue Periods')).not.toBeInTheDocument();
   });
 
   it('renders filled periods correctly with status buttons', () => {

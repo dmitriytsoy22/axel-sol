@@ -17,6 +17,11 @@ const messages = {
     emptyState: 'Telemetry data is currently unavailable.',
     staleData: 'Last updated: {time}',
     loading: "Loading telemetry..."
+  },
+  RpcError: {
+    title: 'Connection Error',
+    description: 'Failed to load',
+    retry: 'Try Again'
   }
 };
 
@@ -95,9 +100,9 @@ describe('TelemetryWidget', () => {
     renderWidget();
 
     await waitFor(() => {
-      expect(screen.getByTestId('telemetry-error')).toBeInTheDocument();
+      expect(screen.getByText('Connection Error')).toBeInTheDocument();
     });
-    expect(screen.getByText('Telemetry data is currently unavailable.')).toBeInTheDocument();
+    expect(screen.getByText('Failed to load')).toBeInTheDocument();
   });
 
   it('handles stale data correctly', async () => {

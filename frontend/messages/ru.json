@@ -130,5 +130,21 @@
     "connected": "Подключено к RPC",
     "disconnected": "Нет связи с RPC",
     "connecting": "Подключение..."
+  },
+  "Payouts": {
+    "title": "История Выплат",
+    "description": "Полная история ваших выплат на блокчейне.",
+    "totalClaimed": "Всего Получено",
+    "unclaimed": "Не получено",
+    "periods": "Периоды",
+    "tablePeriod": "Период",
+    "tableDeposited": "Внесено",
+    "tableShare": "Доля",
+    "tableClaim": "К получению",
+    "tableStatus": "Статус",
+    "tableTxLink": "Ссылка на TX",
+    "noPayouts": "Выплаты не найдены.",
+    "statusClaimed": "Получено",
+    "statusAvailable": "Доступно"
   }
 }
