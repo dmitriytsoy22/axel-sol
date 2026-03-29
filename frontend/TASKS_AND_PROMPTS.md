@@ -16,11 +16,11 @@
 | 4 | Мультиязычность (i18n) | — | ✅ |
 | 5 | Каталог автомобилей | US-F03 | ✅ |
 | 6 | Страница актива | US-F04 | ✅ |
-| 7 | Whitelist Check + KYC CTA | US-F02 | ⬜ |
-| 8 | Invest Flow | US-F05 | ⬜ |
-| 9 | TX Confirmation Feedback | US-F06 | ⬜ |
+| 7 | Whitelist Check + KYC CTA | US-F02 | ✅ |
+| 8 | Invest Flow | US-F05 | ✅ |
+| 9 | TX Confirmation Feedback | US-F06 | ✅ |
 | 10 | Dashboard + Portfolio | US-F07 | ⬜ |
-| 11 | Live Telemetry Widget | US-F07b | ⬜ |
+| 11 | Live Telemetry Widget | US-F07b | ✅ |
 | 12 | Claim Revenue | US-F08 | ⬜ |
 | 13 | RPC Error Handling | US-F12 | ⬜ |
 | 14 | Payout History | US-F09 | ⬜ |
