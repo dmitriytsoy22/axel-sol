@@ -25,20 +25,20 @@ describe('DataTable', () => {
   it('renders data correctly', () => {
     render(<DataTable data={mockData} columns={mockColumns} />);
     
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('$300')).toBeInTheDocument();
+    expect(screen.getAllByText('Alice')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('$300')[0]).toBeInTheDocument();
   });
 
   it('handles empty state', () => {
     render(<DataTable data={[]} columns={mockColumns} emptyMessage="No items found" />);
     
-    expect(screen.getByText('No items found')).toBeInTheDocument();
+    expect(screen.getAllByText('No items found')[0]).toBeInTheDocument();
   });
 
   it('sorts data ascending and descending', () => {
     render(<DataTable data={mockData} columns={mockColumns} />);
     
-    const amountHeader = screen.getByText('Amount').closest('th');
+    const amountHeader = screen.getAllByText('Amount')[0].closest('th');
     
     // Initial order is unsorted (renders in array order)
     let cells = screen.getAllByRole('cell');
@@ -73,18 +73,18 @@ describe('DataTable', () => {
     render(<DataTable data={manyData} columns={mockColumns} pageSize={10} />);
     
     // Page 1
-    expect(screen.getByText('Person 0')).toBeInTheDocument();
-    expect(screen.getByText('Person 9')).toBeInTheDocument();
+    expect(screen.getAllByText('Person 0')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Person 9')[0]).toBeInTheDocument();
     expect(screen.queryByText('Person 10')).not.toBeInTheDocument();
     
     // Page indicators
-    expect(screen.getByText((content, element) => {
+    expect(screen.getAllByText((content, element) => {
       return element?.tagName.toLowerCase() === 'span' && content === '1';
-    })).toBeInTheDocument();
+    })[0]).toBeInTheDocument();
     
-    expect(screen.getByText((content, element) => {
+    expect(screen.getAllByText((content, element) => {
       return element?.tagName.toLowerCase() === 'span' && content === '2';
-    })).toBeInTheDocument();
+    })[0]).toBeInTheDocument();
 
     const nextBtn = screen.getByLabelText('Next Page');
     const prevBtn = screen.getByLabelText('Previous Page');
@@ -96,8 +96,8 @@ describe('DataTable', () => {
     fireEvent.click(nextBtn);
     
     expect(screen.queryByText('Person 9')).not.toBeInTheDocument();
-    expect(screen.getByText('Person 10')).toBeInTheDocument();
-    expect(screen.getByText('Person 14')).toBeInTheDocument();
+    expect(screen.getAllByText('Person 10')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Person 14')[0]).toBeInTheDocument();
 
     expect(nextBtn).toBeDisabled();
     expect(prevBtn).not.toBeDisabled();

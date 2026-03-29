@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { usePathname, useRouter, Link } from '@/i18n/routing';
 import { useLocale } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWalletInfo } from '@/hooks/useWalletInfo';
 import { Link as LinkIcon, Menu, X } from 'lucide-react';
 import { NAV_LINKS } from './constants';
@@ -21,7 +22,7 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
   const router = useRouter();
   const locale = useLocale();
 
-  const { select, wallets, disconnect, connected } = useWallet();
+  const { disconnect, connected } = useWallet();
   const { truncatedAddress, balance, publicKey } = useWalletInfo();
 
   const [copied, setCopied] = useState(false);
@@ -35,14 +36,11 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
     router.replace(pathname as any, { locale: newLocale });
   }, [pathname, router]);
 
+  const { setVisible } = useWalletModal();
+
   const handleConnect = useCallback(() => {
-    const phantomWallet = wallets.find((w) => w.adapter.name === 'Phantom');
-    if (phantomWallet) {
-      select(phantomWallet.adapter.name);
-    } else {
-      window.open('https://phantom.app', '_blank', 'noopener,noreferrer');
-    }
-  }, [wallets, select]);
+    setVisible(true);
+  }, [setVisible]);
 
   const handleDisconnect = useCallback(async () => {
     await disconnect();
@@ -58,8 +56,6 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
       console.error('[AXEL] Failed to copy address');
     }
   }, [publicKey]);
-
-  const hasPhantom = mounted && wallets.some((w) => w.adapter.name === 'Phantom');
 
   return (
     <>
@@ -151,7 +147,7 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
               className="flex items-center justify-center space-x-2 w-full mt-4 text-brand-primary-active bg-brand-primary-light hover:bg-[#B5F5FC] text-[16px] font-medium transition-colors duration-fast cursor-pointer border-none rounded-xl py-3"
             >
               <LinkIcon size={20} strokeWidth={2} />
-              <span>{hasPhantom ? tCommon('connect') : `${tCommon('installPhantom')} →`}</span>
+              <span>{tCommon('connect')}</span>
             </button>
           ) : (
             <div className="flex items-center justify-center space-x-2 w-full mt-4 text-text-secondary bg-surface-secondary text-[16px] font-medium rounded-xl py-3 border border-border-subtle">

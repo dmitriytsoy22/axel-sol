@@ -33,7 +33,7 @@ function HomePageContent(): JSX.Element {
     <div className="flex flex-col items-center w-full pb-20">
       {/* Hero Section */}
       <section className="w-full bg-gradient-to-b from-gray-50 to-white pt-24 pb-16 px-5 border-b border-gray-100 flex justify-center">
-        <div className="max-w-[980px] w-full text-center animate-fade-in">
+        <div className="max-w-[1200px] w-full text-center animate-fade-in">
           <h1 className="text-display-lg text-text-primary mb-4 font-semibold tracking-tight">
             {t('title')}
           </h1>
@@ -59,7 +59,7 @@ function HomePageContent(): JSX.Element {
       </section>
 
       {/* Catalog Grid */}
-      <section className="w-full max-w-[980px] px-5 py-12">
+      <section className="w-full max-w-[1200px] px-5 py-12">
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (

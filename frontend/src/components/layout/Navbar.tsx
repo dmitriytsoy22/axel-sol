@@ -41,7 +41,7 @@ export const Navbar = (): JSX.Element => {
         id="navbar"
         className={`fixed top-0 w-full h-[52px] z-sticky bg-white/80 backdrop-blur-xl shadow-[0_10px_40px_rgba(29,29,31,0.05)] border-b transition-colors duration-250 ${scrolled ? 'border-border-subtle' : 'border-transparent'}`}
       >
-        <div className="flex justify-between items-center px-8 w-full max-w-[980px] mx-auto h-full">
+        <div className="flex justify-between items-center px-8 w-full max-w-[1200px] mx-auto h-full">
           <Link
             href="/"
             className="no-underline hover:opacity-80 transition-opacity duration-normal"

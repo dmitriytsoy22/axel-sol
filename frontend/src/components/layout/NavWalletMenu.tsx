@@ -3,12 +3,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWalletInfo } from '@/hooks/useWalletInfo';
 import { Link as LinkIcon } from 'lucide-react';
 
 export const NavWalletMenu = (): JSX.Element => {
   const tCommon = useTranslations('Common');
-  const { select, wallets, disconnect, connected } = useWallet();
+  const { disconnect, connected } = useWallet();
   const { truncatedAddress, balance, publicKey } = useWalletInfo();
   
   const [chipDropdownOpen, setChipDropdownOpen] = useState(false);
@@ -37,14 +38,11 @@ export const NavWalletMenu = (): JSX.Element => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const { setVisible } = useWalletModal();
+
   const handleConnect = useCallback(() => {
-    const phantomWallet = wallets.find((w) => w.adapter.name === 'Phantom');
-    if (phantomWallet) {
-      select(phantomWallet.adapter.name);
-    } else {
-      window.open('https://phantom.app', '_blank', 'noopener,noreferrer');
-    }
-  }, [wallets, select]);
+    setVisible(true);
+  }, [setVisible]);
 
   const handleDisconnect = useCallback(async () => {
     await disconnect();
@@ -116,7 +114,7 @@ export const NavWalletMenu = (): JSX.Element => {
           className="flex items-center space-x-1.5 px-5 py-2 rounded-full bg-brand-primary-light text-brand-primary-active hover:bg-[#B5F5FC] transition-colors duration-200 font-medium text-[13px] border-none cursor-pointer"
         >
           <LinkIcon size={16} strokeWidth={2} />
-          <span>{hasPhantom ? tCommon('connect') : tCommon('installPhantom')}</span>
+          <span>{tCommon('connect')}</span>
         </button>
       ) : (
         <button className="flex items-center space-x-1.5 px-5 py-2 rounded-full bg-surface-secondary text-text-secondary font-medium text-[13px] border-none">

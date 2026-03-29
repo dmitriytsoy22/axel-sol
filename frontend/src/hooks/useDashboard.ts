@@ -56,12 +56,6 @@ export function useDashboard() {
     // Simulate network delay for fetching Investor PDA and Claims from chains
     const timer = setTimeout(() => {
       if (!mounted) return;
-      
-      if (Math.random() < 0.2) {
-        setError(new Error('RPC Error: Failed to load user dashboard on-chain holdings.'));
-        setIsLoading(false);
-        return;
-      }
 
       // Mock Holdings based on first two projects
       const mockHoldings: Holding[] = [

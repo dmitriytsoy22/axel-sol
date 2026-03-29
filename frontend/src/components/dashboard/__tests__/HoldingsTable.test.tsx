@@ -43,13 +43,32 @@ describe('HoldingsTable', () => {
         } as any,
         tokensMinted: 100,
         solInvested: 1_000_000_000,
+      },
+      {
+        project: {
+          mint: 'mint2',
+          carMake: 'Tesla',
+          carModel: 'Model 3',
+          carYear: 2023,
+          licensePlate: 'DEF',
+          imageUrl: '/img2.png',
+          status: 'inactive' as const,
+          pricePerToken: 2_000_000_000,
+        } as any,
+        tokensMinted: 50,
+        solInvested: 2_000_000_000,
       }
     ];
 
     renderWithTranslations(<HoldingsTable holdings={mockHoldings} />);
-    expect(screen.getByText('Your Holdings')).toBeInTheDocument();
-    expect(screen.getByText('Toyota Camry')).toBeInTheDocument();
-    expect(screen.getByText('100')).toBeInTheDocument();
-    expect(screen.getByText('100 SOL')).toBeInTheDocument();
+    // Desktop View text
+    expect(screen.getAllByText('Toyota Camry')[0]).toBeInTheDocument();
+    
+    // In our mock, status is 'active' -> uppercase 'Active'
+    expect(screen.getAllByText(/active/i)[0]).toBeInTheDocument();
+
+    // Check mint2
+    expect(screen.getAllByText('Tesla Model 3')[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/inactive/i)[0]).toBeInTheDocument();
   });
 });

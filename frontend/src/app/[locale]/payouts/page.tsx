@@ -10,7 +10,7 @@ export default function PayoutsPage() {
   const { data, summary, isLoading } = usePayoutHistory();
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 space-y-8 animate-fade-in">
+    <div className="max-w-[1200px] mx-auto px-5 py-10 space-y-8 animate-fade-in">
       <div className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight text-gray-900">{t('title')}</h1>
         <p className="text-gray-500 max-w-2xl">{t('description')}</p>

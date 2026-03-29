@@ -9,6 +9,10 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => `mock_t_${key}`,
 }));
 
+vi.mock('@/i18n/routing', () => ({
+  Link: ({ children, href }: any) => <a href={href}>{children}</a>
+}));
+
 const mockProject: ProjectState = {
   admin: 'adminAddress',
   mint: 'mintAddress',

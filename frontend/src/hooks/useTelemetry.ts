@@ -28,11 +28,8 @@ export function useTelemetry(staleTimeoutMs = 60 * 60 * 1000): {
       setError(null);
 
       try {
-        // Simulate network delay and 20% error rate 
+        // Simulate network delay
         await new Promise(resolve => setTimeout(resolve, 800));
-        if (Math.random() < 0.2) {
-          throw new Error('RPC Error: Telemetry stream unavailable');
-        }
 
         const response = await fetch('/telemetry/latest');
         if (!response.ok) {
