@@ -106,5 +106,17 @@
     "claimNow": "Claim Now",
     "connectWallet": "Connect Wallet to View Dashboard",
     "period": "Period"
+  },
+  "Telemetry": {
+    "title": "Live Telemetry",
+    "statusInService": "In Service",
+    "statusMaintenance": "Maintenance",
+    "statusInactive": "Inactive",
+    "dailyRevenue": "Daily Revenue",
+    "mileage": "Mileage",
+    "trips": "Trips",
+    "emptyState": "Telemetry data is currently unavailable.",
+    "staleData": "Last updated: {time}",
+    "loading": "Loading telemetry..."
   }
 }

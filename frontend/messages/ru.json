@@ -106,5 +106,17 @@
     "claimNow": "Получить",
     "connectWallet": "Подключите кошелек для просмотра",
     "period": "Период"
+  },
+  "Telemetry": {
+    "title": "Live Телеметрия",
+    "statusInService": "В работе",
+    "statusMaintenance": "На ТО",
+    "statusInactive": "Неактивен",
+    "dailyRevenue": "Дневная Выручка",
+    "mileage": "Пробег",
+    "trips": "Поездки",
+    "emptyState": "Данные телеметрии сейчас недоступны.",
+    "staleData": "Обновлено: {time}",
+    "loading": "Загрузка телеметрии..."
   }
 }

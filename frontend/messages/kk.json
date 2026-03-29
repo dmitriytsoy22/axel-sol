@@ -106,5 +106,17 @@
     "claimNow": "Алу",
     "connectWallet": "Көру үшін әмиянды қосыңыз",
     "period": "Кезең"
+  },
+  "Telemetry": {
+    "title": "Live Телеметрия",
+    "statusInService": "Жұмыста",
+    "statusMaintenance": "ҚТ-де",
+    "statusInactive": "Белсенді емес",
+    "dailyRevenue": "Күнделікті Табыс",
+    "mileage": "Жүріс",
+    "trips": "Сапарлар",
+    "emptyState": "Телеметрия деректері қазір қолжетімсіз.",
+    "staleData": "Жаңартылды: {time}",
+    "loading": "Телеметрияны жүктеу..."
   }
 }

@@ -5,6 +5,7 @@ import { useDashboard } from '@/hooks/useDashboard';
 import { PortfolioSummary } from './PortfolioSummary';
 import { HoldingsTable } from './HoldingsTable';
 import { RevenuePeriodsCard } from './RevenuePeriodsCard';
+import { TelemetryWidget } from './TelemetryWidget';
 import { useTranslations } from 'next-intl';
 
 export function DashboardView(): JSX.Element {
@@ -38,6 +39,7 @@ export function DashboardView(): JSX.Element {
           unclaimedRevenue={summary.unclaimedRevenue} 
         />
       )}
+      <TelemetryWidget />
       <HoldingsTable holdings={holdings} />
       <RevenuePeriodsCard periods={revenuePeriods} />
     </div>
