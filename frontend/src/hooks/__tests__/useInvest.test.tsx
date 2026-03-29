@@ -1,8 +1,29 @@
+import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useInvest } from '../useInvest';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
+import { NextIntlClientProvider } from 'next-intl';
+import { ToastProvider } from '@/components/ui/toast/ToastProvider';
+
+const mockMessages = {
+  TransactionStatus: {
+    success: 'Success',
+    error: 'Error'
+  },
+  Toast: {
+    viewExplorer: 'View'
+  }
+};
+
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+  <NextIntlClientProvider locale="en" messages={mockMessages}>
+    <ToastProvider>
+      {children}
+    </ToastProvider>
+  </NextIntlClientProvider>
+);
 
 vi.mock('@solana/wallet-adapter-react', () => ({
   useWallet: vi.fn(),
@@ -52,13 +73,13 @@ describe('useInvest hook', () => {
   });
 
   it('initializes with idle state', () => {
-    const { result } = renderHook(() => useInvest());
+    const { result } = renderHook(() => useInvest(), { wrapper });
     expect(result.current.state).toBe('idle');
     expect(result.current.errorMsg).toBeNull();
   });
 
   it('handles successful investment flow', async () => {
-    const { result } = renderHook(() => useInvest());
+    const { result } = renderHook(() => useInvest(), { wrapper });
     
     await act(async () => {
       await result.current.invest('Project111111111111111111111111111111111111', 1, 0.5, 5); // 1 SOL
@@ -70,7 +91,7 @@ describe('useInvest hook', () => {
   });
 
   it('fails if amount < minInvestment', async () => {
-    const { result } = renderHook(() => useInvest());
+    const { result } = renderHook(() => useInvest(), { wrapper });
     
     await act(async () => {
       await result.current.invest('proj111', 0.1, 0.5, 5);
@@ -81,7 +102,7 @@ describe('useInvest hook', () => {
   });
 
   it('fails if amount > maxInvestment', async () => {
-    const { result } = renderHook(() => useInvest());
+    const { result } = renderHook(() => useInvest(), { wrapper });
     
     await act(async () => {
       await result.current.invest('proj111', 10, 0.5, 5);
@@ -93,7 +114,7 @@ describe('useInvest hook', () => {
 
   it('fails if balance is insufficient', async () => {
     mockGetBalance.mockResolvedValue(0.1 * 10 ** 9); // 0.1 SOL
-    const { result } = renderHook(() => useInvest());
+    const { result } = renderHook(() => useInvest(), { wrapper });
     
     await act(async () => {
       await result.current.invest('proj111', 1, 0.5, 5);
@@ -105,7 +126,7 @@ describe('useInvest hook', () => {
 
   it('returns an Anchor error specific translation string if error pattern matches', async () => {
     mockSendTransaction.mockRejectedValue(new Error('Simulation failed: Instruction failed. Custom Error: 0x1770'));
-    const { result } = renderHook(() => useInvest());
+    const { result } = renderHook(() => useInvest(), { wrapper });
 
     await act(async () => {
        await result.current.invest('proj111', 1, 0.5, 5);

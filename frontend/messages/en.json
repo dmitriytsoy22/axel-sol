@@ -73,5 +73,16 @@
     "description": "To comply with regulations and invest in tokenized real-world assets, you must complete Identity Verification (KYC).",
     "cta": "Start Verification",
     "connecting": "Connecting..."
+  },
+  "Toast": {
+    "viewExplorer": "View on Explorer"
+  },
+  "TransactionStatus": {
+    "preflight": "Preparing Transaction...",
+    "awaitingWallet": "Please approve in your wallet",
+    "sending": "Sending...",
+    "confirming": "Confirming (Polling)...",
+    "success": "Transaction Successful!",
+    "error": "Transaction Failed"
   }
 }

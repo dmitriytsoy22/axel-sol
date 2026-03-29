@@ -36,6 +36,14 @@ const messages = {
     '6001': 'Insufficient funds for transaction',
     unknown: 'Unknown error',
   },
+  TransactionStatus: {
+    success: 'Investment Successful!',
+    preflight: 'Preflight',
+    awaitingWallet: 'Awaiting',
+    sending: 'Sending',
+    confirming: 'Confirming',
+    error: 'Error'
+  }
 };
 
 describe('InvestModal', () => {

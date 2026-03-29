@@ -4,6 +4,7 @@ import '@/styles/globals.css';
 import WalletProvider from '@/providers/WalletProvider';
 import { Navbar } from '@/components/layout';
 import { Footer } from '@/components/layout';
+import { ToastProvider } from '@/components/ui/toast/ToastProvider';
 
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations } from 'next-intl/server';
@@ -65,9 +66,11 @@ export default async function RootLayout({
       <body className="font-sans bg-white text-text-primary min-h-screen flex flex-col">
         <NextIntlClientProvider messages={messages}>
           <WalletProvider>
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
+            <ToastProvider>
+              <Navbar />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </ToastProvider>
           </WalletProvider>
         </NextIntlClientProvider>
       </body>
