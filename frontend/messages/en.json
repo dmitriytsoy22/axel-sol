@@ -84,5 +84,26 @@
     "confirming": "Confirming (Polling)...",
     "success": "Transaction Successful!",
     "error": "Transaction Failed"
+  },
+  "Dashboard": {
+    "title": "Your Portfolio",
+    "noInvestments": "No Investments Yet",
+    "noInvestmentsDesc": "You haven't invested in any assets yet. Visit the catalog to explore available opportunities.",
+    "exploreCatalog": "Explore Catalog",
+    "totalValue": "Total Value",
+    "tokensHeld": "Tokens Held",
+    "unclaimedRevenue": "Unclaimed Revenue",
+    "holdings": "Your Holdings",
+    "asset": "Asset",
+    "tokens": "Tokens",
+    "value": "Value",
+    "status": "Status",
+    "revenuePeriods": "Revenue Periods",
+    "claimable": "Claimable",
+    "claimed": "Claimed",
+    "unclaimed": "Unclaimed",
+    "claimNow": "Claim Now",
+    "connectWallet": "Connect Wallet to View Dashboard",
+    "period": "Period"
   }
 }

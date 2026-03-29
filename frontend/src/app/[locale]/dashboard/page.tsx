@@ -1,15 +1,19 @@
+import React from 'react';
+import { getTranslations } from 'next-intl/server';
+import { DashboardView } from '@/components/dashboard/DashboardView';
+
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  const t = await getTranslations({ locale, namespace: 'Dashboard' });
+  return { title: t('title') };
+}
+
 export default function DashboardPage(): JSX.Element {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] px-5">
-      <div className="max-w-page w-full animate-fade-in">
-        <h1 className="text-headline text-text-primary mb-2">Dashboard</h1>
-        <p className="text-body text-text-secondary">
-          Your portfolio, holdings, and revenue — all from on-chain data.
-        </p>
-        <p className="text-footnote text-text-tertiary mt-4">
-          Full dashboard will be implemented in Task 9.
-        </p>
+    <div className="min-h-[80vh] w-full mt-10">
+      <div className="max-w-page mx-auto px-5 w-full">
+        <DashboardView />
       </div>
     </div>
   );
 }
+
