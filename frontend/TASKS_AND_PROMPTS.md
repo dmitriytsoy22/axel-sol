@@ -21,7 +21,7 @@
 | 9 | TX Confirmation Feedback | US-F06 | ✅ |
 | 10 | Dashboard + Portfolio | US-F07 | ⬜ |
 | 11 | Live Telemetry Widget | US-F07b | ✅ |
-| 12 | Claim Revenue | US-F08 | ⬜ |
+| 12 | Claim Revenue | US-F08 | ✅ |
 | 13 | RPC Error Handling | US-F12 | ⬜ |
 | 14 | Payout History | US-F09 | ⬜ |
 | 15 | Admin Panel | US-F10 | ⬜ |

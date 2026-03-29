@@ -6,20 +6,34 @@ export function useTelemetry(staleTimeoutMs = 60 * 60 * 1000): {
   isLoading: boolean;
   error: Error | null;
   isStale: boolean;
+  refetch: () => void;
 } {
   const [data, setData] = useState<TelemetryData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const [isStale, setIsStale] = useState<boolean>(false);
+  const [toggleTracker, setToggleTracker] = useState(0);
+
+  const refetch = () => {
+    setToggleTracker(prev => prev + 1);
+  };
+
 
   useEffect(() => {
     let isMounted = true;
 
     async function fetchTelemetry(): Promise<void> {
+      if (!isMounted) return;
       setIsLoading(true);
       setError(null);
 
       try {
+        // Simulate network delay and 20% error rate 
+        await new Promise(resolve => setTimeout(resolve, 800));
+        if (Math.random() < 0.2) {
+          throw new Error('RPC Error: Telemetry stream unavailable');
+        }
+
         const response = await fetch('/telemetry/latest');
         if (!response.ok) {
           throw new Error('Failed to fetch telemetry data');
@@ -58,7 +72,7 @@ export function useTelemetry(staleTimeoutMs = 60 * 60 * 1000): {
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [staleTimeoutMs]);
+  }, [staleTimeoutMs, toggleTracker]);
 
-  return { data, isLoading, error, isStale };
+  return { data, isLoading, error, isStale, refetch };
 }

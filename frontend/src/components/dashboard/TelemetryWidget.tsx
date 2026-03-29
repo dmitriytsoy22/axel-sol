@@ -4,21 +4,16 @@ import React from 'react';
 import { useTranslations } from 'next-intl';
 import { useTelemetry } from '@/hooks/useTelemetry';
 import { Activity, Route, Banknote, Car, AlertTriangle } from 'lucide-react';
+import { RpcErrorBoundary } from '@/components/shared/RpcErrorBoundary';
 
-export function TelemetryWidget(): JSX.Element | null {
+function TelemetryWidgetContent(): JSX.Element | null {
   const t = useTranslations('Telemetry');
   const { data, isLoading, error, isStale } = useTelemetry();
 
   if (error) {
-    return (
-      <div className="bg-red-50/50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-2xl p-6 mb-8 mt-8" data-testid="telemetry-error">
-        <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
-          <AlertTriangle className="h-5 w-5" />
-          <p className="text-sm font-medium">{t('emptyState')}</p>
-        </div>
-      </div>
-    );
+    throw error;
   }
+
 
   if (isLoading) {
     return (
@@ -137,3 +132,13 @@ export function TelemetryWidget(): JSX.Element | null {
     </div>
   );
 }
+
+export function TelemetryWidget(): JSX.Element {
+  const { refetch } = useTelemetry();
+  return (
+    <RpcErrorBoundary onReset={refetch}>
+      <TelemetryWidgetContent />
+    </RpcErrorBoundary>
+  );
+}
+

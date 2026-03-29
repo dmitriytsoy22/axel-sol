@@ -6,13 +6,18 @@ import { useProjectState } from '@/hooks/useProjectState';
 import { ProjectStatus } from '@/types/project';
 import { AssetCard } from '@/components/catalog/AssetCard';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { RpcErrorBoundary } from '@/components/shared/RpcErrorBoundary';
 
-export default function HomePage(): JSX.Element {
+function HomePageContent(): JSX.Element {
   const t = useTranslations('HomePage');
   const tCatalog = useTranslations('Catalog');
   
-  const { projects, isLoading } = useProjectState();
+  const { projects, isLoading, error, refetch } = useProjectState();
   const [filter, setFilter] = useState<ProjectStatus | 'all'>('all');
+
+  if (error) {
+    throw error;
+  }
 
   const filteredProjects = projects.filter((p) => filter === 'all' || p.status === filter);
 
@@ -96,5 +101,14 @@ export default function HomePage(): JSX.Element {
         )}
       </section>
     </div>
+  );
+}
+
+export default function HomePage(): JSX.Element {
+  const { refetch } = useProjectState();
+  return (
+    <RpcErrorBoundary onReset={refetch}>
+      <HomePageContent />
+    </RpcErrorBoundary>
   );
 }

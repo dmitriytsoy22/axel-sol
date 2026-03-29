@@ -12,13 +12,18 @@ import { RevenueProjection } from '@/components/asset/RevenueProjection';
 import { InvestButton } from '@/components/asset/InvestButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ArrowLeft } from 'lucide-react';
+import { RpcErrorBoundary } from '@/components/shared/RpcErrorBoundary';
 
-export default function AssetDetailsPage(): React.JSX.Element {
+function AssetDetailsContent(): React.JSX.Element {
   const { id } = useParams();
   const router = useRouter();
   const t = useTranslations('Asset');
   
-  const { projects, isLoading } = useProjectState();
+  const { projects, isLoading, error, refetch } = useProjectState();
+
+  if (error) {
+    throw error;
+  }
   
   // Find project by array index or mint address (to support both ways in UI mock)
   const project = projects.find(p => 
@@ -128,3 +133,14 @@ export default function AssetDetailsPage(): React.JSX.Element {
     </div>
   );
 }
+
+
+export default function AssetDetailsPage(): React.JSX.Element {
+  const { refetch } = useProjectState();
+  return (
+    <RpcErrorBoundary onReset={refetch}>
+      <AssetDetailsContent />
+    </RpcErrorBoundary>
+  );
+}
+

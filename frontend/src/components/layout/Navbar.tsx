@@ -7,6 +7,7 @@ import { NavLanguageSwitcher } from './NavLanguageSwitcher';
 import { NavWalletMenu } from './NavWalletMenu';
 import { NavMobileMenu } from './NavMobileMenu';
 import { Logo } from './Logo';
+import { ConnectionStatus } from '../shared/ConnectionStatus';
 
 export const Navbar = (): JSX.Element => {
   const [scrolled, setScrolled] = useState(false);
@@ -51,6 +52,9 @@ export const Navbar = (): JSX.Element => {
           <NavDesktopLinks />
 
           <div className="flex items-center space-x-4">
+            <div className="hidden md:block">
+              <ConnectionStatus />
+            </div>
             <NavLanguageSwitcher />
             <NavWalletMenu />
             <NavMobileMenu isOpen={mobileMenuOpen} setIsOpen={setMobileMenuOpen} />

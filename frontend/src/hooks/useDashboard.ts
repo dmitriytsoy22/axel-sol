@@ -17,25 +17,52 @@ export interface EnrichedRevenuePeriod {
 }
 
 export function useDashboard() {
-  const { projects, isLoading: isProjectsLoading } = useProjectState();
+  const { projects, isLoading: isProjectsLoading, error: projectsError, refetch: refetchProjects } = useProjectState();
   const { connected } = useWalletInfo();
   
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [revenuePeriods, setRevenuePeriods] = useState<EnrichedRevenuePeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [toggleTracker, setToggleTracker] = useState(0);
+
+  const refetch = () => {
+    refetchProjects();
+    setToggleTracker(prev => prev + 1);
+  };
 
   // Mocking on-chain data collection
   useEffect(() => {
+    let mounted = true;
+    
+    if (projectsError) {
+      setError(projectsError);
+      setIsLoading(false);
+      return;
+    }
+
     if (!connected || isProjectsLoading || projects.length === 0) {
-      setHoldings([]);
-      setRevenuePeriods([]);
-      setIsLoading(isProjectsLoading);
+      if (mounted) {
+        setHoldings([]);
+        setRevenuePeriods([]);
+        setIsLoading(isProjectsLoading);
+        setError(null);
+      }
       return;
     }
 
     setIsLoading(true);
+    setError(null);
     // Simulate network delay for fetching Investor PDA and Claims from chains
     const timer = setTimeout(() => {
+      if (!mounted) return;
+      
+      if (Math.random() < 0.2) {
+        setError(new Error('RPC Error: Failed to load user dashboard on-chain holdings.'));
+        setIsLoading(false);
+        return;
+      }
+
       // Mock Holdings based on first two projects
       const mockHoldings: Holding[] = [
         {
@@ -85,8 +112,11 @@ export function useDashboard() {
       setIsLoading(false);
     }, 1000);
 
-    return () => clearTimeout(timer);
-  }, [connected, isProjectsLoading, projects]);
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
+  }, [connected, isProjectsLoading, projects, projectsError, toggleTracker]);
 
   const summary = useMemo(() => {
     const totalValue = holdings.reduce(
@@ -113,6 +143,8 @@ export function useDashboard() {
     revenuePeriods,
     summary,
     isLoading,
+    error,
     connected,
+    refetch,
   };
 }

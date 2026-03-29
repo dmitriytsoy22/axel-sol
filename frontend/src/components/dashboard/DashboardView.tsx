@@ -7,10 +7,15 @@ import { HoldingsTable } from './HoldingsTable';
 import { RevenuePeriodsCard } from './RevenuePeriodsCard';
 import { TelemetryWidget } from './TelemetryWidget';
 import { useTranslations } from 'next-intl';
+import { RpcErrorBoundary } from '@/components/shared/RpcErrorBoundary';
 
-export function DashboardView(): JSX.Element {
-  const { holdings, revenuePeriods, summary, isLoading, connected } = useDashboard();
+function DashboardContent(): JSX.Element {
+  const { holdings, revenuePeriods, summary, isLoading, connected, error } = useDashboard();
   const t = useTranslations('Dashboard');
+
+  if (error) {
+    throw error;
+  }
 
   if (!connected) {
     return (
@@ -45,3 +50,13 @@ export function DashboardView(): JSX.Element {
     </div>
   );
 }
+
+export function DashboardView(): JSX.Element {
+  const { refetch } = useDashboard();
+  return (
+    <RpcErrorBoundary onReset={refetch}>
+      <DashboardContent />
+    </RpcErrorBoundary>
+  );
+}
+

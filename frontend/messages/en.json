@@ -105,7 +105,9 @@
     "unclaimed": "Unclaimed",
     "claimNow": "Claim Now",
     "connectWallet": "Connect Wallet to View Dashboard",
-    "period": "Period"
+    "period": "Period",
+    "claiming": "Claiming...",
+    "claimAll": "Claim All Claimable"
   },
   "Telemetry": {
     "title": "Live Telemetry",
@@ -118,5 +120,15 @@
     "emptyState": "Telemetry data is currently unavailable.",
     "staleData": "Last updated: {time}",
     "loading": "Loading telemetry..."
+  },
+  "RpcError": {
+    "title": "Connection Error",
+    "description": "Failed to load on-chain data. The Solana RPC node might be experiencing high latency or is temporarily unavailable.",
+    "retry": "Try Again"
+  },
+  "ConnectionStatus": {
+    "connected": "Connected to RPC",
+    "disconnected": "Disconnected from RPC",
+    "connecting": "Connecting..."
   }
 }

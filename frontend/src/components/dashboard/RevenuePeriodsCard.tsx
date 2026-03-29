@@ -2,6 +2,8 @@ import React from 'react';
 import { Card } from '@/components/ui/Card';
 import { EnrichedRevenuePeriod } from '@/hooks/useDashboard';
 import { useTranslations } from 'next-intl';
+import { ClaimButton } from './ClaimButton';
+import { ClaimAllButton } from './ClaimAllButton';
 
 interface RevenuePeriodsCardProps {
   periods: EnrichedRevenuePeriod[];
@@ -25,8 +27,9 @@ export function RevenuePeriodsCard({ periods }: RevenuePeriodsCardProps): JSX.El
 
   return (
     <Card className="overflow-hidden" data-testid="revenue-periods-card">
-      <div className="px-6 py-5 border-b border-gray-100 bg-white">
+      <div className="px-6 py-5 border-b border-gray-100 bg-white flex items-center justify-between">
         <h3 className="text-lg font-medium text-gray-900">{t('revenuePeriods')}</h3>
+        <ClaimAllButton periods={periods} />
       </div>
       <div className="divide-y divide-gray-100 bg-white">
         {periods.map((item, id) => {
@@ -47,9 +50,7 @@ export function RevenuePeriodsCard({ periods }: RevenuePeriodsCardProps): JSX.El
                   {getStatusDisplay(item.status)}
                 </div>
                 {item.status === 'claimable' && (
-                  <button className="px-4 py-2 border border-brand-primary text-brand-primary text-sm font-medium rounded-full hover:bg-brand-primary hover:text-white transition-colors">
-                    {t('claimNow')}
-                  </button>
+                  <ClaimButton period={item} />
                 )}
               </div>
             </div>

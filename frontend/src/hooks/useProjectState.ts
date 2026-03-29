@@ -77,17 +77,41 @@ export function useProjectState(): {
   projects: ProjectState[];
   isLoading: boolean;
   error: Error | null;
+  refetch: () => void;
 } {
   const [projects, setProjects] = useState<ProjectState[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [toggleTracker, setToggleTracker] = useState(0);
+
+  const refetch = () => {
+    setToggleTracker(prev => prev + 1);
+  };
 
   useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+    setError(null);
+
     const timer = setTimeout(() => {
+      if (!mounted) return;
+      
+      // Simulate roughly 20% chance of RPC error 
+      if (Math.random() < 0.2) {
+        setError(new Error('RPC Connection Timeout: Failed to load projects data.'));
+        setIsLoading(false);
+        return;
+      }
+
       setProjects(MOCK_PROJECTS);
       setIsLoading(false);
     }, 1500); // simulate 1.5s network delay
-    return () => clearTimeout(timer);
-  }, []);
+    
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
+  }, [toggleTracker]);
 
-  return { projects, isLoading, error: null };
+  return { projects, isLoading, error, refetch };
 }
