@@ -61,7 +61,7 @@ function HomePageContent(): JSX.Element {
       {/* Catalog Grid */}
       <section className="w-full max-w-[980px] px-5 py-12">
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
               <div key={i} className="flex flex-col bg-white rounded-2xl border border-gray-100 p-0 overflow-hidden shadow-sm h-[400px]">
                 <Skeleton className="w-full h-[60%] rounded-none" />
@@ -77,7 +77,7 @@ function HomePageContent(): JSX.Element {
             ))}
           </div>
         ) : filteredProjects.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {filteredProjects.map((project) => (
               <AssetCard key={project.mint} project={project} />
             ))}

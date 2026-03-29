@@ -51,7 +51,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
       <div className="px-6 py-5 border-b border-gray-100 bg-white">
         <h3 className="text-lg font-medium text-gray-900">{t('holdings')}</h3>
       </div>
-      <div className="overflow-x-auto">
+      <div className="hidden sm:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider text-left">
             <tr>
@@ -101,6 +101,41 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile view */}
+      <div className="sm:hidden flex flex-col divide-y divide-gray-100">
+        {holdings.map((holding) => {
+           const valueSOL = (holding.tokensMinted * holding.project.pricePerToken) / 1_000_000_000;
+           return (
+            <div key={holding.project.mint} className="p-5 flex flex-col gap-4 bg-white">
+              <div className="flex justify-between items-start gap-4">
+                <Link href={`/assets/${holding.project.mint}`} className="flex items-center gap-3">
+                  <div className="w-12 h-12 relative rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                    <Image src={holding.project.imageUrl} alt={holding.project.carModel} fill sizes="48px" className="object-cover" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-gray-900 text-sm">{holding.project.carMake} {holding.project.carModel}</span>
+                    <span className="text-gray-500 text-xs">{holding.project.carYear} • {holding.project.licensePlate}</span>
+                  </div>
+                </Link>
+                <div className="flex-shrink-0">
+                  <Badge status={holding.project.status}>{getStatusText(holding.project.status)}</Badge>
+                </div>
+              </div>
+              <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                <div className="flex flex-col">
+                  <span className="text-gray-500 text-xs">{t('tokens')}</span>
+                  <span className="text-gray-900 font-medium text-sm">{holding.tokensMinted.toLocaleString()}</span>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-gray-500 text-xs">{t('value')}</span>
+                  <span className="text-brand-primary font-semibold text-sm">{valueSOL.toLocaleString(undefined, { maximumFractionDigits: 2 })} SOL</span>
+                </div>
+              </div>
+            </div>
+           );
+        })}
       </div>
     </Card>
   );

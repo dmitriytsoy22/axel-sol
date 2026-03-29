@@ -72,7 +72,8 @@ export function DataTable<T>({
 
   return (
     <div className={`w-full bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${className}`}>
-      <div className="overflow-x-auto">
+      {/* Desktop Table View */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-left text-sm whitespace-nowrap">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -129,6 +130,28 @@ export function DataTable<T>({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Cards View */}
+      <div className="sm:hidden flex flex-col divide-y divide-gray-100">
+        {currentData.length > 0 ? (
+          currentData.map((row, rowIndex) => (
+            <div key={rowIndex} className="p-4 flex flex-col gap-3 hover:bg-gray-50/50 transition-colors duration-200">
+              {columns.map((col, colIndex) => (
+                <div key={colIndex} className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">{col.header}</span>
+                  <span className="text-gray-900 text-right break-words pl-4">
+                    {col.cell ? col.cell(row) : (row as Record<string, any>)[col.accessorKey as string]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))
+        ) : (
+          <div className="px-6 py-8 text-center text-gray-400">
+            {emptyMessage}
+          </div>
+        )}
       </div>
 
       {totalPages > 1 && (

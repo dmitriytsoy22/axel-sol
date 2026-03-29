@@ -114,7 +114,7 @@ function AssetDetailsContent(): React.JSX.Element {
           <InvestmentDetails project={project} />
           
           {/* Desktop Invest Button */}
-          <div className="hidden lg:block mt-2">
+          <div className="hidden md:block mt-2">
             <InvestButton 
               isKycCompleted={true} 
               onInvestClick={() => console.log('Invest Clicked')} 
@@ -124,7 +124,7 @@ function AssetDetailsContent(): React.JSX.Element {
       </div>
 
       {/* Mobile Sticky Invest Area */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 pb-safe bg-white/80 backdrop-blur-xl border-t border-gray-100 lg:hidden z-40">
+      <div className="fixed bottom-0 left-0 right-0 p-4 pb-safe bg-white/80 backdrop-blur-xl border-t border-gray-100 md:hidden z-40">
         <InvestButton 
           isKycCompleted={true} 
           onInvestClick={() => console.log('Invest Clicked')} 
