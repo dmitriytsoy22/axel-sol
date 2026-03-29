@@ -6,6 +6,7 @@ import {
   RevenuePeriod,
   ClaimRecord,
 } from '@/types';
+import { stripHtml, isValidSolanaAddress, isPositiveSolAmount } from '@/lib/security/sanitize';
 
 /**
  * TODO: Real layout deserialization will be implemented when IDL is provided by Dev B.
@@ -35,28 +36,33 @@ export async function fetchProjectState(
     // TODO: Deserialize accountInfo.data using layout/Borsh
 
     // Mock data for UI development
+    const adminAddress = PublicKey.default.toBase58();
+    const mintAddress = PublicKey.default.toBase58();
+    const escrowVault = PublicKey.default.toBase58();
+    const revenueVault = PublicKey.default.toBase58();
+
     return {
-      admin: PublicKey.default.toBase58(),
-      mint: PublicKey.default.toBase58(),
-      escrowVault: PublicKey.default.toBase58(),
-      revenueVault: PublicKey.default.toBase58(),
+      admin: isValidSolanaAddress(adminAddress) ? adminAddress : '',
+      mint: isValidSolanaAddress(mintAddress) ? mintAddress : '',
+      escrowVault: isValidSolanaAddress(escrowVault) ? escrowVault : '',
+      revenueVault: isValidSolanaAddress(revenueVault) ? revenueVault : '',
       status: 'fundraising',
-      totalTokenSupply: 100000,
-      tokensRemaining: 45000,
-      pricePerToken: 10000000, // 0.01 SOL
-      minInvestment: 50000000, // 0.05 SOL
-      maxInvestment: 500000000, // 0.5 SOL
-      solRaised: 550000000, // 5.5 SOL
-      minRaise: 1000000000, // 10 SOL
-      maxRaise: 2000000000, // 20 SOL
+      totalTokenSupply: isPositiveSolAmount(100000) ? 100000 : 0,
+      tokensRemaining: isPositiveSolAmount(45000) ? 45000 : 0,
+      pricePerToken: isPositiveSolAmount(10000000) ? 10000000 : 0, // 0.01 SOL
+      minInvestment: isPositiveSolAmount(50000000) ? 50000000 : 0, // 0.05 SOL
+      maxInvestment: isPositiveSolAmount(500000000) ? 500000000 : 0, // 0.5 SOL
+      solRaised: isPositiveSolAmount(550000000) ? 550000000 : 0, // 5.5 SOL
+      minRaise: isPositiveSolAmount(1000000000) ? 1000000000 : 0, // 10 SOL
+      maxRaise: isPositiveSolAmount(2000000000) ? 2000000000 : 0, // 20 SOL
       deadline: Math.floor(Date.now() / 1000) + 86400 * 30, // 30 days
-      investorCount: 12,
-      carMake: 'Tesla',
-      carModel: 'Model S',
+      investorCount: isPositiveSolAmount(12) ? 12 : 0,
+      carMake: stripHtml('Tesla'),
+      carModel: stripHtml('Model S'),
       carYear: 2024,
-      vin: '5YJS123456789ABCD',
-      licensePlate: '01 123 ASD',
-      imageUrl: 'https://images.unsplash.com/photo-1560958089-b8a1929cea89?q=80&w=2071&auto=format&fit=crop',
+      vin: stripHtml('5YJS123456789ABCD'),
+      licensePlate: stripHtml('01 123 ASD'),
+      imageUrl: stripHtml('https://images.unsplash.com/photo-1560958089-b8a1929cea89?q=80&w=2071&auto=format&fit=crop'),
     };
   } catch (error) {
     console.error(`RPC Error fetching ProjectState:`, error);
@@ -85,11 +91,14 @@ export async function fetchInvestorRecord(
 
     // TODO: Deserialize accountInfo.data
 
+    const walletAddress = PublicKey.default.toBase58();
+    const projectAddress = PublicKey.default.toBase58();
+
     return {
-      wallet: PublicKey.default.toBase58(),
-      projectPda: PublicKey.default.toBase58(),
-      solInvested: 150000000, // 0.15 SOL
-      tokensMinted: 15,
+      wallet: isValidSolanaAddress(walletAddress) ? walletAddress : '',
+      projectPda: isValidSolanaAddress(projectAddress) ? projectAddress : '',
+      solInvested: isPositiveSolAmount(150000000) ? 150000000 : 0, // 0.15 SOL
+      tokensMinted: isPositiveSolAmount(15) ? 15 : 0,
     };
   } catch (error) {
     console.error(`RPC Error fetching InvestorRecord:`, error);
@@ -118,8 +127,10 @@ export async function fetchWhitelistEntry(
 
     // TODO: Deserialize accountInfo.data
 
+    const walletAddress = PublicKey.default.toBase58();
+
     return {
-      wallet: PublicKey.default.toBase58(),
+      wallet: isValidSolanaAddress(walletAddress) ? walletAddress : '',
       approved: true,
     };
   } catch (error) {
@@ -154,23 +165,25 @@ export async function fetchAllRevenuePeriods(
     */
 
     // Returning mock data to unblock UI
+    const mockPda = projectPda.toBase58();
+    
     return [
       {
-        index: 1,
-        projectPda: projectPda.toBase58(),
-        periodLabel: 'Q1 2026',
-        totalDeposited: 1200000000, // 1.2 SOL
-        tokenSupplySnapshot: 100000,
-        depositTxSignature: 'mock_tx_sig_v1',
+        index: isPositiveSolAmount(1) ? 1 : 0,
+        projectPda: isValidSolanaAddress(mockPda) ? mockPda : '',
+        periodLabel: stripHtml('Q1 2026'),
+        totalDeposited: isPositiveSolAmount(1200000000) ? 1200000000 : 0, // 1.2 SOL
+        tokenSupplySnapshot: isPositiveSolAmount(100000) ? 100000 : 0,
+        depositTxSignature: stripHtml('mock_tx_sig_v1'),
         createdAt: Math.floor(Date.now() / 1000) - 86400 * 5,
       },
       {
-        index: 2,
-        projectPda: projectPda.toBase58(),
-        periodLabel: 'Q2 2026',
-        totalDeposited: 1500000000, // 1.5 SOL
-        tokenSupplySnapshot: 100000,
-        depositTxSignature: 'mock_tx_sig_v2',
+        index: isPositiveSolAmount(2) ? 2 : 0,
+        projectPda: isValidSolanaAddress(mockPda) ? mockPda : '',
+        periodLabel: stripHtml('Q2 2026'),
+        totalDeposited: isPositiveSolAmount(1500000000) ? 1500000000 : 0, // 1.5 SOL
+        tokenSupplySnapshot: isPositiveSolAmount(100000) ? 100000 : 0,
+        depositTxSignature: stripHtml('mock_tx_sig_v2'),
         createdAt: Math.floor(Date.now() / 1000) - 86400 * 2,
       }
     ];
@@ -201,11 +214,13 @@ export async function fetchClaimRecord(
 
     // TODO: Deserialize accountInfo.data
 
+    const mockWallet = PublicKey.default.toBase58();
+
     return {
-      wallet: PublicKey.default.toBase58(),
-      periodIndex: 1,
-      amountClaimed: 12000000, // 0.012 SOL
-      claimTxSignature: 'mock_claim_tx_sig',
+      wallet: isValidSolanaAddress(mockWallet) ? mockWallet : '',
+      periodIndex: isPositiveSolAmount(1) ? 1 : 0,
+      amountClaimed: isPositiveSolAmount(12000000) ? 12000000 : 0, // 0.012 SOL
+      claimTxSignature: stripHtml('mock_claim_tx_sig'),
       claimedAt: Math.floor(Date.now() / 1000) - 86400,
     };
   } catch (error) {
@@ -239,12 +254,14 @@ export async function fetchAllClaimRecords(
     });
     */
 
+    const walletStr = wallet.toBase58();
+
     return [
       {
-        wallet: wallet.toBase58(),
-        periodIndex: 1,
-        amountClaimed: 12000000, // 0.012 SOL
-        claimTxSignature: 'mock_claim_tx_sig_1',
+        wallet: isValidSolanaAddress(walletStr) ? walletStr : '',
+        periodIndex: isPositiveSolAmount(1) ? 1 : 0,
+        amountClaimed: isPositiveSolAmount(12000000) ? 12000000 : 0, // 0.012 SOL
+        claimTxSignature: stripHtml('mock_claim_tx_sig_1'),
         claimedAt: Math.floor(Date.now() / 1000) - 86400 * 4,
       }
     ];

@@ -168,5 +168,10 @@
     "closeProject": "Close Project",
     "pauseWarning": "Investors won't be able to buy or claim tokens.",
     "closeWarning": "Irreversible action. Closes the project permanently."
+  },
+  "Security": {
+    "invalidAddress": "Invalid Solana address detected.",
+    "invalidAmount": "Invalid amount detected.",
+    "unsanitizedContent": "Potentially malicious content stripped."
   }
 }
