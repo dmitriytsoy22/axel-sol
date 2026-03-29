@@ -146,5 +146,27 @@
     "noPayouts": "Төлемдер табылмады.",
     "statusClaimed": "Алынды",
     "statusAvailable": "Қолжетімді"
+  },
+  "Admin": {
+    "title": "Әкімші тақтасы",
+    "accessDenied": "Рұқсат етілмеген: Сіз бұл жобаның әкімшісі емессіз.",
+    "projectMetrics": "Жоба көрсеткіштері",
+    "solRaised": "Жиналған SOL",
+    "investors": "Инвесторлар",
+    "status": "Мәртебесі",
+    "depositRevenue": "Табысты енгізу",
+    "depositDesc": "Жаңа төлем кезеңін тіркеп, қаражатты табыс қоймасына енгізіңіз.",
+    "grossRevenue": "Жалпы кіріс (SOL)",
+    "expenses": "Шығындар (SOL)",
+    "maintenanceReserve": "Қызмет көрсету резерві (SOL)",
+    "netProfit": "Таза пайда",
+    "depositBtn": "Қоймаға енгізу",
+    "depositing": "Енгізілуде...",
+    "projectControls": "Жобаны басқару",
+    "pauseProject": "Жобаны кідірту",
+    "resumeProject": "Жобаны жалғастыру",
+    "closeProject": "Жобаны жабу",
+    "pauseWarning": "Инвесторлар токендерді сатып ала немесе талап ете алмайды.",
+    "closeWarning": "Қайтымсыз әрекет. Жобаны біржолата жабады."
   }
 }

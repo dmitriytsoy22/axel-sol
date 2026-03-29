@@ -146,5 +146,27 @@
     "noPayouts": "No payouts found.",
     "statusClaimed": "Claimed",
     "statusAvailable": "Available"
+  },
+  "Admin": {
+    "title": "Admin Dashboard",
+    "accessDenied": "Access Denied: You are not the admin of this project.",
+    "projectMetrics": "Project Metrics",
+    "solRaised": "SOL Raised",
+    "investors": "Investors",
+    "status": "Status",
+    "depositRevenue": "Deposit Revenue",
+    "depositDesc": "Register new revenue period and deposit funds to the revenue vault.",
+    "grossRevenue": "Gross Revenue (SOL)",
+    "expenses": "Expenses (SOL)",
+    "maintenanceReserve": "Maintenance Reserve (SOL)",
+    "netProfit": "Net Profit",
+    "depositBtn": "Deposit to Vault",
+    "depositing": "Depositing...",
+    "projectControls": "Project Controls",
+    "pauseProject": "Pause Project",
+    "resumeProject": "Resume Project",
+    "closeProject": "Close Project",
+    "pauseWarning": "Investors won't be able to buy or claim tokens.",
+    "closeWarning": "Irreversible action. Closes the project permanently."
   }
 }

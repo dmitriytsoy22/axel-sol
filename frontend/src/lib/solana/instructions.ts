@@ -124,3 +124,55 @@ export const buildPauseProjectInstruction = (
     data: Buffer.from([]), // Placeholder info
   });
 };
+
+/**
+ * Parameters for building the Resume Project instruction (Admin)
+ */
+export interface ResumeProjectInstructionParams {
+  adminWallet: PublicKey;
+  projectPda: PublicKey;
+}
+
+/**
+ * Builds the transaction instruction for an admin to resume a project.
+ * @param params - The instruction parameters
+ * @returns TransactionInstruction
+ */
+export const buildResumeProjectInstruction = (
+  params: ResumeProjectInstructionParams
+): TransactionInstruction => {
+  return new TransactionInstruction({
+    keys: [
+      { pubkey: params.adminWallet, isSigner: true, isWritable: false },
+      { pubkey: params.projectPda, isSigner: false, isWritable: true },
+    ],
+    programId: new PublicKey('11111111111111111111111111111111'),
+    data: Buffer.from([]), 
+  });
+};
+
+/**
+ * Parameters for building the Close Project instruction (Admin)
+ */
+export interface CloseProjectInstructionParams {
+  adminWallet: PublicKey;
+  projectPda: PublicKey;
+}
+
+/**
+ * Builds the transaction instruction for an admin to close a project.
+ * @param params - The instruction parameters
+ * @returns TransactionInstruction
+ */
+export const buildCloseProjectInstruction = (
+  params: CloseProjectInstructionParams
+): TransactionInstruction => {
+  return new TransactionInstruction({
+    keys: [
+      { pubkey: params.adminWallet, isSigner: true, isWritable: false },
+      { pubkey: params.projectPda, isSigner: false, isWritable: true },
+    ],
+    programId: new PublicKey('11111111111111111111111111111111'),
+    data: Buffer.from([]), 
+  });
+};

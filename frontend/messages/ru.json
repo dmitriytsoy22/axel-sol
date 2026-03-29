@@ -146,5 +146,27 @@
     "noPayouts": "Выплаты не найдены.",
     "statusClaimed": "Получено",
     "statusAvailable": "Доступно"
+  },
+  "Admin": {
+    "title": "Панель Администратора",
+    "accessDenied": "Доступ запрещен: Вы не являетесь администратором этого проекта.",
+    "projectMetrics": "Метрики Проекта",
+    "solRaised": "Собрано SOL",
+    "investors": "Инвесторы",
+    "status": "Статус",
+    "depositRevenue": "Внести Доход",
+    "depositDesc": "Зарегистрируйте новый период выплат и внесите средства в хранилище дохода.",
+    "grossRevenue": "Валовая Выручка (SOL)",
+    "expenses": "Расходы (SOL)",
+    "maintenanceReserve": "Резерв на Обслуживание (SOL)",
+    "netProfit": "Чистая Прибыль",
+    "depositBtn": "Внести в Хранилище",
+    "depositing": "Внесение...",
+    "projectControls": "Управление Проектом",
+    "pauseProject": "Приостановить Проект",
+    "resumeProject": "Возобновить Проект",
+    "closeProject": "Закрыть Проект",
+    "pauseWarning": "Инвесторы не смогут покупать или получать токены.",
+    "closeWarning": "Необратимое действие. Закрывает проект навсегда."
   }
 }
