@@ -67,5 +67,11 @@
     "status": "Status",
     "backToCatalog": "Back to Catalog",
     "notFound": "Asset not found"
+  },
+  "Kyc": {
+    "title": "Verification Required",
+    "description": "To comply with regulations and invest in tokenized real-world assets, you must complete Identity Verification (KYC).",
+    "cta": "Start Verification",
+    "connecting": "Connecting..."
   }
 }
