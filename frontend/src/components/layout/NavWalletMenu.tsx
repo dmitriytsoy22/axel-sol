@@ -60,7 +60,6 @@ export const NavWalletMenu = (): JSX.Element => {
     }
   }, [publicKey]);
 
-  const hasPhantom = mounted && wallets.some((w) => w.adapter.name === 'Phantom');
 
   return (
     <div className="hidden sm:block">
