@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(sed -i -e 's/Dev A — Frontend/dimagonedone \\(Frontend\\)/g' -e 's/Dev A \\(Frontend\\)/dimagonedone \\(Frontend\\)/g' -e 's/Dev B — On-chain \\\\/ Solana/ndrkbrg \\(On-chain\\)/g' -e 's/Dev B — On-chain/ndrkbrg \\(On-chain\\)/g' -e 's/Dev B \\(On-chain\\)/ndrkbrg \\(On-chain\\)/g' -e 's/Dev C — Backend/russh \\(Backend\\)/g' -e 's/Dev C \\(Backend\\)/russh \\(Backend\\)/g' -e 's/Dev A/dimagonedone/g' -e 's/Dev B/ndrkbrg/g' -e 's/Dev C/russh/g' \"$f\")",
+      "Bash(done)"
+    ]
+  }
+}
