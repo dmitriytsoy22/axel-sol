@@ -7,7 +7,7 @@ skip-lint = false
 
 [programs.localnet]
 axel = "DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi"
-transfer-hook = "CgbtcZvWngGWNH2uQa8vXfiNSYGpQKVNdx7wDUuMFqmC"
+transfer_hook = "CgbtcZvWngGWNH2uQa8vXfiNSYGpQKVNdx7wDUuMFqmC"
 
 [registry]
 url = "https://api.apr.dev"

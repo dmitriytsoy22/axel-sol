@@ -1,42 +1,39 @@
 import { before, describe, test } from "node:test";
 import assert from "node:assert";
-import { connect, SOL } from "solana-kite";
-import { type Address, type TransactionSigner, generateKeyPairSigner } from "@solana/kit";
-import {
-  getInitializeProjectInstructionAsync,
-  fetchProjectState,
-  findProjectStatePda,
-} from "../sdk/generated/src/generated";
+import * as anchor from "@coral-xyz/anchor";
+import { PublicKey, Keypair, LAMPORTS_PER_SOL, Connection } from "@solana/web3.js";
+import type { Axel } from "../target/types/axel";
+import BN from "bn.js";
 
-const connection = connect("localnet");
+import IDL from "../target/idl/axel.json" with { type: "json" };
 
-// Test parameters for a valid project
-const TRANSFER_HOOK_PROGRAM_ID =
-  "CgbtcZvWngGWNH2uQa8vXfiNSYGpQKVNdx7wDUuMFqmC" as Address;
+const AXEL_PROGRAM_ID = new PublicKey(
+  "DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi",
+);
+const TRANSFER_HOOK_PROGRAM_ID = new PublicKey(
+  "CgbtcZvWngGWNH2uQa8vXfiNSYGpQKVNdx7wDUuMFqmC",
+);
+const TOKEN_EXTENSIONS_PROGRAM_ID = new PublicKey(
+  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+);
 
-function futureDeadline(): bigint {
-  return BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour from now
+function futureDeadline(): BN {
+  return new BN(Math.floor(Date.now() / 1000) + 3600);
 }
 
-function pastDeadline(): bigint {
-  return BigInt(Math.floor(Date.now() / 1000) - 3600); // 1 hour ago
+function pastDeadline(): BN {
+  return new BN(Math.floor(Date.now() / 1000) - 3600);
 }
 
-async function buildValidParams(
-  admin: TransactionSigner,
-  mint: TransactionSigner,
-  overrides: Record<string, unknown> = {},
-) {
-  const oracleKeypair = await generateKeyPairSigner();
+function buildValidParams(overrides: Record<string, unknown> = {}) {
+  const oracleKeypair = Keypair.generate();
   return {
-    admin,
-    mint,
-    carCostLamports: 10n * SOL,
-    pricePerShareLamports: SOL / 10n, // 0.1 SOL per share → 100 shares
-    minRaiseLamports: 5n * SOL,
+    carCostLamports: new BN(10 * LAMPORTS_PER_SOL),
+    pricePerShareLamports: new BN(LAMPORTS_PER_SOL / 10),
+    minRaiseLamports: new BN(5 * LAMPORTS_PER_SOL),
     deadline: futureDeadline(),
     transferHookProgramId: TRANSFER_HOOK_PROGRAM_ID,
-    oraclePubkey: oracleKeypair.address,
+    oraclePubkey: oracleKeypair.publicKey,
     tokenName: "Axel Taxi #001",
     tokenSymbol: "AXEL",
     tokenUri: "https://arweave.net/test-metadata",
@@ -44,117 +41,200 @@ async function buildValidParams(
     make: "Toyota",
     model: "Camry",
     year: 2023,
-    valuationSol: 10n * SOL,
+    valuationSol: new BN(10 * LAMPORTS_PER_SOL),
     ...overrides,
   };
 }
 
+function findProjectStatePda(mint: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("project"), mint.toBuffer()],
+    AXEL_PROGRAM_ID,
+  );
+}
+
+function findEscrowVaultPda(mint: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("escrow"), mint.toBuffer()],
+    AXEL_PROGRAM_ID,
+  );
+}
+
+function findRevenueVaultPda(mint: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("revenue"), mint.toBuffer()],
+    AXEL_PROGRAM_ID,
+  );
+}
+
 describe("initialize_project", () => {
-  let admin: TransactionSigner;
+  let provider: anchor.AnchorProvider;
+  let program: anchor.Program<Axel>;
+  let admin: Keypair;
 
   before(async () => {
-    admin = await connection.createWallet(10n * SOL);
+    const connection = new Connection("http://127.0.0.1:8899", "confirmed");
+    admin = Keypair.generate();
+
+    // Airdrop SOL to admin
+    const sig = await connection.requestAirdrop(
+      admin.publicKey,
+      10 * LAMPORTS_PER_SOL,
+    );
+    await connection.confirmTransaction(sig, "confirmed");
+
+    const wallet = new anchor.Wallet(admin);
+    provider = new anchor.AnchorProvider(connection, wallet, {
+      commitment: "confirmed",
+    });
+    program = new anchor.Program(IDL as Axel, provider);
   });
 
   test("happy path — creates project with correct state", async () => {
-    const mint = await generateKeyPairSigner();
-    const params = await buildValidParams(admin, mint);
+    const mint = Keypair.generate();
+    const params = buildValidParams();
+    const [projectStatePda] = findProjectStatePda(mint.publicKey);
+    const [escrowVaultPda] = findEscrowVaultPda(mint.publicKey);
+    const [revenueVaultPda] = findRevenueVaultPda(mint.publicKey);
 
-    const instruction = await getInitializeProjectInstructionAsync(params);
+    await program.methods
+      .initializeProject(params)
+      .accounts({
+        admin: admin.publicKey,
+        mint: mint.publicKey,
+        projectState: projectStatePda,
+        escrowVault: escrowVaultPda,
+        revenueVault: revenueVaultPda,
+        tokenExtensionsProgram: TOKEN_EXTENSIONS_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([admin, mint])
+      .rpc();
 
-    await connection.sendTransactionFromInstructions({
-      feePayer: admin,
-      instructions: [instruction],
-      signers: [admin, mint],
-    });
+    const projectState = await program.account.projectState.fetch(
+      projectStatePda,
+    );
 
-    // Fetch and verify ProjectState
-    const [projectStatePda] = await findProjectStatePda({ mint: mint.address });
-    const projectState = await fetchProjectState(connection.rpc, projectStatePda);
-
-    assert.strictEqual(projectState.data.admin, admin.address);
-    assert.strictEqual(projectState.data.mint, mint.address);
-    assert.strictEqual(projectState.data.tokenSupply, 100n); // 10 SOL / 0.1 SOL
-    assert.strictEqual(projectState.data.pricePerShare, SOL / 10n);
-    assert.strictEqual(projectState.data.minRaise, 5n * SOL);
-    assert.strictEqual(projectState.data.maxRaise, 10n * SOL); // 100 * 0.1 SOL
-    assert.strictEqual(projectState.data.solRaised, 0n);
-    assert.strictEqual(projectState.data.status.__kind, "Fundraising");
-    assert.strictEqual(projectState.data.periodCount, 0);
+    assert.strictEqual(
+      projectState.admin.toBase58(),
+      admin.publicKey.toBase58(),
+    );
+    assert.strictEqual(
+      projectState.mint.toBase58(),
+      mint.publicKey.toBase58(),
+    );
+    assert.ok(projectState.tokenSupply.eq(new BN(100)));
+    assert.ok(
+      projectState.pricePerShare.eq(new BN(LAMPORTS_PER_SOL / 10)),
+    );
+    assert.ok(projectState.minRaise.eq(new BN(5 * LAMPORTS_PER_SOL)));
+    assert.ok(
+      projectState.maxRaise.eq(new BN(10 * LAMPORTS_PER_SOL)),
+    );
+    assert.ok(projectState.solRaised.eq(new BN(0)));
+    assert.deepStrictEqual(projectState.status, { fundraising: {} });
+    assert.strictEqual(projectState.periodCount, 0);
   });
 
   test("fails with zero price per share", async () => {
-    const mint = await generateKeyPairSigner();
-    const params = await buildValidParams(admin, mint, {
-      pricePerShareLamports: 0n,
+    const mint = Keypair.generate();
+    const params = buildValidParams({
+      pricePerShareLamports: new BN(0),
     });
+    const [projectStatePda] = findProjectStatePda(mint.publicKey);
+    const [escrowVaultPda] = findEscrowVaultPda(mint.publicKey);
+    const [revenueVaultPda] = findRevenueVaultPda(mint.publicKey);
 
-    const instruction = await getInitializeProjectInstructionAsync(params);
-
-    await assert.rejects(
-      () =>
-        connection.sendTransactionFromInstructions({
-          feePayer: admin,
-          instructions: [instruction],
-          signers: [admin, mint],
-        }),
-      (error: Error) => {
-        assert.ok(
-          error.message.includes("0x1771"), // 6001 = ZeroPricePerShare
-          `Expected error 0x1771 (ZeroPricePerShare), got: ${error.message}`,
-        );
-        return true;
-      },
-    );
+    try {
+      await program.methods
+        .initializeProject(params)
+        .accounts({
+          admin: admin.publicKey,
+          mint: mint.publicKey,
+          projectState: projectStatePda,
+          escrowVault: escrowVaultPda,
+          revenueVault: revenueVaultPda,
+          tokenExtensionsProgram: TOKEN_EXTENSIONS_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([admin, mint])
+        .rpc();
+      assert.fail("Expected transaction to fail");
+    } catch (error: any) {
+      assert.ok(
+        error.toString().includes("6001") ||
+          error.toString().includes("ZeroPricePerShare") ||
+          error.toString().includes("0x1771"),
+        `Expected error 6001 (ZeroPricePerShare), got: ${error}`,
+      );
+    }
   });
 
   test("fails when car cost is not divisible by price per share", async () => {
-    const mint = await generateKeyPairSigner();
-    const params = await buildValidParams(admin, mint, {
-      carCostLamports: 10n * SOL + 1n, // not divisible by 0.1 SOL
+    const mint = Keypair.generate();
+    const params = buildValidParams({
+      carCostLamports: new BN(10 * LAMPORTS_PER_SOL + 1),
     });
+    const [projectStatePda] = findProjectStatePda(mint.publicKey);
+    const [escrowVaultPda] = findEscrowVaultPda(mint.publicKey);
+    const [revenueVaultPda] = findRevenueVaultPda(mint.publicKey);
 
-    const instruction = await getInitializeProjectInstructionAsync(params);
-
-    await assert.rejects(
-      () =>
-        connection.sendTransactionFromInstructions({
-          feePayer: admin,
-          instructions: [instruction],
-          signers: [admin, mint],
-        }),
-      (error: Error) => {
-        assert.ok(
-          error.message.includes("0x1770"), // 6000 = InvalidTokenSupplyDivision
-          `Expected error 0x1770 (InvalidTokenSupplyDivision), got: ${error.message}`,
-        );
-        return true;
-      },
-    );
+    try {
+      await program.methods
+        .initializeProject(params)
+        .accounts({
+          admin: admin.publicKey,
+          mint: mint.publicKey,
+          projectState: projectStatePda,
+          escrowVault: escrowVaultPda,
+          revenueVault: revenueVaultPda,
+          tokenExtensionsProgram: TOKEN_EXTENSIONS_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([admin, mint])
+        .rpc();
+      assert.fail("Expected transaction to fail");
+    } catch (error: any) {
+      assert.ok(
+        error.toString().includes("6000") ||
+          error.toString().includes("InvalidTokenSupplyDivision") ||
+          error.toString().includes("0x1770"),
+        `Expected error 6000 (InvalidTokenSupplyDivision), got: ${error}`,
+      );
+    }
   });
 
   test("fails when deadline is in the past", async () => {
-    const mint = await generateKeyPairSigner();
-    const params = await buildValidParams(admin, mint, {
+    const mint = Keypair.generate();
+    const params = buildValidParams({
       deadline: pastDeadline(),
     });
+    const [projectStatePda] = findProjectStatePda(mint.publicKey);
+    const [escrowVaultPda] = findEscrowVaultPda(mint.publicKey);
+    const [revenueVaultPda] = findRevenueVaultPda(mint.publicKey);
 
-    const instruction = await getInitializeProjectInstructionAsync(params);
-
-    await assert.rejects(
-      () =>
-        connection.sendTransactionFromInstructions({
-          feePayer: admin,
-          instructions: [instruction],
-          signers: [admin, mint],
-        }),
-      (error: Error) => {
-        assert.ok(
-          error.message.includes("0x1773"), // 6003 = DeadlineInPast
-          `Expected error 0x1773 (DeadlineInPast), got: ${error.message}`,
-        );
-        return true;
-      },
-    );
+    try {
+      await program.methods
+        .initializeProject(params)
+        .accounts({
+          admin: admin.publicKey,
+          mint: mint.publicKey,
+          projectState: projectStatePda,
+          escrowVault: escrowVaultPda,
+          revenueVault: revenueVaultPda,
+          tokenExtensionsProgram: TOKEN_EXTENSIONS_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([admin, mint])
+        .rpc();
+      assert.fail("Expected transaction to fail");
+    } catch (error: any) {
+      assert.ok(
+        error.toString().includes("6003") ||
+          error.toString().includes("DeadlineInPast") ||
+          error.toString().includes("0x1773"),
+        `Expected error 6003 (DeadlineInPast), got: ${error}`,
+      );
+    }
   });
 });

@@ -113,21 +113,23 @@ pub fn handler(
     let base_mint_size =
         ExtensionType::try_calculate_account_len::<MintState>(fixed_extensions)?;
 
-    // TokenMetadata is variable-length so we compute its space separately.
-    // It is stored as a token extension TLV entry with an inner spl-type-length-value TLV:
-    //   extension_type(u16) + extension_length(u16) + spl_discriminator(8) + packed_len(u32) + borsh_data
+    // TokenMetadata is variable-length; Token-2022 will realloc the account
+    // when we initialize metadata in step 8. We only allocate the fixed
+    // extensions now, but fund the account with enough lamports for the
+    // final size (including metadata) so rent stays covered after realloc.
     let metadata_borsh_size = compute_metadata_borsh_size(
         &params.token_name,
         &params.token_symbol,
         &params.token_uri,
         &additional_metadata,
     );
-
     let extension_header_size = std::mem::size_of::<u16>() + std::mem::size_of::<u16>();
     let spl_tlv_header_size = 8 + std::mem::size_of::<u32>();
     let metadata_extension_size = extension_header_size + spl_tlv_header_size + metadata_borsh_size;
-
     let total_mint_size = base_mint_size + metadata_extension_size;
+
+    // Fund for the final size, but allocate only the fixed-extensions size.
+    // Token-2022's metadata init will realloc the account to fit metadata.
     let mint_rent = Rent::get()?.minimum_balance(total_mint_size);
 
     let mint_key = context.accounts.mint.key();
@@ -143,7 +145,7 @@ pub fn handler(
             },
         ),
         mint_rent,
-        total_mint_size as u64,
+        base_mint_size as u64,
         &anchor_spl::token_2022::ID,
     )?;
 
