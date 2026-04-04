@@ -18,4 +18,15 @@ pub mod axel {
     ) -> Result<()> {
         instructions::admin::initialize_project::handler(context, params)
     }
+
+    pub fn add_to_whitelist(context: Context<AddToWhitelist>, wallet: Pubkey) -> Result<()> {
+        instructions::admin::whitelist::add_handler(context, wallet)
+    }
+
+    pub fn remove_from_whitelist(
+        context: Context<RemoveFromWhitelist>,
+        wallet: Pubkey,
+    ) -> Result<()> {
+        instructions::admin::whitelist::remove_handler(context, wallet)
+    }
 }
