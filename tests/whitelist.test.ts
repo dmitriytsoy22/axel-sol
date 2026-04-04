@@ -87,7 +87,7 @@ describe("whitelist management", () => {
     assert.strictEqual(entry.approved, false);
   });
 
-  test("add_to_whitelist — fails on duplicate add", async () => {
+  test("add_to_whitelist — idempotent on duplicate add", async () => {
     const investor = Keypair.generate();
     const [whitelistPda] = findWhitelistPda(investor.publicKey);
 
@@ -101,25 +101,19 @@ describe("whitelist management", () => {
       .signers([admin])
       .rpc();
 
-    // Second add should fail — PDA already exists (Anchor init constraint)
-    try {
-      await program.methods
-        .addToWhitelist(investor.publicKey)
-        .accounts({
-          admin: admin.publicKey,
-          whitelistEntry: whitelistPda,
-          systemProgram: anchor.web3.SystemProgram.programId,
-        })
-        .signers([admin])
-        .rpc();
-      assert.fail("Expected duplicate add to fail");
-    } catch (error: any) {
-      assert.ok(
-        error.toString().includes("already in use") ||
-          error.toString().includes("0x0"),
-        `Expected already-in-use error, got: ${error}`,
-      );
-    }
+    // Second add succeeds (init_if_needed) — still approved
+    await program.methods
+      .addToWhitelist(investor.publicKey)
+      .accounts({
+        admin: admin.publicKey,
+        whitelistEntry: whitelistPda,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([admin])
+      .rpc();
+
+    const entry = await program.account.whitelistEntry.fetch(whitelistPda);
+    assert.strictEqual(entry.approved, true);
   });
 
   test("remove_from_whitelist — fails for non-existent entry", async () => {

@@ -5,6 +5,7 @@ use spl_tlv_account_resolution::{
 };
 use spl_transfer_hook_interface::instruction::ExecuteInstruction;
 
+
 declare_id!("CgbtcZvWngGWNH2uQa8vXfiNSYGpQKVNdx7wDUuMFqmC");
 
 /// The axel main program ID — used to derive WhitelistEntry PDAs
@@ -38,6 +39,16 @@ pub mod transfer_hook {
         check_whitelist(dest_whitelist, TransferHookError::DestinationNotWhitelisted)?;
 
         Ok(())
+    }
+
+    /// Fallback: Token-2022 invokes the hook with the spl-transfer-hook-interface
+    /// discriminator, not the Anchor discriminator. Route it to our execute handler.
+    pub fn fallback<'info>(
+        program_id: &Pubkey,
+        accounts: &'info [AccountInfo<'info>],
+        data: &[u8],
+    ) -> Result<()> {
+        __private::__global::execute(program_id, accounts, data)
     }
 
     /// Initializes the ExtraAccountMetaList PDA that tells Token-2022
@@ -103,48 +114,47 @@ fn check_whitelist(account: &AccountInfo, error: TransferHookError) -> Result<()
 /// 1. WhitelistEntry PDA for the source owner (seeds: ["whitelist", source_owner])
 /// 2. WhitelistEntry PDA for the destination owner (seeds: ["whitelist", dest_owner])
 fn extra_account_metas() -> Result<Vec<ExtraAccountMeta>> {
+    // Account indices in the full transfer hook invocation:
+    // 0 = source token account
+    // 1 = mint
+    // 2 = destination token account
+    // 3 = source owner/delegate
+    // 4 = extra_account_meta_list PDA
+    // --- extra accounts start at index 5 ---
+    // 5 = axel_program (static pubkey, must come first so PDAs can reference it)
+    // 6 = source_whitelist PDA (derived via axel_program at index 5)
+    // 7 = dest_whitelist PDA (derived via axel_program at index 5)
     Ok(vec![
-        // Source owner whitelist PDA (derived from axel program)
+        // [index 5] The axel program ID — needed as the derivation program for whitelist PDAs
+        ExtraAccountMeta::new_with_pubkey(&AXEL_PROGRAM_ID, false, false)?,
+        // [index 6] Source owner whitelist PDA
         ExtraAccountMeta::new_external_pda_with_seeds(
-            5, // axel_program index (added as account #5 in the list below)
+            5, // axel_program at index 5
             &[
                 Seed::Literal {
                     bytes: b"whitelist".to_vec(),
                 },
-                // source_owner = index 2 in the standard execute accounts
-                // (0=source, 1=mint, 2=destination, 3=owner/authority, 4=extra_account_meta_list)
-                // Actually: source token account owner. The owner of the SOURCE token account.
-                // In Token-2022 transfer hook: accounts are:
-                // 0 = source token account
-                // 1 = mint
-                // 2 = destination token account
-                // 3 = source owner/delegate
-                // 4 = extra_account_meta_list
                 Seed::AccountKey { index: 3 }, // source owner
             ],
-            false, // is_signer
-            false, // is_writable
+            false,
+            false,
         )?,
-        // Destination owner whitelist PDA — we need the destination OWNER,
-        // which is not directly in the standard accounts. We use the destination
-        // token account (index 2) and extract its owner via AccountData seed.
+        // [index 7] Destination owner whitelist PDA — extract owner from dest token account data
         ExtraAccountMeta::new_external_pda_with_seeds(
-            5, // axel_program index
+            5, // axel_program at index 5
             &[
                 Seed::Literal {
                     bytes: b"whitelist".to_vec(),
                 },
                 Seed::AccountData {
-                    account_index: 2,    // destination token account
-                    data_index: 32,      // owner field offset in Token Account (after mint pubkey)
-                    length: 32,          // Pubkey length
+                    account_index: 2, // destination token account
+                    data_index: 32,   // owner field offset (after mint pubkey)
+                    length: 32,       // Pubkey length
                 },
             ],
             false,
             false,
         )?,
-        // The axel program ID (needed as the PDA derivation program for both whitelist entries)
-        ExtraAccountMeta::new_with_pubkey(&AXEL_PROGRAM_ID, false, false)?,
     ])
 }
 
@@ -177,17 +187,17 @@ pub struct Execute<'info> {
     )]
     pub extra_account_meta_list: AccountInfo<'info>,
 
-    /// WhitelistEntry PDA for source owner (from axel program)
+    /// The axel program (needed for PDA derivation) — must be index 5
+    /// CHECK: validated by ExtraAccountMetaList resolution
+    pub axel_program: AccountInfo<'info>,
+
+    /// WhitelistEntry PDA for source owner (from axel program) — index 6
     /// CHECK: validated in handler via check_whitelist
     pub source_whitelist: AccountInfo<'info>,
 
-    /// WhitelistEntry PDA for destination owner (from axel program)
+    /// WhitelistEntry PDA for destination owner (from axel program) — index 7
     /// CHECK: validated in handler via check_whitelist
     pub dest_whitelist: AccountInfo<'info>,
-
-    /// The axel program (needed for PDA derivation)
-    /// CHECK: validated by ExtraAccountMetaList resolution
-    pub axel_program: AccountInfo<'info>,
 }
 
 /// Accounts for initializing the ExtraAccountMetaList PDA.

@@ -9,7 +9,7 @@ pub struct AddToWhitelist<'info> {
     pub admin: Signer<'info>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = admin,
         space = WhitelistEntry::DISCRIMINATOR.len() + WhitelistEntry::INIT_SPACE,
         seeds = [b"whitelist", wallet.as_ref()],
