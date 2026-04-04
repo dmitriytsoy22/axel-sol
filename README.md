@@ -45,7 +45,6 @@
 - [Design System](#-design-system)
 - [Internationalization (i18n)](#-internationalization-i18n)
 - [Security](#-security)
-- [Roadmap](#-roadmap)
 - [Team](#-team)
 - [Contributing](#-contributing)
 - [License](#-license)
@@ -437,19 +436,6 @@ Routes are locale-prefixed: `/ru/dashboard`, `/en/admin`, `/kk/payouts`.
 | **Frontend** | Wallet address validation before all on-chain calls |
 | **Frontend** | No inline scripts, strict Referrer-Policy |
 | **Auth** | Sign-In with Solana (SIWS) — no JWT, no server sessions |
-
----
-
-## 🗺 Roadmap
-
-| Phase | Timeline | Milestone |
-| :---: | :--- | :--- |
-| ✅ **1** | Days 1–5 | Foundation — project scaffolding, wallet adapter, RPC helpers |
-| 🔄 **2** | Days 6–12 | Core — catalog, asset pages, on-chain instructions, oracle cron |
-| ⬜ **3** | Days 13–18 | Integration — full invest flow, dashboard, telemetry widget |
-| ⬜ **4** | Days 19–23 | Polish — admin panel, payout history, mobile responsive |
-| ⬜ **5** | Days 24–29 | Security — CSP hardening, E2E QA, security audit |
-| ⬜ **6** | Days 30–34 | Launch — staging deploy, smoke tests, mainnet readiness |
 
 ---
 
