@@ -1,19 +1,32 @@
-# On-chain Developer Plan — RWA Taxi Tokenization
+# On-chain Developer Plan — RWA Taxi Tokenization (v2: Direct Sale Model)
+
 **Role:** ndrkbrg (On-chain) (Anchor/Rust, Token-2022, Transfer Hook)
 **Prepared by:** Product Owner / System Analyst
-**Last updated:** 2026-03-28
+**Last updated:** 2026-04-05
+
+---
+
+## Architecture Change (v2)
+
+**v1 (Fundraising model):** Investors send SOL to escrow → admin finalizes raise → program mints tokens → refund if failed.
+
+**v2 (Direct Sale model):** Admin already owns the asset. `initialize_project` creates the mint, mints all tokens to a program-controlled token vault, and revokes mint authority. Investors buy tokens at a fixed price via `buy_tokens` (atomic SOL-for-tokens swap). No escrow, no fundraise window, no refund.
+
+**Why the change:** The fundraising model adds complexity (escrow, deadline, min_raise, finalize, refund) to protect against a scenario that doesn't apply — the admin already owns the car. Direct sale is simpler, more flexible, and closer to how real tokenized assets work.
+
+**What stays the same:** Token-2022 mint with all 6 extensions, transfer hook whitelist enforcement, revenue distribution (deposit + claim), telemetry oracle, pause/resume.
 
 ---
 
 ## Product Context
 
-The on-chain layer is the trust anchor of the entire platform. It enforces the rules of investment, ownership, and revenue distribution without any possibility of off-chain manipulation. All financial state — who owns how many tokens, how much SOL is in escrow, how much revenue has been deposited — must be provable on-chain.
+The on-chain layer is the trust anchor of the entire platform. It enforces the rules of ownership and revenue distribution without any possibility of off-chain manipulation. All financial state — who owns how many tokens, how much revenue has been deposited — must be provable on-chain.
 
-**Two programs to build:**
+**Two programs:**
 
 | Program | Purpose |
 | --- | --- |
-| `rwa-taxi` | Main program: fundraising, investment, revenue deposit/claim, project lifecycle |
+| `axel` | Main program: token sale, revenue deposit/claim, project lifecycle |
 | `transfer-hook` | Token-2022 hook: enforces whitelist/KYC on every token transfer |
 
 **Token standard:** Token-2022 (Token Extensions Program) — NOT the classic SPL Token program.
@@ -24,52 +37,51 @@ The on-chain layer is the trust anchor of the entire platform. It enforces the r
 
 ## North Star Metric
 
-> Every SOL in the platform can be accounted for: either in the fundraising escrow vault, the revenue vault, or in an investor's wallet — with on-chain proof.
+> Every token is backed by a real asset. Token supply is fixed and provably capped (mint authority revoked). Revenue distribution is proportional and verifiable on-chain.
 
 ---
 
 ## On-chain Account Architecture
 
 ```
-ProjectState (PDA: ["project", asset_id])
+ProjectState (PDA: ["project", mint])
   ├── admin: Pubkey
-  ├── mint: Pubkey                    ← Token-2022 mint
-  ├── escrow_vault: Pubkey            ← SOL escrow during fundraising
-  ├── revenue_vault: Pubkey           ← SOL for revenue distributions
-  ├── token_supply: u64               ← car_cost_lamports / price_per_share
-  ├── price_per_share: u64            ← lamports per token
-  ├── min_raise: u64                  ← minimum SOL to finalize
-  ├── max_raise: u64                  ← = token_supply × price_per_share
-  ├── sol_raised: u64
-  ├── deadline: i64                   ← Unix timestamp
-  └── status: ProjectStatus           ← Fundraising | Finalized | Active | Paused | Closed
-
-InvestorRecord (PDA: ["investor", project, wallet])
-  ├── wallet: Pubkey
-  ├── project: Pubkey
-  ├── sol_invested: u64
-  └── tokens_received: u64
+  ├── mint: Pubkey                    <- Token-2022 mint
+  ├── token_vault: Pubkey             <- program-controlled ATA holding unsold tokens
+  ├── revenue_vault: Pubkey           <- SOL for revenue distributions
+  ├── token_supply: u64               <- total tokens minted (fixed forever)
+  ├── price_per_share: u64            <- lamports per token (admin can update)
+  ├── status: ProjectStatus           <- Active | Paused | Closed
+  ├── period_count: u32
+  ├── oracle_pubkey: Pubkey
+  └── bump: u8
 
 RevenuePeriod (PDA: ["revenue", project, period_index])
   ├── project: Pubkey
   ├── period_index: u32
-  ├── total_deposited: u64            ← SOL deposited for this period
-  ├── token_supply_snapshot: u64      ← total supply at time of deposit
-  └── deposited_at: i64
+  ├── total_deposited: u64            <- SOL deposited for this period
+  ├── token_supply_snapshot: u64      <- total supply at time of deposit
+  ├── deposited_at: i64
+  └── bump: u8
 
 ClaimRecord (PDA: ["claim", revenue_period, wallet])
-  └── claimed: bool                   ← prevents double-claim
+  ├── claimed: bool                   <- prevents double-claim
+  └── bump: u8
 
 WhitelistEntry (PDA: ["whitelist", wallet])
-  └── approved: bool                  ← read by Transfer Hook on every transfer
+  ├── approved: bool                  <- read by Transfer Hook on every transfer
+  └── bump: u8
 
 TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
   ├── project: Pubkey
-  ├── date: i64                        ← Unix timestamp (day-level granularity)
-  ├── data_hash: [u8; 32]              ← SHA-256 of the full Yandex Pro payload
-  ├── oracle_pubkey: Pubkey            ← backend oracle signing keypair
-  └── recorded_at: i64                ← block timestamp
+  ├── date: i64                        <- Unix timestamp (day-level granularity)
+  ├── data_hash: [u8; 32]             <- SHA-256 of the full Yandex Pro payload
+  ├── oracle_pubkey: Pubkey            <- backend oracle signing keypair
+  ├── recorded_at: i64                <- block timestamp
+  └── bump: u8
 ```
+
+**Removed from v1:** `InvestorRecord` (token balances are the source of truth), `escrow_vault` (no escrow), `min_raise`/`max_raise`/`deadline`/`sol_raised` (no fundraising window).
 
 ---
 
@@ -79,329 +91,334 @@ TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
 
 ### Epic 1: Token-2022 Mint Setup
 
-**Business goal:** Create a Token-2022 mint with all required extensions configured at initialization. This is the highest-risk step — once created, extensions are immutable.
+**Business goal:** Create a Token-2022 mint with all required extensions, mint all tokens to admin, and revoke mint authority — proving the supply is fixed forever.
 
-#### US-O01 — Initialize Token-2022 Mint
+#### US-O01 — Initialize Token-2022 Mint [DONE]
+
 > As the platform, I want to create a Token-2022 mint with the correct extensions so that all token behavior is enforced at the protocol level.
 
-**Acceptance Criteria:**
-- Mint created using Token-2022 program (`TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb`)
-- The following extensions are initialized **in this exact order** (Token-2022 requires ordered initialization):
-  1. `TransferHook` — points to the `transfer-hook` program ID
-  2. `DefaultAccountState(Frozen)` — all new token accounts start frozen
-  3. `PermanentDelegate` — set to multisig authority
-  4. `TransferFee` — e.g., 100 basis points (1%), harvest authority = multisig
-  5. `MetadataPointer` — points to mint itself
-  6. `TokenMetadata` — stores car VIN, make, model, year, valuation
-- `MemoTransfer` enabled on all investor token accounts (account-level extension, set on ATA creation)
-- Mint authority held by the `rwa-taxi` program PDA (not a hot key)
-- Freeze authority held by the multisig
-- After token supply is fully minted (`finalize_raise`), mint authority is revoked
+**Status: DONE** — implemented and tested.
 
-**Priority:** Must Have | **Phase:** 1 (design) / 2 (implementation)
+**Acceptance Criteria:**
+
+- Mint created using Token-2022 program
+- Extensions initialized in order: TransferHook, DefaultAccountState(Frozen), PermanentDelegate, TransferFee(100bps), MetadataPointer, TokenMetadata
+- Mint authority held by `project_state` PDA
+- Freeze authority held by admin (multisig in prod)
 
 ---
 
-#### US-O02 — Token Metadata
+#### US-O02 — Token Metadata [DONE]
+
 > As the frontend, I want car metadata stored on-chain in the mint so that asset details are verifiable without trusting the backend.
 
-**Acceptance Criteria:**
-- Metadata stored in `TokenMetadata` extension: `name`, `symbol`, `uri` (points to off-chain JSON), plus additional fields: `vin`, `make`, `model`, `year`, `valuation_sol`
-- Metadata can be updated by metadata update authority (multisig) before tokens are minted
-- Once `finalize_raise` executes and mint authority is revoked, metadata is frozen
-
-**Priority:** Must Have | **Phase:** 2
+**Status: DONE** — metadata (name, symbol, uri, vin, make, model, year, valuation_sol) written in `initialize_project`.
 
 ---
 
 ### Epic 2: Transfer Hook Program
 
-**Business goal:** Enforce whitelist/KYC compliance on every token transfer at the protocol level — transfers to or from non-whitelisted wallets must fail automatically.
+**Business goal:** Enforce whitelist/KYC compliance on every token transfer at the protocol level.
 
-#### US-O03 — Transfer Hook: Whitelist Enforcement
-> As the platform, I want every token transfer to automatically verify that both the sender and receiver are whitelisted so that non-KYC'd wallets can never receive or send tokens.
+#### US-O03 — Transfer Hook: Whitelist Enforcement [DONE]
 
-**Acceptance Criteria:**
-- `transfer-hook` program implements the `execute` instruction as required by the Token-2022 `TransferHook` interface
-- `execute` verifies that its caller is the Token-2022 program (not callable directly)
-- Checks `WhitelistEntry` PDA for both `source_owner` and `destination_owner`
-- If either PDA does not exist or `approved = false`, instruction returns `Unauthorized` error — the transfer fails
-- Exception: transfers FROM the program's `rwa-taxi` PDA (minting) bypass the whitelist check
-- All extra accounts required by the hook are registered in `ExtraAccountMetaList` PDA
-- Anchor tests: whitelist-to-whitelist transfer succeeds; non-whitelisted receiver fails; non-whitelisted sender fails; mint (program authority) to investor succeeds
+> As the platform, I want every token transfer to automatically verify that both the sender and receiver are whitelisted.
 
-**Priority:** Must Have | **Phase:** 2
+**Status: DONE** — `execute` instruction implemented with fallback routing, ExtraAccountMetaList PDA, integration tests passing.
 
 ---
 
-#### US-O04 — Whitelist PDA Management
-> As the backend, I want to add and remove wallets from the whitelist PDA so that KYC approvals and revocations are reflected on-chain.
+#### US-O04 — Whitelist PDA Management [DONE]
 
-**Acceptance Criteria:**
-- `add_to_whitelist` instruction: creates `WhitelistEntry` PDA with `approved = true`; authority check: only the program admin or multisig can call
-- `remove_from_whitelist` instruction: sets `approved = false` (does not close PDA — maintains audit trail)
-- Both instructions emit program log events parseable by the backend event indexer
-- Backend calls these instructions via CPI or direct transaction (coordinate with russh)
+> As the backend, I want to add and remove wallets from the whitelist PDA.
 
-**Priority:** Must Have | **Phase:** 2
+**Status: DONE** — `add_to_whitelist` (idempotent via `init_if_needed`), `remove_from_whitelist` implemented and tested.
 
 ---
 
-### Epic 3: Fundraising Program
+### Epic 3: Project Initialization (v2)
 
-**Business goal:** Run a time-limited fundraise where investors send SOL to an escrow vault and receive Token-2022 tokens proportional to their investment.
+**Business goal:** Admin creates the project, mints all tokens into a program-controlled vault, and revokes mint authority in a single instruction.
 
-#### US-O05 — Initialize Project
-> As the platform admin, I want to initialize an on-chain project so that fundraising parameters are locked in immutably.
+#### US-O05 — Initialize Project [NEEDS UPDATE]
+
+> As the platform admin, I want to initialize a project, mint all tokens, and lock the supply so that investors can buy shares of a real asset.
+
+**Status: NEEDS UPDATE** — current `initialize_project` creates the mint and ProjectState but does NOT mint tokens or revoke mint authority. Needs modification.
+
+**Changes required:**
+
+- Create a token vault ATA (program-controlled) for the project
+- Thaw the vault ATA (DefaultAccountState is Frozen)
+- Mint `token_supply` tokens to the vault ATA (using project_state PDA as mint authority)
+- Revoke mint authority (set to None) — supply is now permanently fixed
+- Remove: `escrow_vault`, `min_raise`, `max_raise`, `deadline`, `sol_raised` from ProjectState
+- Add: `token_vault` to ProjectState
+- Set status to `Active` (not `Fundraising`)
 
 **Acceptance Criteria:**
 
-- `initialize_project` creates `ProjectState` PDA with all fundraising parameters
-- Parameters set at init and immutable: `token_supply`, `price_per_share`, `min_raise`, `max_raise`, `deadline`
-- `token_supply` is derived from `car_cost_lamports / price_per_share` (validated: no remainder allowed)
-- Creates SOL escrow vault (system program account owned by PDA)
-- Creates revenue vault (system program account owned by PDA)
-- Project status set to `Fundraising`
-- Only callable by admin authority (multisig)
-
-**Token-2022 Mint Creation (Option A — CPI inside this instruction):**
-
-`initialize_project` is responsible for creating and fully configuring the Token-2022 mint via CPIs. dimagonedone sends **one instruction**; all mint setup is internal to the program. The admin never interacts with the Token-2022 program directly.
-
-CPI sequence inside `initialize_project`:
-
-1. `SystemProgram::create_account` — allocate mint account with **fixed 512 bytes** (covers base mint + all 6 extensions + metadata headroom; ~0.004 SOL rent)
-2. `token_2022::initialize_transfer_hook` — register `transfer-hook` program ID
-3. `token_2022::initialize_default_account_state` — set default state to `Frozen`
-4. `token_2022::initialize_permanent_delegate` — set to multisig authority
-5. `token_2022::initialize_transfer_fee_config` — set fee (100 bps), harvest authority = multisig
-6. `token_2022::initialize_metadata_pointer` — point to mint itself
-7. `token_2022::initialize_mint2` — set decimals = 0, mint authority = program PDA, freeze authority = multisig
-8. `token_2022::initialize_token_metadata` — write car metadata (name, symbol, uri, VIN, make, model, year)
-
-**Critical:** steps 1–7 must complete before step 8. Steps 2–6 must run before step 7 (`initialize_mint2`). This order is enforced by the Token-2022 program.
-
-`MemoTransfer` extension is account-level — enabled on each investor's ATA when first created, not on the mint.
-
-**Devnet seed script (Phase 1 deliverable):** ndrkbrg provides a CLI TypeScript script (`scripts/init-project.ts`) that calls `initialize_project` with test parameters. dimagonedone and russh use this script to bootstrap a project on devnet without waiting for the admin panel UI (Phase 4).
-
-**Priority:** Must Have | **Phase:** 2
+- `initialize_project` creates mint with all 6 extensions
+- All tokens minted to program-controlled vault ATA
+- Mint authority revoked after minting (verifiable on Explorer)
+- `ProjectState.status == Active`
+- Token supply is fixed and provably capped
 
 ---
 
-#### US-O06 — Investor Contribution
-> As a whitelisted investor, I want to send SOL to the project escrow so that I can receive tokens representing my ownership share.
+### Epic 4: Token Sale (NEW — replaces Fundraising)
+
+**Business goal:** Investors buy tokens from the program vault at a fixed price. Atomic swap: SOL goes to admin, tokens go to investor.
+
+#### US-O06v2 — Buy Tokens
+
+> As a whitelisted investor, I want to buy tokens with SOL so that I own a share of the taxi asset.
+
+**Status: NEW** — replaces old US-O06 (invest), US-O07 (finalize_raise), US-O08 (refund).
 
 **Acceptance Criteria:**
-- `invest` instruction accepts `amount_lamports`
-- Validates: project status is `Fundraising`; deadline not passed; investor is in whitelist
-- Validates: `amount_lamports` ≥ min investment per investor; investor total does not exceed max per investor
-- Transfers SOL from investor wallet to escrow vault via system program
-- Creates or updates `InvestorRecord` PDA (atomic with SOL transfer)
-- Does NOT mint tokens yet — tokens are minted on `finalize_raise`
-- Emits structured log event: `{ event: "invest", wallet, amount_lamports, total_invested }`
 
-**Priority:** Must Have | **Phase:** 2
+- `buy_tokens` instruction accepts `token_amount: u64`
+- Validates: investor is whitelisted, project status is `Active`, vault has enough tokens
+- Calculates: `sol_cost = token_amount * price_per_share`
+- Transfers SOL from investor wallet to admin wallet
+- Transfers tokens from vault ATA to investor's ATA (thaws investor ATA first if frozen)
+- Emits log: `{ event: "buy_tokens", wallet, token_amount, sol_cost }`
+- No minimum/maximum per investor (or optional admin-set limits)
+
+**Tests:**
+
+1. Happy path — investor buys tokens, balances update correctly
+2. Fails — non-whitelisted investor
+3. Fails — vault has insufficient tokens
+4. Fails — project is paused
+5. Multiple buys accumulate correctly
 
 ---
 
-#### US-O07 — Finalize Fundraise
-> As the platform, I want to finalize the raise and mint tokens to investors so that ownership is established on-chain.
+#### US-O06v2b — Update Token Price (OPTIONAL)
+
+> As the admin, I want to update the token price so that I can adjust to market conditions.
 
 **Acceptance Criteria:**
-- `finalize_raise` callable by admin only; validates `sol_raised >= min_raise`
-- Mints `InvestorRecord.tokens_received = sol_invested / price_per_share` tokens to each investor's ATA
-- Because `DefaultAccountState` is `Frozen`, minted tokens land in frozen accounts — cannot be transferred until Freeze Authority unfreezes (triggered by backend after KYC flow)
-- Revokes mint authority after full supply is distributed (calls `setAuthority` to `None`)
-- Project status transitions to `Active`
-- Emits `{ event: "finalize_raise", total_raised, tokens_minted }`
 
-**Priority:** Must Have | **Phase:** 2
+- `update_price` instruction: admin-only, sets new `price_per_share`
+- Emits log with old and new price
 
 ---
 
-#### US-O08 — Refund
-> As an investor, I want to reclaim my SOL if the fundraise fails so that my capital is not locked indefinitely.
+### Epic 5: Revenue Distribution (unchanged)
 
-**Acceptance Criteria:**
-- `refund` callable by any investor after `deadline` has passed AND `sol_raised < min_raise`
-- Uses `PermanentDelegate` to burn investor's tokens if any were provisionally minted
-- Returns investor's `sol_invested` from escrow vault to investor wallet
-- Closes `InvestorRecord` PDA; reclaims rent to admin
-- Not callable if project status is `Active` (raise was successful)
-- Emits `{ event: "refund", wallet, amount_lamports }`
-
-**Priority:** Must Have | **Phase:** 2
-
----
-
-### Epic 4: Revenue Distribution
-
-**Business goal:** Admin deposits SOL representing net profit into the revenue vault; investors call claim to receive their proportional share.
+**Business goal:** Admin deposits SOL representing net profit; investors claim their proportional share based on token holdings.
 
 #### US-O09 — Deposit Revenue
-> As the platform admin, I want to deposit SOL into the revenue vault for a given period so that investors can claim their share.
+
+> As the platform admin, I want to deposit SOL into the revenue vault for a given period.
+
+**Status: NOT STARTED**
 
 **Acceptance Criteria:**
-- `deposit_revenue` callable by admin only; project status must be `Active`
-- Creates `RevenuePeriod` PDA with `period_index` (auto-incremented), `total_deposited`, `token_supply_snapshot` (reads current total supply from mint)
-- Transfers SOL from admin wallet to revenue vault
-- `period_index` is sequential — no gaps allowed (validated against `ProjectState.period_count`)
-- Emits `{ event: "deposit_revenue", period_index, total_deposited, token_supply_snapshot }`
 
-**Priority:** Must Have | **Phase:** 2
+- `deposit_revenue` callable by admin only; project status must be `Active`
+- Creates `RevenuePeriod` PDA with `period_index` (auto-incremented), `total_deposited`, `token_supply_snapshot`
+- Transfers SOL from admin wallet to revenue vault
+- `period_index` is sequential (validated against `ProjectState.period_count`)
+- Emits `{ event: "deposit_revenue", period_index, total_deposited, token_supply_snapshot }`
 
 ---
 
 #### US-O10 — Claim Revenue
-> As an investor, I want to claim my SOL share of a revenue period so that I receive my earnings.
+
+> As an investor, I want to claim my SOL share of a revenue period.
+
+**Status: NOT STARTED**
 
 **Acceptance Criteria:**
-- `claim_revenue` accepts `period_index`; callable by any token holder
-- Validates: `ClaimRecord` PDA for this `(period, wallet)` does not exist (prevents double-claim)
-- Calculates: `payout = (investor_token_balance / period.token_supply_snapshot) × period.total_deposited`
-- Transfers `payout` SOL from revenue vault to investor wallet
-- Creates `ClaimRecord` PDA with `claimed = true` (atomic with transfer — same transaction)
-- Emits `{ event: "claim_revenue", wallet, period_index, amount_lamports }`
-- Fails gracefully if investor held 0 tokens at snapshot time (no tokens → no claim)
 
-**Priority:** Must Have | **Phase:** 2
+- `claim_revenue` accepts `period_index`; callable by any token holder
+- Validates: `ClaimRecord` PDA does not exist (prevents double-claim)
+- Calculates: `payout = (investor_token_balance / period.token_supply_snapshot) * period.total_deposited`
+- Transfers `payout` SOL from revenue vault to investor wallet
+- Creates `ClaimRecord` PDA atomically with transfer
+- Fails gracefully if investor held 0 tokens
 
 ---
 
-### Epic 5: Project Lifecycle Management
+### Epic 6: Project Lifecycle Management
 
-#### US-O11 — Pause Project
-> As the platform admin, I want to pause the project in case of an emergency so that no new investments or claims are processed until the issue is resolved.
+#### US-O11 — Pause / Resume Project
+
+> As the admin, I want to pause the project in case of emergency.
+
+**Status: NOT STARTED**
 
 **Acceptance Criteria:**
-- `pause_project` callable by multisig only; sets `ProjectState.status = Paused`
-- While paused: `invest`, `claim_revenue`, `deposit_revenue` all return `ProjectPaused` error
-- `refund` is still allowed while paused (investor safety)
-- `resume_project` instruction un-pauses; also multisig only
-- Emits `{ event: "pause_project" }` and `{ event: "resume_project" }`
 
-**Priority:** Must Have | **Phase:** 2
+- `pause_project`: sets status to `Paused`; `buy_tokens`, `claim_revenue`, `deposit_revenue` all return `ProjectPaused`
+- `resume_project`: sets status back to `Active`
+- Both admin-only
 
 ---
 
 #### US-O12 — Close Project
-> As the platform admin, I want to close a finished project so that all accounts are cleaned up and rent is reclaimed.
+
+> As the admin, I want to close a finished project.
+
+**Status: NOT STARTED**
 
 **Acceptance Criteria:**
-- `close_project` callable by multisig only; validates all revenue periods are fully claimed (or admin accepts remaining unclaimed balance)
-- Closes `ProjectState` PDA and vaults; reclaims rent to admin
-- Emits `{ event: "close_project" }`
 
-**Priority:** Should Have | **Phase:** 3
+- `close_project`: validates all revenue periods fully claimed (or admin accepts remainder)
+- Closes `ProjectState` PDA and vaults; reclaims rent
 
 ---
 
-### Epic 6: Telemetry Oracle
-
-**Business goal:** Create an immutable on-chain proof that real-world taxi data was recorded by an authorized oracle — connecting the physical asset to the blockchain and making it verifiable by any investor.
+### Epic 7: Telemetry Oracle
 
 #### US-O13 — Record Daily Telemetry
 
-> As the backend oracle, I want to push a daily signed hash of Yandex Pro data to Solana so that investors can independently verify that reported earnings are backed by real operator data.
+> As the backend oracle, I want to push daily Yandex Pro data hash to Solana.
+
+**Status: NOT STARTED**
 
 **Acceptance Criteria:**
 
-- New instruction `record_telemetry` added to the `rwa-taxi` program
-- Accepts: `date` (Unix day timestamp), `data_hash` ([u8; 32] — SHA-256 of the full Yandex Pro JSON payload)
-- Creates `TelemetryRecord` PDA with seeds `["telemetry", project, date]` — one record per project per day
-- Authority check: caller must be the registered `oracle_pubkey` stored in `ProjectState` (set during `initialize_project`)
-- Instruction is idempotent for the same day: second call with same date returns success without overwriting (prevents replay)
-- Emits structured log: `{ event: "record_telemetry", date, data_hash, oracle_pubkey }`
-- Anchor test: valid oracle can record; non-oracle authority rejected; duplicate date rejected; data_hash stored correctly
-
-**Priority:** Must Have | **Phase:** 2
+- `record_telemetry`: creates `TelemetryRecord` PDA, validates oracle authority
+- Idempotent for same day
 
 ---
 
-#### US-O14 — Oracle Pubkey Registration
+#### US-O14 — Oracle Pubkey Registration [DONE]
 
-> As the platform admin, I want to register the oracle public key during project initialization so that only the authorized backend can push telemetry data.
+> As the admin, I want to register the oracle public key during project initialization.
 
-**Acceptance Criteria:**
-
-- `initialize_project` accepts an `oracle_pubkey: Pubkey` parameter; stored in `ProjectState`
-- `oracle_pubkey` can be rotated by multisig via a new `update_oracle` instruction (for key rotation without redeploying)
-- `update_oracle` emits `{ event: "oracle_updated", old_pubkey, new_pubkey }`
-
-**Priority:** Must Have | **Phase:** 2
+**Status: DONE** — `oracle_pubkey` is a field on `ProjectState`, set during `initialize_project`.
 
 ---
 
-### Epic 7: Developer SDK & Tooling
+### Epic 8: Security & Authority Management (later phases)
 
-**Business goal:** Provide a TypeScript SDK so that dimagonedone (frontend) and russh (backend) can interact with the program without writing low-level Anchor client code.
+#### US-O15 — Multisig Authority Setup
 
-#### US-O13 — RwaClient SDK
-> As a frontend and backend developer, I want a TypeScript SDK wrapper so that I can call program instructions without managing raw transactions.
+- Upgrade authority on both programs set to Squads multisig
+- All privileged authorities (PermanentDelegate, TransferFee harvest, Freeze) held by multisig
 
-**Acceptance Criteria:**
-- Exported class `RwaClient` with methods:
-  - `invest(projectId, amountLamports, wallet)` → `TransactionSignature`
-  - `claimRevenue(projectId, periodIndex, wallet)` → `TransactionSignature`
-  - `getProjectState(projectId)` → `ProjectState`
-  - `getInvestorRecord(projectId, wallet)` → `InvestorRecord`
-  - `harvestTransferFees(mint, destination, authority)` → `TransactionSignature`
-  - `unfreezeAccount(tokenAccount, authority)` → `TransactionSignature`
-- All methods automatically attach ComputeBudget instructions with simulated CU + 20% buffer
-- All methods accept an optional `commitment` parameter
-- Versioned alongside IDL — breaking changes bump minor version
+#### US-O16 — Security Audit
 
-**Priority:** Should Have | **Phase:** 4
+- All authority checks, arithmetic safety, atomicity guarantees reviewed
 
 ---
 
-### Epic 7: Security & Authority Management
+## Implementation Status
 
-#### US-O14 — Multisig Authority Setup
-> As the platform operator, I want all privileged authorities held by a Squads multisig so that no single key controls the program.
+### DONE
 
-**Acceptance Criteria:**
-- Upgrade authority on both programs (`rwa-taxi`, `transfer-hook`) set to Squads multisig
-- `PermanentDelegate` authority = multisig
-- `TransferFee` harvest authority = multisig
-- Freeze Authority = multisig
-- Original deployment keypairs removed from hot storage after setup
-- Document: multisig address, member keys, threshold (M-of-N)
+| Item | Files | Tests |
+| --- | --- | --- |
+| Anchor workspace + both programs | `programs/axel/`, `programs/transfer-hook/` | - |
+| All state structs defined | `programs/axel/src/state/` | - |
+| `initialize_project` (mint + 6 extensions + metadata) | `instructions/admin/initialize_project.rs` | `tests/initialize-project.test.ts` (4 tests) |
+| Transfer hook `execute` + fallback + ExtraAccountMetaList | `programs/transfer-hook/src/lib.rs` | `tests/transfer-hook.test.ts` (2), `tests/transfer-hook-execute.test.ts` (3) |
+| `add_to_whitelist` / `remove_from_whitelist` | `instructions/admin/whitelist.rs` | `tests/whitelist.test.ts` (4 tests) |
+| `invest` (v1 — TO BE REMOVED) | `instructions/investor/invest.rs` | `tests/invest.test.ts` (6 tests) |
 
-**Priority:** Must Have | **Phase:** 3 (setup) / 6 (verified)
+### NEEDS UPDATE (for v2)
+
+| Item | What to change |
+| --- | --- |
+| `ProjectState` struct | Remove `escrow_vault`, `min_raise`, `max_raise`, `sol_raised`, `deadline`, `Fundraising`/`Finalized` statuses. Add `token_vault`. |
+| `initialize_project` | After creating mint: create vault ATA, thaw it, mint all tokens to vault, revoke mint authority. Set status to `Active`. |
+| Remove `InvestorRecord` state | Token balances are the source of truth — no need for this PDA. |
+| Remove `invest` instruction | Replaced by `buy_tokens`. |
+
+### TO BUILD (new)
+
+| Item | Story | Priority |
+| --- | --- | --- |
+| `buy_tokens` instruction | US-O06v2 | Must Have |
+| `update_price` instruction | US-O06v2b | Should Have |
+| `deposit_revenue` instruction | US-O09 | Must Have |
+| `claim_revenue` instruction | US-O10 | Must Have |
+| `pause_project` / `resume_project` | US-O11 | Must Have |
+| `record_telemetry` | US-O13 | Must Have |
+| `close_project` | US-O12 | Should Have |
+| `scripts/init-project.ts` seed script | — | Must Have |
+
+### TO DELETE
+
+| Item | Reason |
+| --- | --- |
+| `InvestorRecord` struct + state file | Not needed — token balance is the truth |
+| `invest` instruction + handler | Replaced by `buy_tokens` |
+| `tests/invest.test.ts` | Tests for removed instruction |
+| `Fundraising` / `Finalized` enum variants | No fundraising in v2 |
+| `escrow_vault` PDA logic | No escrow |
 
 ---
 
-#### US-O15 — Security Audit
-> As the platform, I want a pre-launch security review of all on-chain logic so that no exploitable vulnerabilities go to mainnet.
+## Step-by-Step Implementation Plan
 
-**Acceptance Criteria:**
-- [ ] All authority checks use `has_one` or `constraint` — no unchecked `Pubkey` comparisons
-- [ ] All arithmetic uses `checked_add`, `checked_mul`, `checked_div` — no overflow possible
-- [ ] `claim_revenue` creates `ClaimRecord` atomically in the same tx as the SOL transfer
-- [ ] `deposit_revenue` `period_index` is sequential — no period can be skipped or replayed
-- [ ] Transfer Hook `execute` validates its caller is the Token-2022 program
-- [ ] Whitelist PDA seeds are deterministic and cannot be spoofed by a crafted PDA
-- [ ] `PermanentDelegate` authority is the multisig, not the program itself
-- [ ] `pause_project` correctly returns `ProjectPaused` for all financial instructions
-- [ ] `cargo clippy` passes with zero warnings
-- [ ] All test scenarios pass on devnet release build
+### Step 1: Update ProjectState and cleanup
 
-**Priority:** Must Have | **Phase:** 5
+1. Update `ProjectState` struct: remove fundraising fields, add `token_vault`
+2. Simplify `ProjectStatus` enum: `Active`, `Paused`, `Closed`
+3. Delete `InvestorRecord` struct and state file
+4. Delete `invest` instruction and handler
+5. Update `mod.rs` files to remove deleted modules
+6. Update `lib.rs` to remove `invest` instruction
+
+### Step 2: Update `initialize_project`
+
+1. Remove fundraising params from `InitializeProjectParams` (deadline, min_raise)
+2. Add vault ATA creation after mint init
+3. Thaw the vault ATA (DefaultAccountState is Frozen)
+4. Mint all tokens to vault ATA using PDA-signed CPI
+5. Revoke mint authority (set to None)
+6. Set status to `Active`
+7. Update tests
+
+### Step 3: Implement `buy_tokens`
+
+1. Create `instructions/investor/buy_tokens.rs`
+2. Atomic swap: investor SOL → admin, vault tokens → investor ATA
+3. Thaw investor ATA if frozen (first purchase)
+4. Write tests
+
+### Step 4: Implement `deposit_revenue`
+
+1. Create `instructions/admin/deposit_revenue.rs`
+2. Create `RevenuePeriod` PDA, transfer SOL to revenue vault
+3. Write tests
+
+### Step 5: Implement `claim_revenue`
+
+1. Create `instructions/investor/claim_revenue.rs`
+2. Calculate proportional payout, create `ClaimRecord` atomically
+3. Write tests
+
+### Step 6: Implement `pause_project` / `resume_project`
+
+1. Create `instructions/admin/pause_resume.rs`
+2. Write tests
+
+### Step 7: Implement `record_telemetry`
+
+1. Create `instructions/oracle/record_telemetry.rs`
+2. Write tests
+
+### Step 8: Write `scripts/init-project.ts` seed script
 
 ---
 
 ## Phase Delivery Schedule
 
-| Phase | Days | Stories | Key Deliverable |
-| --- | --- | --- | --- |
-| 1 | 1–5 | US-O01 (design) | Anchor workspace + `transfer-hook` program scaffolded; account structs defined; IDL stub exported; extension plan agreed |
-| 2 | 6–12 | US-O01–O12 | All instructions + Transfer Hook implemented; full test suite on devnet |
-| 3 | 13–18 | US-O12, US-O14 | Integration test scenario; final IDL frozen; multisig authority set; PDA docs |
-| 4 | 19–23 | US-O13 | `RwaClient` SDK; devnet seed script; pause/close verified |
-| 5 | 24–29 | US-O15 | Security audit checklist complete; release build on devnet; mainnet checklist |
-| 6 | 30–34 | — | Deployment artifact; emergency runbook; final program ID confirmed |
+| Phase | Stories | Key Deliverable |
+| --- | --- | --- |
+| 1 (DONE) | US-O01, O02, O03, O04, O05 (partial), O14 | Anchor workspace, mint + extensions, transfer hook, whitelist |
+| 2 (CURRENT) | US-O05 update, US-O06v2 | Updated initialize_project + buy_tokens |
+| 3 | US-O09, O10 | Revenue deposit + claim |
+| 4 | US-O11, O13 | Pause/resume + telemetry |
+| 5 | US-O12, O15, O16 | Close project, multisig, security audit |
 
 ---
 
@@ -409,14 +426,12 @@ CPI sequence inside `initialize_project`:
 
 | Output | Consumer | Needed By |
 | --- | --- | --- |
-| IDL JSON (stable) | dimagonedone (Frontend), russh (Backend) | Phase 3 start |
-| IDL JSON (frozen) | dimagonedone (Frontend), russh (Backend) | Phase 3 end |
-| Whitelist PDA seeds + instruction signature | russh (Backend) | Phase 2 |
-| `ExtraAccountMetaList` PDA address for Transfer Hook | russh (Backend) | Phase 2 |
-| On-chain log event format (invest, refund, etc.) | russh (Backend) | Phase 2 |
-| Freeze Authority (multisig or intermediary) API | russh (Backend) | Phase 2 |
-| `RwaClient` SDK npm package | dimagonedone (Frontend), russh (Backend) | Phase 4 |
-| Final program ID | dimagonedone (Frontend), russh (Backend) | Phase 6 |
+| IDL JSON (stable) | dimagonedone, russh | Phase 2 |
+| Whitelist PDA seeds + instruction signature | russh | Phase 1 (DONE) |
+| `buy_tokens` instruction signature | dimagonedone | Phase 2 |
+| Revenue distribution instructions | dimagonedone | Phase 3 |
+| `record_telemetry` instruction | russh | Phase 4 |
+| Final program IDs | dimagonedone, russh | Phase 5 |
 
 ---
 
@@ -425,8 +440,7 @@ CPI sequence inside `initialize_project`:
 A user story is complete when:
 
 - [ ] Instruction compiles and deploys to devnet
-- [ ] Anchor test covers: happy path, authority failure, wrong-state failure, arithmetic edge case
-- [ ] Emits correct structured log event parseable by russh's indexer
-- [ ] `cargo clippy` passes with zero warnings for the instruction
-- [ ] Documented in the PDA reference doc (seeds, size, account fields)
-- [ ] Reviewed by one other team member
+- [ ] Anchor test covers: happy path, authority failure, wrong-state failure, edge cases
+- [ ] Emits correct structured log event
+- [ ] `cargo clippy` passes with zero warnings
+- [ ] Documented in PDA reference doc

@@ -29,4 +29,36 @@ pub mod axel {
     ) -> Result<()> {
         instructions::admin::whitelist::remove_handler(context, wallet)
     }
+
+    pub fn buy_tokens(context: Context<BuyTokens>, token_amount: u64) -> Result<()> {
+        instructions::investor::buy_tokens::buy_tokens_handler(context, token_amount)
+    }
+
+    pub fn deposit_revenue(
+        context: Context<DepositRevenue>,
+        period_index: u32,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::admin::deposit_revenue::deposit_revenue_handler(context, period_index, amount)
+    }
+
+    pub fn claim_revenue(context: Context<ClaimRevenue>, period_index: u32) -> Result<()> {
+        instructions::investor::claim_revenue::claim_revenue_handler(context, period_index)
+    }
+
+    pub fn pause_project(context: Context<PauseProject>) -> Result<()> {
+        instructions::admin::pause_resume::pause_handler(context)
+    }
+
+    pub fn resume_project(context: Context<ResumeProject>) -> Result<()> {
+        instructions::admin::pause_resume::resume_handler(context)
+    }
+
+    pub fn record_telemetry(
+        context: Context<RecordTelemetry>,
+        date: u32,
+        data_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::oracle::record_telemetry::record_telemetry_handler(context, date, data_hash)
+    }
 }

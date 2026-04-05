@@ -35,8 +35,7 @@ Key reads the frontend performs directly against Solana RPC:
 | Data needed | On-chain source |
 | --- | --- |
 | Project status, SOL raised, deadline | `getAccountInfo(ProjectState PDA)` |
-| Investor's tokens + SOL invested | `getAccountInfo(InvestorRecord PDA)` |
-| Token balance | `getTokenAccountBalance(investor ATA)` |
+| Investor's token balance | `getTokenAccountBalance(investor ATA)` |
 | Wallet is whitelisted? | `getAccountInfo(WhitelistEntry PDA)` — exists + `approved: true` |
 | All revenue periods | `getProgramAccounts` filtered by `RevenuePeriod` discriminator |
 | Claimed for a period? | `getAccountInfo(ClaimRecord PDA)` — exists = already claimed |
@@ -96,7 +95,7 @@ Key reads the frontend performs directly against Solana RPC:
 **Acceptance Criteria:**
 
 - Reads all `ProjectState` PDAs via `getProgramAccounts` filtered by program
-- Card per asset: car photo (from Token Metadata `uri` JSON), make/model/year, funding progress bar, price per token (SOL), status badge (Fundraising / Active / Closed)
+- Card per asset: car photo (from Token Metadata `uri` JSON), make/model/year, tokens available, price per token (SOL), status badge (Active / Paused / Closed)
 - Status derived from `ProjectState.status` field
 - Empty state if no projects exist
 - Loading skeleton during RPC fetch
@@ -111,9 +110,9 @@ Key reads the frontend performs directly against Solana RPC:
 
 **Acceptance Criteria:**
 
-- Reads `ProjectState PDA` for full params: total tokens, remaining, price per token (SOL), min/max investment, deadline with live countdown
-- Reads Token-2022 `TokenMetadata` extension: VIN, make, model, year, insurance, license
-- Funding progress bar: `sol_raised / max_raise`
+- Reads `ProjectState PDA` for full params: total tokens, price per token (SOL), tokens remaining in vault
+- Reads Token-2022 `TokenMetadata` extension: VIN, make, model, year, valuation
+- Tokens available bar: vault balance / total supply
 - Shows on-chain mint address + program address (each a clickable Solana Explorer link)
 - Invest button (gated by US-F02 whitelist check)
 
@@ -131,15 +130,14 @@ Key reads the frontend performs directly against Solana RPC:
 
 **Acceptance Criteria:**
 
-- SOL amount input field; shows token count in real time: `tokens = floor(amount / price_per_share)`
+- Token amount input field; shows SOL cost in real time: `cost = token_amount * price_per_share`
 - Client-side preflight validation (reading on-chain state — no backend call):
-  - Wallet SOL balance ≥ input amount + estimated tx fee
-  - `amount_lamports` ≥ `ProjectState.min_investment`
-  - `amount_lamports` ≤ `ProjectState.max_investment`
-  - Existing `InvestorRecord.sol_invested + amount` ≤ per-investor cap
-  - `ProjectState.status == Fundraising` and deadline not passed
-- Inline error message per failed check; Invest button disabled until all pass
-- On submit: constructs `invest` Anchor instruction and sends via connected wallet
+  - Wallet SOL balance >= cost + estimated tx fee
+  - Token vault has enough tokens available
+  - `ProjectState.status == Active`
+  - Wallet is whitelisted
+- Inline error message per failed check; Buy button disabled until all pass
+- On submit: constructs `buy_tokens` Anchor instruction and sends via connected wallet
 - Transaction states: Idle → Awaiting Wallet Approval → Confirming → Success / Error
 - Success: shows tx signature with Explorer link; token balance and dashboard update
 - On-chain error codes decoded to readable strings (e.g., `WhitelistEntryNotFound` → "Your wallet is not whitelisted. Please complete KYC.")
@@ -174,9 +172,8 @@ Key reads the frontend performs directly against Solana RPC:
 
 **Acceptance Criteria:**
 
-- Reads `InvestorRecord PDA` and token account balance from on-chain
-- Shows: tokens held, price per token (SOL), total value (SOL), SOL invested
-- If fundraising still open: progress bar + deadline countdown
+- Reads token account balance from on-chain
+- Shows: tokens held, price per token (SOL), total value (SOL), ownership percentage
 - Loading skeleton during RPC fetch
 
 **Priority:** Must Have | **Phase:** 3

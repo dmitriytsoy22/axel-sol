@@ -2,6 +2,7 @@ import { before, describe, test } from "node:test";
 import assert from "node:assert";
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey, Keypair, LAMPORTS_PER_SOL, Connection } from "@solana/web3.js";
+import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import type { Axel } from "../target/types/axel";
 import type { TransferHook } from "../target/types/transfer_hook";
 import BN from "bn.js";
@@ -19,20 +20,9 @@ const TOKEN_EXTENSIONS_PROGRAM_ID = new PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
 );
 
-function futureDeadline(): BN {
-  return new BN(Math.floor(Date.now() / 1000) + 3600);
-}
-
 function findProjectStatePda(mint: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("project"), mint.toBuffer()],
-    AXEL_PROGRAM_ID,
-  );
-}
-
-function findEscrowVaultPda(mint: PublicKey): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("escrow"), mint.toBuffer()],
     AXEL_PROGRAM_ID,
   );
 }
@@ -79,15 +69,12 @@ describe("transfer-hook", () => {
     mint = Keypair.generate();
     const oracleKeypair = Keypair.generate();
     const [projectStatePda] = findProjectStatePda(mint.publicKey);
-    const [escrowVaultPda] = findEscrowVaultPda(mint.publicKey);
     const [revenueVaultPda] = findRevenueVaultPda(mint.publicKey);
 
     await axelProgram.methods
       .initializeProject({
         carCostLamports: new BN(10 * LAMPORTS_PER_SOL),
         pricePerShareLamports: new BN(LAMPORTS_PER_SOL / 10),
-        minRaiseLamports: new BN(5 * LAMPORTS_PER_SOL),
-        deadline: futureDeadline(),
         transferHookProgramId: TRANSFER_HOOK_PROGRAM_ID,
         oraclePubkey: oracleKeypair.publicKey,
         tokenName: "Axel Taxi #001",
@@ -103,7 +90,6 @@ describe("transfer-hook", () => {
         admin: admin.publicKey,
         mint: mint.publicKey,
         projectState: projectStatePda,
-        escrowVault: escrowVaultPda,
         revenueVault: revenueVaultPda,
         tokenExtensionsProgram: TOKEN_EXTENSIONS_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId,

@@ -17,8 +17,6 @@ const TOKEN_DECIMALS: u8 = 0;
 pub struct InitializeProjectParams {
     pub car_cost_lamports: u64,
     pub price_per_share_lamports: u64,
-    pub min_raise_lamports: u64,
-    pub deadline: i64,
     pub transfer_hook_program_id: Pubkey,
     pub oracle_pubkey: Pubkey,
     pub token_name: String,
@@ -49,13 +47,6 @@ pub struct InitializeProject<'info> {
     )]
     pub project_state: Account<'info, ProjectState>,
 
-    /// CHECK: PDA for escrow SOL vault, validated by seeds
-    #[account(
-        seeds = [b"escrow", mint.key().as_ref()],
-        bump,
-    )]
-    pub escrow_vault: UncheckedAccount<'info>,
-
     /// CHECK: PDA for revenue SOL vault, validated by seeds
     #[account(
         seeds = [b"revenue", mint.key().as_ref()],
@@ -80,14 +71,6 @@ pub fn handler(
     require!(
         params.car_cost_lamports % params.price_per_share_lamports == 0,
         AxelError::InvalidTokenSupplyDivision
-    );
-    require!(
-        params.min_raise_lamports <= params.car_cost_lamports,
-        AxelError::MinRaiseExceedsCarCost
-    );
-    require!(
-        params.deadline > Clock::get()?.unix_timestamp,
-        AxelError::DeadlineInPast
     );
 
     let token_supply = params.car_cost_lamports / params.price_per_share_lamports;
@@ -210,7 +193,7 @@ pub fn handler(
 
     // --- Step 7: Initialize the mint ---
     // mint_authority = project_state PDA (only the program can mint shares)
-    // freeze_authority = admin (Squads multisig in production)
+    // freeze_authority = project_state PDA (program can thaw accounts during buy_tokens)
     let project_state_key = context.accounts.project_state.key();
 
     anchor_spl::token_2022::initialize_mint2(
@@ -222,7 +205,7 @@ pub fn handler(
         ),
         TOKEN_DECIMALS,
         &project_state_key,
-        Some(&admin_key),
+        Some(&project_state_key),
     )?;
 
     // --- Step 8: Initialize token metadata ---
@@ -272,20 +255,15 @@ pub fn handler(
     let project_state = &mut context.accounts.project_state;
     project_state.admin = admin_key;
     project_state.mint = mint_key;
-    project_state.escrow_vault = context.accounts.escrow_vault.key();
     project_state.revenue_vault = context.accounts.revenue_vault.key();
     project_state.token_supply = token_supply;
+    project_state.tokens_sold = 0;
     project_state.price_per_share = params.price_per_share_lamports;
-    project_state.min_raise = params.min_raise_lamports;
-    project_state.max_raise = token_supply
-        .checked_mul(params.price_per_share_lamports)
-        .unwrap();
-    project_state.sol_raised = 0;
-    project_state.deadline = params.deadline;
-    project_state.status = ProjectStatus::Fundraising;
+    project_state.status = ProjectStatus::Active;
     project_state.period_count = 0;
     project_state.oracle_pubkey = params.oracle_pubkey;
     project_state.bump = bump;
+    project_state.revenue_vault_bump = context.bumps.revenue_vault;
 
     Ok(())
 }
