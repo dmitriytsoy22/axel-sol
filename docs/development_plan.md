@@ -31,7 +31,7 @@
 
 - Initialize Anchor workspace with `anchor init rwa-taxi`; add second program `anchor new transfer-hook`
 - Define all program account structs: `ProjectState`, `InvestorRecord`, `RevenuePeriod`, `ClaimRecord`, `WhitelistEntry`, `TelemetryRecord`
-- Define all 11 instruction stubs (no logic yet): `initialize_project`, `start_raise`, `invest`, `finalize_raise`, `refund`, `deposit_revenue`, `claim_revenue`, `pause_project`, `close_project`, `add_to_whitelist`, `remove_from_whitelist`, `record_telemetry`
+- Define instruction stubs: `initialize_project`, `buy_tokens`, `deposit_revenue`, `claim_revenue`, `pause_project`, `resume_project`, `close_project`, `add_to_whitelist`, `remove_from_whitelist`, `record_telemetry`
 - Define Transfer Hook program stub: `execute` instruction
 - Plan Token-2022 mint extensions: Transfer Hook, Default Account State (Frozen), Permanent Delegate, Transfer Fee, Token Metadata + Metadata Pointer, Memo Transfer
 - Configure devnet deployment keypairs and Squads multisig for upgrade authority
@@ -75,13 +75,11 @@
 **ndrkbrg (On-chain)**
 
 - Implement all Token-2022 mint setup with correct extension order
-- Implement `initialize_project`, `start_raise`
-- Implement `invest`: SOL transfer to escrow, `InvestorRecord` PDA create/update, whitelist check
-- Implement `finalize_raise`: mint Token-2022 tokens to investors (accounts start frozen)
-- Implement `refund`: Permanent Delegate burns tokens, SOL returned from escrow
+- Implement `initialize_project`: create mint + extensions, mint all tokens to vault, revoke mint authority
+- Implement `buy_tokens`: atomic SOL-for-tokens swap from vault to investor
 - Implement `deposit_revenue`: creates `RevenuePeriod` PDA, transfers SOL to revenue vault
 - Implement `claim_revenue`: calculates share, transfers SOL, creates `ClaimRecord` PDA atomically
-- Implement `pause_project`, `close_project`
+- Implement `pause_project`, `resume_project`, `close_project`
 - Implement `add_to_whitelist`, `remove_from_whitelist`
 - Implement Transfer Hook `execute`: checks `WhitelistEntry` for both sides of every transfer
 - Implement `record_telemetry`: creates `TelemetryRecord` PDA; validates oracle authority
@@ -113,8 +111,8 @@
 
 **dimagonedone (Frontend)**
 
-- Wire invest flow: send `invest` Anchor instruction on-chain; show confirmation states
-- Build Dashboard: reads `InvestorRecord` PDA + token balance + `RevenuePeriod` PDAs + `ClaimRecord` PDAs — all from RPC
+- Wire buy tokens flow: send `buy_tokens` Anchor instruction on-chain; show confirmation states
+- Build Dashboard: reads token balance + `RevenuePeriod` PDAs + `ClaimRecord` PDAs — all from RPC
 - Add live telemetry widget: calls `GET /telemetry/latest`; shows earnings + "Verified on Solana ✓" link
 - Implement claim flow: per-period claim button → `claim_revenue` on-chain tx → ClaimRecord confirmed
 - Implement RPC error handling: loading states, retry buttons, timeout messages
@@ -124,7 +122,7 @@
 **ndrkbrg (On-chain)**
 
 - Deploy final instruction set to devnet with multisig as upgrade authority
-- Run full integration scenario: init project → whitelist 3 wallets → all invest → finalize → deposit revenue → all claim → verify telemetry record
+- Run full integration scenario: init project → whitelist 3 wallets → buy tokens → deposit revenue → all claim → verify telemetry record
 - Export final versioned IDL; freeze and share with dimagonedone and russh
 - Document all PDAs with seeds, bump storage, rent-exempt sizes
 
@@ -238,7 +236,7 @@
 **ndrkbrg (On-chain)**
 
 - Confirm multisig upgrade authority is set; original keypairs removed from hot storage
-- Run final devnet scenario: SOL escrow → Token-2022 minting → Transfer Hook enforced → telemetry record verified
+- Run final devnet scenario: init project → buy tokens → Transfer Hook enforced → revenue claim → telemetry record verified
 - Produce deployment artifact: program IDs, IDL JSON, deployment tx signatures, block heights
 - Write emergency runbook: how to `pause_project` and `close_project` if critical bug found post-launch
 

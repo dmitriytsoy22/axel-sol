@@ -1,0 +1,23 @@
+[toolchain]
+package_manager = "npm"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+axel = "DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi"
+transfer_hook = "CgbtcZvWngGWNH2uQa8vXfiNSYGpQKVNdx7wDUuMFqmC"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[test]
+startup_wait = 20000
+
+[scripts]
+test = "node --import tsx/esm --test tests/**/*.ts"

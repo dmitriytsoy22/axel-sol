@@ -1,0 +1,28 @@
+{
+  "name": "axel",
+  "version": "0.1.0",
+  "description": "RWA taxi tokenization on Solana",
+  "type": "module",
+  "scripts": {
+    "test": "node --import tsx/esm --test tests/**/*.ts",
+    "build": "anchor build",
+    "generate": "npx tsx scripts/generate-clients.ts",
+    "init-project": "npx tsx scripts/init-project.ts",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@codama/nodes-from-anchor": "latest",
+    "@codama/renderers-js": "latest",
+    "@solana/spl-token": "^0.4.14",
+    "@types/node": "latest",
+    "anchor-bankrun": "^0.5.0",
+    "codama": "latest",
+    "solana-bankrun": "^0.4.0",
+    "solana-kite": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  },
+  "dependencies": {
+    "@solana/program-client-core": "^6.6.0"
+  }
+}
