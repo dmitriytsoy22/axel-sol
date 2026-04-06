@@ -65,4 +65,8 @@ pub mod axel {
     pub fn revoke_mint_authority(context: Context<RevokeMintAuthority>) -> Result<()> {
         instructions::admin::revoke_mint_authority::revoke_mint_authority_handler(context)
     }
+
+    pub fn update_price(context: Context<UpdatePrice>, new_price_per_share: u64) -> Result<()> {
+        instructions::admin::update_price::update_price_handler(context, new_price_per_share)
+    }
 }
