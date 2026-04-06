@@ -55,4 +55,7 @@ pub enum AxelError {
 
     #[msg("Signer is not the registered oracle")]
     UnauthorizedOracle,
+
+    #[msg("Cannot revoke mint authority while tokens are still available for sale")]
+    TokensStillAvailable,
 }

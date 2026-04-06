@@ -61,4 +61,8 @@ pub mod axel {
     ) -> Result<()> {
         instructions::oracle::record_telemetry::record_telemetry_handler(context, date, data_hash)
     }
+
+    pub fn revoke_mint_authority(context: Context<RevokeMintAuthority>) -> Result<()> {
+        instructions::admin::revoke_mint_authority::revoke_mint_authority_handler(context)
+    }
 }

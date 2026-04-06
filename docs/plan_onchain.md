@@ -2,19 +2,23 @@
 
 **Role:** ndrkbrg (On-chain) (Anchor/Rust, Token-2022, Transfer Hook)
 **Prepared by:** Product Owner / System Analyst
-**Last updated:** 2026-04-05
+**Last updated:** 2026-04-05 (post-implementation refresh)
 
 ---
 
-## Architecture Change (v2)
+## Architecture (v2 — Direct Sale, Mint-on-Demand)
 
-**v1 (Fundraising model):** Investors send SOL to escrow → admin finalizes raise → program mints tokens → refund if failed.
+**Model:** Admin already owns the asset. `initialize_project` creates the Token-2022 mint with 0 tokens in circulation. Investors buy tokens at a fixed price via `buy_tokens` — tokens are minted directly to the investor's ATA at purchase time (mint-on-demand). After all tokens are sold, admin calls `revoke_mint_authority` to permanently lock the supply.
 
-**v2 (Direct Sale model):** Admin already owns the asset. `initialize_project` creates the mint, mints all tokens to a program-controlled token vault, and revokes mint authority. Investors buy tokens at a fixed price via `buy_tokens` (atomic SOL-for-tokens swap). No escrow, no fundraise window, no refund.
+**Why mint-on-demand (not pre-minted vault):**
 
-**Why the change:** The fundraising model adds complexity (escrow, deadline, min_raise, finalize, refund) to protect against a scenario that doesn't apply — the admin already owns the car. Direct sale is simpler, more flexible, and closer to how real tokenized assets work.
+- A pre-minted vault would require transfers from vault → investor on every purchase, triggering the transfer hook and requiring whitelist PDAs for both the vault owner (project_state PDA) and the investor as extra accounts.
+- Mint-on-demand bypasses the transfer hook entirely (minting is not a transfer).
+- The `token_supply` field on ProjectState caps the maximum; `tokens_sold` tracks what has been minted; the revoke instruction finalizes the cap.
 
-**What stays the same:** Token-2022 mint with all 6 extensions, transfer hook whitelist enforcement, revenue distribution (deposit + claim), telemetry oracle, pause/resume.
+**Why direct sale (not fundraising):** The admin already owns the car. No escrow, deadline, min_raise, finalize, or refund logic is needed.
+
+**What stays the same from classical token designs:** Token-2022 mint with all 6 extensions, transfer hook whitelist enforcement, revenue distribution (deposit + claim), telemetry oracle, pause/resume.
 
 ---
 
@@ -47,41 +51,45 @@ The on-chain layer is the trust anchor of the entire platform. It enforces the r
 ProjectState (PDA: ["project", mint])
   ├── admin: Pubkey
   ├── mint: Pubkey                    <- Token-2022 mint
-  ├── token_vault: Pubkey             <- program-controlled ATA holding unsold tokens
-  ├── revenue_vault: Pubkey           <- SOL for revenue distributions
-  ├── token_supply: u64               <- total tokens minted (fixed forever)
-  ├── price_per_share: u64            <- lamports per token (admin can update)
+  ├── revenue_vault: Pubkey           <- SOL vault for revenue distributions
+  ├── token_supply: u64               <- max tokens that can ever be minted
+  ├── tokens_sold: u64                <- tokens actually minted so far
+  ├── price_per_share: u64            <- lamports per token
   ├── status: ProjectStatus           <- Active | Paused | Closed
-  ├── period_count: u32
+  ├── period_count: u32               <- revenue periods deposited so far
   ├── oracle_pubkey: Pubkey
-  └── bump: u8
+  ├── bump: u8
+  └── revenue_vault_bump: u8          <- stored so claim_revenue can sign as the vault PDA
 
-RevenuePeriod (PDA: ["revenue", project, period_index])
-  ├── project: Pubkey
+RevenueVault (system-owned PDA, SOL only, no data)
+  seeds = ["revenue", mint]
+
+RevenuePeriod (PDA: ["revenue_period", mint, period_index_le])
+  ├── project: Pubkey                 <- mint
   ├── period_index: u32
-  ├── total_deposited: u64            <- SOL deposited for this period
-  ├── token_supply_snapshot: u64      <- total supply at time of deposit
+  ├── total_deposited: u64
+  ├── token_supply_snapshot: u64      <- tokens_sold at time of deposit
   ├── deposited_at: i64
   └── bump: u8
 
 ClaimRecord (PDA: ["claim", revenue_period, wallet])
-  ├── claimed: bool                   <- prevents double-claim
+  ├── claimed: bool                   <- existence prevents double-claim
   └── bump: u8
 
 WhitelistEntry (PDA: ["whitelist", wallet])
-  ├── approved: bool                  <- read by Transfer Hook on every transfer
+  ├── approved: bool
   └── bump: u8
 
-TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
-  ├── project: Pubkey
-  ├── date: i64                        <- Unix timestamp (day-level granularity)
-  ├── data_hash: [u8; 32]             <- SHA-256 of the full Yandex Pro payload
-  ├── oracle_pubkey: Pubkey            <- backend oracle signing keypair
-  ├── recorded_at: i64                <- block timestamp
+TelemetryRecord (PDA: ["telemetry", mint, date_le])
+  ├── project: Pubkey                 <- mint
+  ├── date: u32                        <- YYYYMMDD integer (e.g. 20260405)
+  ├── data_hash: [u8; 32]             <- SHA-256 of the Yandex Pro payload
+  ├── oracle_pubkey: Pubkey
+  ├── recorded_at: i64
   └── bump: u8
 ```
 
-**Removed from v1:** `InvestorRecord` (token balances are the source of truth), `escrow_vault` (no escrow), `min_raise`/`max_raise`/`deadline`/`sol_raised` (no fundraising window).
+**Not present:** `InvestorRecord` (token balances are the source of truth), `token_vault` / `escrow_vault` (mint-on-demand, no pre-minted supply), `min_raise` / `max_raise` / `deadline` (no fundraising window).
 
 ---
 
@@ -138,61 +146,47 @@ TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
 
 ### Epic 3: Project Initialization (v2)
 
-**Business goal:** Admin creates the project, mints all tokens into a program-controlled vault, and revokes mint authority in a single instruction.
+**Business goal:** Admin creates the project and the Token-2022 mint in a single instruction. No tokens are minted yet — they are minted on demand during `buy_tokens`.
 
-#### US-O05 — Initialize Project [NEEDS UPDATE]
+#### US-O05 — Initialize Project [DONE]
 
-> As the platform admin, I want to initialize a project, mint all tokens, and lock the supply so that investors can buy shares of a real asset.
+> As the platform admin, I want to initialize a project and create its mint so that investors can buy shares.
 
-**Status: NEEDS UPDATE** — current `initialize_project` creates the mint and ProjectState but does NOT mint tokens or revoke mint authority. Needs modification.
+**Status: DONE**
 
-**Changes required:**
-
-- Create a token vault ATA (program-controlled) for the project
-- Thaw the vault ATA (DefaultAccountState is Frozen)
-- Mint `token_supply` tokens to the vault ATA (using project_state PDA as mint authority)
-- Revoke mint authority (set to None) — supply is now permanently fixed
-- Remove: `escrow_vault`, `min_raise`, `max_raise`, `deadline`, `sol_raised` from ProjectState
-- Add: `token_vault` to ProjectState
-- Set status to `Active` (not `Fundraising`)
-
-**Acceptance Criteria:**
-
-- `initialize_project` creates mint with all 6 extensions
-- All tokens minted to program-controlled vault ATA
-- Mint authority revoked after minting (verifiable on Explorer)
-- `ProjectState.status == Active`
-- Token supply is fixed and provably capped
+- Creates Token-2022 mint with 6 extensions (TransferHook, DefaultAccountState Frozen, PermanentDelegate, TransferFee 100bps, MetadataPointer, TokenMetadata)
+- `mint_authority = freeze_authority = project_state PDA` (program signs mints and thaws)
+- Writes ProjectState with `tokens_sold = 0`, `status = Active`, `revenue_vault_bump` stored
+- No tokens minted yet — mint-on-demand model
 
 ---
 
-### Epic 4: Token Sale (NEW — replaces Fundraising)
+### Epic 4: Token Sale
 
-**Business goal:** Investors buy tokens from the program vault at a fixed price. Atomic swap: SOL goes to admin, tokens go to investor.
+**Business goal:** Investors buy tokens at a fixed price. Atomic swap: SOL goes to admin, tokens are minted directly to the investor's ATA.
 
-#### US-O06v2 — Buy Tokens
+#### US-O06v2 — Buy Tokens [DONE]
 
 > As a whitelisted investor, I want to buy tokens with SOL so that I own a share of the taxi asset.
 
-**Status: NEW** — replaces old US-O06 (invest), US-O07 (finalize_raise), US-O08 (refund).
+**Status: DONE**
 
-**Acceptance Criteria:**
+- Validates: investor whitelisted, project Active, `token_amount > 0`, remaining supply sufficient
+- Transfers SOL from investor → admin
+- Creates investor ATA via Associated Token Program if it doesn't exist, then thaws it (program signs as freeze_authority)
+- Mints `token_amount` tokens directly to the investor's ATA (program signs as mint_authority)
+- Increments `tokens_sold`
 
-- `buy_tokens` instruction accepts `token_amount: u64`
-- Validates: investor is whitelisted, project status is `Active`, vault has enough tokens
-- Calculates: `sol_cost = token_amount * price_per_share`
-- Transfers SOL from investor wallet to admin wallet
-- Transfers tokens from vault ATA to investor's ATA (thaws investor ATA first if frozen)
-- Emits log: `{ event: "buy_tokens", wallet, token_amount, sol_cost }`
-- No minimum/maximum per investor (or optional admin-set limits)
+#### US-O06c — Revoke Mint Authority [DONE]
 
-**Tests:**
+> As the admin, I want to permanently lock the supply after all tokens have been sold.
 
-1. Happy path — investor buys tokens, balances update correctly
-2. Fails — non-whitelisted investor
-3. Fails — vault has insufficient tokens
-4. Fails — project is paused
-5. Multiple buys accumulate correctly
+**Status: DONE**
+
+- Admin-only instruction
+- Requires `tokens_sold == token_supply` to prevent stranding unsold tokens
+- CPI to Token-2022 `set_authority` with `AuthorityType::MintTokens`, `new_authority = None`
+- After this call, no tokens can ever be minted for this mint — supply is cryptographically fixed
 
 ---
 
@@ -211,52 +205,46 @@ TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
 
 **Business goal:** Admin deposits SOL representing net profit; investors claim their proportional share based on token holdings.
 
-#### US-O09 — Deposit Revenue
+#### US-O09 — Deposit Revenue [DONE]
 
 > As the platform admin, I want to deposit SOL into the revenue vault for a given period.
 
-**Status: NOT STARTED**
+**Status: DONE**
 
-**Acceptance Criteria:**
-
-- `deposit_revenue` callable by admin only; project status must be `Active`
-- Creates `RevenuePeriod` PDA with `period_index` (auto-incremented), `total_deposited`, `token_supply_snapshot`
-- Transfers SOL from admin wallet to revenue vault
-- `period_index` is sequential (validated against `ProjectState.period_count`)
-- Emits `{ event: "deposit_revenue", period_index, total_deposited, token_supply_snapshot }`
+- Admin-only; project must be Active; `tokens_sold > 0`
+- Validates `period_index == project_state.period_count` (strict sequential, no skipping)
+- Transfers SOL from admin → revenue_vault PDA
+- Creates `RevenuePeriod` PDA with snapshot of `tokens_sold` (tokens in circulation at deposit time)
+- Increments `period_count`
 
 ---
 
-#### US-O10 — Claim Revenue
+#### US-O10 — Claim Revenue [DONE]
 
 > As an investor, I want to claim my SOL share of a revenue period.
 
-**Status: NOT STARTED**
+**Status: DONE**
 
-**Acceptance Criteria:**
-
-- `claim_revenue` accepts `period_index`; callable by any token holder
-- Validates: `ClaimRecord` PDA does not exist (prevents double-claim)
-- Calculates: `payout = (investor_token_balance / period.token_supply_snapshot) * period.total_deposited`
-- Transfers `payout` SOL from revenue vault to investor wallet
-- Creates `ClaimRecord` PDA atomically with transfer
-- Fails gracefully if investor held 0 tokens
+- Callable by any token holder; project must be Active
+- Reads investor's token balance directly from their Token-2022 ATA (validated: correct mint + correct owner)
+- Payout formula: `(balance * total_deposited) / token_supply_snapshot` in u128 to avoid overflow
+- Transfers SOL from revenue_vault PDA to investor via `invoke_signed` using vault's seeds (`["revenue", mint]`)
+- Creates `ClaimRecord` PDA seeded by `["claim", revenue_period, investor]` — `init` constraint prevents double-claim
 
 ---
 
 ### Epic 6: Project Lifecycle Management
 
-#### US-O11 — Pause / Resume Project
+#### US-O11 — Pause / Resume Project [DONE]
 
 > As the admin, I want to pause the project in case of emergency.
 
-**Status: NOT STARTED**
+**Status: DONE**
 
-**Acceptance Criteria:**
-
-- `pause_project`: sets status to `Paused`; `buy_tokens`, `claim_revenue`, `deposit_revenue` all return `ProjectPaused`
-- `resume_project`: sets status back to `Active`
-- Both admin-only
+- `pause_project`: requires Active, sets status to `Paused`
+- `resume_project`: requires Paused, sets status to `Active`
+- Both admin-only via `has_one = admin`
+- While paused, `buy_tokens`, `deposit_revenue`, `claim_revenue` all fail with `ProjectNotActive`
 
 ---
 
@@ -275,16 +263,17 @@ TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
 
 ### Epic 7: Telemetry Oracle
 
-#### US-O13 — Record Daily Telemetry
+#### US-O13 — Record Daily Telemetry [DONE]
 
 > As the backend oracle, I want to push daily Yandex Pro data hash to Solana.
 
-**Status: NOT STARTED**
+**Status: DONE**
 
-**Acceptance Criteria:**
-
-- `record_telemetry`: creates `TelemetryRecord` PDA, validates oracle authority
-- Idempotent for same day
+- Oracle-only: signer must equal `project_state.oracle_pubkey`
+- Project must be Active
+- Creates `TelemetryRecord` PDA seeded by `["telemetry", mint, date]` where `date` is a `u32` like `20260405`
+- Stores: project mint, date, 32-byte SHA-256 data hash, oracle pubkey, recorded_at
+- Idempotent per day: duplicate calls fail because the PDA already exists
 
 ---
 
@@ -315,110 +304,39 @@ TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
 
 | Item | Files | Tests |
 | --- | --- | --- |
-| Anchor workspace + both programs | `programs/axel/`, `programs/transfer-hook/` | - |
-| All state structs defined | `programs/axel/src/state/` | - |
-| `initialize_project` (mint + 6 extensions + metadata) | `instructions/admin/initialize_project.rs` | `tests/initialize-project.test.ts` (4 tests) |
-| Transfer hook `execute` + fallback + ExtraAccountMetaList | `programs/transfer-hook/src/lib.rs` | `tests/transfer-hook.test.ts` (2), `tests/transfer-hook-execute.test.ts` (3) |
-| `add_to_whitelist` / `remove_from_whitelist` | `instructions/admin/whitelist.rs` | `tests/whitelist.test.ts` (4 tests) |
-| `invest` (v1 — TO BE REMOVED) | `instructions/investor/invest.rs` | `tests/invest.test.ts` (6 tests) |
+| Anchor workspace + both programs | `programs/axel/`, `programs/transfer-hook/` | — |
+| All state structs (no `InvestorRecord`) | `programs/axel/src/state/` | — |
+| `initialize_project` (mint + 6 extensions + metadata, v2) | `instructions/admin/initialize_project.rs` | `tests/initialize-project.test.ts` |
+| Transfer hook `execute` + fallback + ExtraAccountMetaList | `programs/transfer-hook/src/lib.rs` | `tests/transfer-hook.test.ts`, `tests/transfer-hook-execute.test.ts` |
+| `add_to_whitelist` (idempotent) / `remove_from_whitelist` | `instructions/admin/whitelist.rs` | `tests/whitelist.test.ts` |
+| `buy_tokens` (mint-on-demand) | `instructions/investor/buy_tokens.rs` | `tests/buy-tokens.test.ts` |
+| `deposit_revenue` | `instructions/admin/deposit_revenue.rs` | `tests/deposit-revenue.test.ts` |
+| `claim_revenue` | `instructions/investor/claim_revenue.rs` | `tests/claim-revenue.test.ts` |
+| `pause_project` / `resume_project` | `instructions/admin/pause_resume.rs` | `tests/pause-resume.test.ts` |
+| `record_telemetry` (oracle) | `instructions/oracle/record_telemetry.rs` | `tests/record-telemetry.test.ts` |
+| `revoke_mint_authority` | `instructions/admin/revoke_mint_authority.rs` | `tests/revoke-mint-authority.test.ts` |
+| Seed script | `scripts/init-project.ts` | — |
 
-### NEEDS UPDATE (for v2)
-
-| Item | What to change |
-| --- | --- |
-| `ProjectState` struct | Remove `escrow_vault`, `min_raise`, `max_raise`, `sol_raised`, `deadline`, `Fundraising`/`Finalized` statuses. Add `token_vault`. |
-| `initialize_project` | After creating mint: create vault ATA, thaw it, mint all tokens to vault, revoke mint authority. Set status to `Active`. |
-| Remove `InvestorRecord` state | Token balances are the source of truth — no need for this PDA. |
-| Remove `invest` instruction | Replaced by `buy_tokens`. |
-
-### TO BUILD (new)
+### TO BUILD
 
 | Item | Story | Priority |
 | --- | --- | --- |
-| `buy_tokens` instruction | US-O06v2 | Must Have |
 | `update_price` instruction | US-O06v2b | Should Have |
-| `deposit_revenue` instruction | US-O09 | Must Have |
-| `claim_revenue` instruction | US-O10 | Must Have |
-| `pause_project` / `resume_project` | US-O11 | Must Have |
-| `record_telemetry` | US-O13 | Must Have |
 | `close_project` | US-O12 | Should Have |
-| `scripts/init-project.ts` seed script | — | Must Have |
-
-### TO DELETE
-
-| Item | Reason |
-| --- | --- |
-| `InvestorRecord` struct + state file | Not needed — token balance is the truth |
-| `invest` instruction + handler | Replaced by `buy_tokens` |
-| `tests/invest.test.ts` | Tests for removed instruction |
-| `Fundraising` / `Finalized` enum variants | No fundraising in v2 |
-| `escrow_vault` PDA logic | No escrow |
-
----
-
-## Step-by-Step Implementation Plan
-
-### Step 1: Update ProjectState and cleanup
-
-1. Update `ProjectState` struct: remove fundraising fields, add `token_vault`
-2. Simplify `ProjectStatus` enum: `Active`, `Paused`, `Closed`
-3. Delete `InvestorRecord` struct and state file
-4. Delete `invest` instruction and handler
-5. Update `mod.rs` files to remove deleted modules
-6. Update `lib.rs` to remove `invest` instruction
-
-### Step 2: Update `initialize_project`
-
-1. Remove fundraising params from `InitializeProjectParams` (deadline, min_raise)
-2. Add vault ATA creation after mint init
-3. Thaw the vault ATA (DefaultAccountState is Frozen)
-4. Mint all tokens to vault ATA using PDA-signed CPI
-5. Revoke mint authority (set to None)
-6. Set status to `Active`
-7. Update tests
-
-### Step 3: Implement `buy_tokens`
-
-1. Create `instructions/investor/buy_tokens.rs`
-2. Atomic swap: investor SOL → admin, vault tokens → investor ATA
-3. Thaw investor ATA if frozen (first purchase)
-4. Write tests
-
-### Step 4: Implement `deposit_revenue`
-
-1. Create `instructions/admin/deposit_revenue.rs`
-2. Create `RevenuePeriod` PDA, transfer SOL to revenue vault
-3. Write tests
-
-### Step 5: Implement `claim_revenue`
-
-1. Create `instructions/investor/claim_revenue.rs`
-2. Calculate proportional payout, create `ClaimRecord` atomically
-3. Write tests
-
-### Step 6: Implement `pause_project` / `resume_project`
-
-1. Create `instructions/admin/pause_resume.rs`
-2. Write tests
-
-### Step 7: Implement `record_telemetry`
-
-1. Create `instructions/oracle/record_telemetry.rs`
-2. Write tests
-
-### Step 8: Write `scripts/init-project.ts` seed script
+| Multisig (Squads) authority migration | US-O15 | Later (pre-mainnet) |
+| Security audit | US-O16 | Later (pre-mainnet) |
 
 ---
 
 ## Phase Delivery Schedule
 
-| Phase | Stories | Key Deliverable |
+| Phase | Stories | Status |
 | --- | --- | --- |
-| 1 (DONE) | US-O01, O02, O03, O04, O05 (partial), O14 | Anchor workspace, mint + extensions, transfer hook, whitelist |
-| 2 (CURRENT) | US-O05 update, US-O06v2 | Updated initialize_project + buy_tokens |
-| 3 | US-O09, O10 | Revenue deposit + claim |
-| 4 | US-O11, O13 | Pause/resume + telemetry |
-| 5 | US-O12, O15, O16 | Close project, multisig, security audit |
+| 1 | US-O01, O02, O03, O04, O14 | DONE |
+| 2 | US-O05, US-O06v2, US-O06c (revoke) | DONE |
+| 3 | US-O09, O10 | DONE |
+| 4 | US-O11, O13 | DONE |
+| 5 | US-O06v2b, O12, O15, O16 | TODO |
 
 ---
 
