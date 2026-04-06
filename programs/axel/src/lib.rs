@@ -69,4 +69,8 @@ pub mod axel {
     pub fn update_price(context: Context<UpdatePrice>, new_price_per_share: u64) -> Result<()> {
         instructions::admin::update_price::update_price_handler(context, new_price_per_share)
     }
+
+    pub fn close_project(context: Context<CloseProject>) -> Result<()> {
+        instructions::admin::close_project::close_project_handler(context)
+    }
 }

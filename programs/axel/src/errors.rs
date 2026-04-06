@@ -58,4 +58,7 @@ pub enum AxelError {
 
     #[msg("Cannot revoke mint authority while tokens are still available for sale")]
     TokensStillAvailable,
+
+    #[msg("Project is already closed")]
+    ProjectAlreadyClosed,
 }
