@@ -190,13 +190,15 @@ TelemetryRecord (PDA: ["telemetry", mint, date_le])
 
 ---
 
-#### US-O06v2b — Update Token Price (OPTIONAL)
+#### US-O06v2b — Update Token Price [DONE]
 
 > As the admin, I want to update the token price so that I can adjust to market conditions.
 
-**Acceptance Criteria:**
+**Status: DONE**
 
-- `update_price` instruction: admin-only, sets new `price_per_share`
+- Admin-only (`has_one = admin`); project must be Active
+- Validates new price > 0 (`ZeroPricePerShare`)
+- Updates `price_per_share` on `ProjectState`
 - Emits log with old and new price
 
 ---
@@ -248,16 +250,16 @@ TelemetryRecord (PDA: ["telemetry", mint, date_le])
 
 ---
 
-#### US-O12 — Close Project
+#### US-O12 — Close Project [DONE]
 
 > As the admin, I want to close a finished project.
 
-**Status: NOT STARTED**
+**Status: DONE**
 
-**Acceptance Criteria:**
-
-- `close_project`: validates all revenue periods fully claimed (or admin accepts remainder)
-- Closes `ProjectState` PDA and vaults; reclaims rent
+- Admin-only (`has_one = admin`); project must not already be Closed (works from Active or Paused)
+- Drains all remaining SOL from revenue vault to admin via `invoke_signed` with vault PDA seeds
+- Sets status to `Closed` — all operations (`buy_tokens`, `deposit_revenue`, `claim_revenue`) blocked
+- `ProjectState` PDA remains readable (not deleted) for historical reference
 
 ---
 
@@ -315,14 +317,14 @@ TelemetryRecord (PDA: ["telemetry", mint, date_le])
 | `pause_project` / `resume_project` | `instructions/admin/pause_resume.rs` | `tests/pause-resume.test.ts` |
 | `record_telemetry` (oracle) | `instructions/oracle/record_telemetry.rs` | `tests/record-telemetry.test.ts` |
 | `revoke_mint_authority` | `instructions/admin/revoke_mint_authority.rs` | `tests/revoke-mint-authority.test.ts` |
+| `update_price` | `instructions/admin/update_price.rs` | `tests/update-price.test.ts` |
+| `close_project` | `instructions/admin/close_project.rs` | `tests/close-project.test.ts` |
 | Seed script | `scripts/init-project.ts` | — |
 
 ### TO BUILD
 
 | Item | Story | Priority |
 | --- | --- | --- |
-| `update_price` instruction | US-O06v2b | Should Have |
-| `close_project` | US-O12 | Should Have |
 | Multisig (Squads) authority migration | US-O15 | Later (pre-mainnet) |
 | Security audit | US-O16 | Later (pre-mainnet) |
 
@@ -336,7 +338,8 @@ TelemetryRecord (PDA: ["telemetry", mint, date_le])
 | 2 | US-O05, US-O06v2, US-O06c (revoke) | DONE |
 | 3 | US-O09, O10 | DONE |
 | 4 | US-O11, O13 | DONE |
-| 5 | US-O06v2b, O12, O15, O16 | TODO |
+| 5a | US-O06v2b, O12 | DONE |
+| 5b | O15, O16 | TODO (pre-mainnet) |
 
 ---
 
