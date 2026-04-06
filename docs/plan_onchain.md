@@ -287,16 +287,18 @@ TelemetryRecord (PDA: ["telemetry", mint, date_le])
 
 ---
 
-### Epic 8: Security & Authority Management (later phases)
+### Epic 8: Security & Authority Management (post-MVP)
 
-#### US-O15 — Multisig Authority Setup
+#### US-O15 — Multisig Authority Setup (POST-MVP)
 
 - Upgrade authority on both programs set to Squads multisig
 - All privileged authorities (PermanentDelegate, TransferFee harvest, Freeze) held by multisig
+- **Deferred:** Not needed for MVP — single admin keypair is sufficient for devnet/testnet
 
-#### US-O16 — Security Audit
+#### US-O16 — Security Audit (POST-MVP)
 
 - All authority checks, arithmetic safety, atomicity guarantees reviewed
+- **Deferred:** Pre-mainnet requirement, not MVP scope
 
 ---
 
@@ -321,12 +323,12 @@ TelemetryRecord (PDA: ["telemetry", mint, date_le])
 | `close_project` | `instructions/admin/close_project.rs` | `tests/close-project.test.ts` |
 | Seed script | `scripts/init-project.ts` | — |
 
-### TO BUILD
+### POST-MVP
 
 | Item | Story | Priority |
 | --- | --- | --- |
-| Multisig (Squads) authority migration | US-O15 | Later (pre-mainnet) |
-| Security audit | US-O16 | Later (pre-mainnet) |
+| Multisig (Squads) authority migration | US-O15 | Post-MVP (pre-mainnet) |
+| Security audit | US-O16 | Post-MVP (pre-mainnet) |
 
 ---
 
@@ -339,7 +341,7 @@ TelemetryRecord (PDA: ["telemetry", mint, date_le])
 | 3 | US-O09, O10 | DONE |
 | 4 | US-O11, O13 | DONE |
 | 5a | US-O06v2b, O12 | DONE |
-| 5b | O15, O16 | TODO (pre-mainnet) |
+| 5b | O15, O16 | POST-MVP |
 
 ---
 
