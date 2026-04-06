@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { Transaction, PublicKey } from '@solana/web3.js';
 import { buildClaimRevenueInstruction } from '@/lib/solana/instructions';
-import { deriveProjectState, deriveInvestorRecord, deriveRevenuePeriod, deriveClaimRecord } from '@/lib/solana/pda';
 import { useTransactionConfirmation } from '@/hooks/useTransactionConfirmation';
 import { TransactionStatusVariant } from '@/components/ui/TransactionStatus';
 
@@ -11,18 +10,19 @@ export type ClaimState = TransactionStatusVariant;
 export function useClaim(): {
   state: ClaimState;
   errorMsg: string | null;
-  claim: (projectId: string, periodIndex: number) => Promise<void>;
+  claim: (projectMint: string, periodIndex: number) => Promise<void>;
   claimAll: (periods: { projectId: string; periodIndex: number }[]) => Promise<void>;
   reset: () => void;
 } {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const wallet = useWallet();
+  const { publicKey, sendTransaction } = wallet;
   const [state, setState] = useState<ClaimState>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  
+
   const { confirmTransaction } = useTransactionConfirmation();
 
-  const claim = useCallback(async (projectId: string, periodIndex: number) => {
+  const claim = useCallback(async (projectMint: string, periodIndex: number) => {
     if (!publicKey) {
       setState('error');
       setErrorMsg('Wallet not connected');
@@ -33,20 +33,19 @@ export function useClaim(): {
       setState('preflight');
       setErrorMsg(null);
 
-      const programId = new PublicKey('11111111111111111111111111111111'); // Placeholder
-      const [projectPda] = deriveProjectState(programId, projectId);
-      const [investorRecordPda] = deriveInvestorRecord(programId, projectPda, publicKey);
-      const [revenuePeriodPda] = deriveRevenuePeriod(programId, projectPda, periodIndex);
-      const [claimRecordPda] = deriveClaimRecord(programId, revenuePeriodPda, publicKey);
+      const mint = new PublicKey(projectMint);
 
       setState('awaiting_wallet');
-      
-      const instruction = buildClaimRevenueInstruction({
-        userWallet: publicKey,
-        projectPda,
-        revenuePeriodPda,
-        claimRecordPda,
-        investorRecordPda,
+
+      const instruction = await buildClaimRevenueInstruction({
+        wallet: {
+          publicKey,
+          signTransaction: async (tx: any) => tx,
+          signAllTransactions: async (txs: any[]) => txs,
+        },
+        connection,
+        mint,
+        periodIndex,
       });
 
       const transaction = new Transaction().add(instruction);
@@ -90,28 +89,25 @@ export function useClaim(): {
       setState('preflight');
       setErrorMsg(null);
 
-      const programId = new PublicKey('11111111111111111111111111111111'); // Placeholder
       const transaction = new Transaction();
 
       for (const { projectId, periodIndex } of periods) {
-        const [projectPda] = deriveProjectState(programId, projectId);
-        const [investorRecordPda] = deriveInvestorRecord(programId, projectPda, publicKey);
-        const [revenuePeriodPda] = deriveRevenuePeriod(programId, projectPda, periodIndex);
-        const [claimRecordPda] = deriveClaimRecord(programId, revenuePeriodPda, publicKey);
-
-        const instruction = buildClaimRevenueInstruction({
-          userWallet: publicKey,
-          projectPda,
-          revenuePeriodPda,
-          claimRecordPda,
-          investorRecordPda,
+        const mint = new PublicKey(projectId);
+        const instruction = await buildClaimRevenueInstruction({
+          wallet: {
+            publicKey,
+            signTransaction: async (tx: any) => tx,
+            signAllTransactions: async (txs: any[]) => txs,
+          },
+          connection,
+          mint,
+          periodIndex,
         });
-
         transaction.add(instruction);
       }
 
       setState('awaiting_wallet');
-      
+
       const latestBlockhash = await connection.getLatestBlockhash('confirmed');
       transaction.recentBlockhash = latestBlockhash.blockhash;
       transaction.feePayer = publicKey;

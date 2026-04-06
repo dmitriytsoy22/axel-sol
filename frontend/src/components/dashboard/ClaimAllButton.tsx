@@ -32,7 +32,7 @@ export function ClaimAllButton({ periods, onSuccess }: ClaimAllButtonProps): JSX
 
   const handleClaimAll = () => {
     const payload = claimablePeriods.map(p => ({
-      projectId: p.period.projectPda.toString(),
+      projectId: p.period.project,
       periodIndex: p.period.index,
     }));
     claimAll(payload);

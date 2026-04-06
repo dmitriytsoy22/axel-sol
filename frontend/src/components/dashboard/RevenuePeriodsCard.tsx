@@ -38,10 +38,10 @@ export function RevenuePeriodsCard({ periods }: RevenuePeriodsCardProps): JSX.El
             <div key={id} className="px-6 py-5 flex items-center justify-between hover:bg-gray-50 transition-colors">
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-gray-900 mb-1">
-                  {item.period.periodLabel || `${t('period')} ${item.period.index}`}
+                  {`${t('period')} ${item.period.index}`}
                 </span>
                 <span className="text-xs text-gray-500">
-                  {new Date(item.period.createdAt * 1000).toLocaleDateString()}
+                  {new Date(item.period.depositedAt * 1000).toLocaleDateString()}
                 </span>
               </div>
               <div className="flex items-center space-x-6">

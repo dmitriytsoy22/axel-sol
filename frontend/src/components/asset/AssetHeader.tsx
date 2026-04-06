@@ -15,12 +15,9 @@ export function AssetHeader({ project }: AssetHeaderProps): React.JSX.Element {
   // Helper to map status to translation key
   const getStatusTranslation = (status: string) => {
     switch (status) {
-      case 'fundraising': return tCat('statusFundraising');
       case 'active': return tCat('statusActive');
       case 'paused': return tCat('statusPaused');
       case 'closed': return tCat('statusClosed');
-      case 'finalized': return tCat('statusFinalized');
-      case 'initializing': return tCat('statusInitializing');
       default: return status;
     }
   };
@@ -54,8 +51,8 @@ export function AssetHeader({ project }: AssetHeaderProps): React.JSX.Element {
             <span className="text-sm text-gray-900 font-mono">{project.vin}</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{tAsset('licensePlate')}</span>
-            <span className="text-sm text-gray-900 font-mono">{project.licensePlate}</span>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{tAsset('status')}</span>
+            <span className="text-sm text-gray-900 font-mono capitalize">{project.status}</span>
           </div>
         </div>
       </div>

@@ -17,12 +17,9 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
 
   const getStatusText = (status: ProjectState['status']): string => {
     switch (status) {
-      case 'fundraising': return catalogT('statusFundraising');
       case 'active': return catalogT('statusActive');
       case 'paused': return catalogT('statusPaused');
       case 'closed': return catalogT('statusClosed');
-      case 'finalized': return catalogT('statusFinalized');
-      case 'initializing': return catalogT('statusInitializing');
       default: return status;
     }
   };
@@ -63,14 +60,14 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {holdings.map((holding) => {
-              const valueSOL = (holding.tokensMinted * holding.project.pricePerToken) / 1_000_000_000;
+              const valueSOL = (holding.tokenBalance * holding.project.pricePerToken) / 1_000_000_000;
               return (
                 <tr key={holding.project.mint} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Link href={`/assets/${holding.project.mint}`} className="flex items-center group">
                       <div className="flex-shrink-0 h-10 w-10 relative rounded-md overflow-hidden bg-gray-100">
-                        <Image 
-                          src={holding.project.imageUrl} 
+                        <Image
+                          src={holding.project.imageUrl}
                           alt={holding.project.carModel}
                           fill
                           sizes="40px"
@@ -81,12 +78,12 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
                         <div className="text-sm font-medium text-gray-900 group-hover:text-brand-primary transition-colors">
                           {holding.project.carMake} {holding.project.carModel}
                         </div>
-                        <div className="text-sm text-gray-500">{holding.project.carYear} • {holding.project.licensePlate}</div>
+                        <div className="text-sm text-gray-500">{holding.project.carYear}</div>
                       </div>
                     </Link>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                    {holding.tokensMinted.toLocaleString()}
+                    {holding.tokenBalance.toLocaleString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                     {valueSOL.toLocaleString(undefined, { maximumFractionDigits: 2 })} SOL
@@ -106,7 +103,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
       {/* Mobile view */}
       <div className="sm:hidden flex flex-col divide-y divide-gray-100">
         {holdings.map((holding) => {
-           const valueSOL = (holding.tokensMinted * holding.project.pricePerToken) / 1_000_000_000;
+           const valueSOL = (holding.tokenBalance * holding.project.pricePerToken) / 1_000_000_000;
            return (
             <div key={holding.project.mint} className="p-5 flex flex-col gap-4 bg-white">
               <div className="flex justify-between items-start gap-4">
@@ -116,7 +113,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
                   </div>
                   <div className="flex flex-col">
                     <span className="font-semibold text-gray-900 text-sm">{holding.project.carMake} {holding.project.carModel}</span>
-                    <span className="text-gray-500 text-xs">{holding.project.carYear} • {holding.project.licensePlate}</span>
+                    <span className="text-gray-500 text-xs">{holding.project.carYear}</span>
                   </div>
                 </Link>
                 <div className="flex-shrink-0">
@@ -126,7 +123,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
               <div className="flex justify-between items-center pt-3 border-t border-gray-100">
                 <div className="flex flex-col">
                   <span className="text-gray-500 text-xs">{t('tokens')}</span>
-                  <span className="text-gray-900 font-medium text-sm">{holding.tokensMinted.toLocaleString()}</span>
+                  <span className="text-gray-900 font-medium text-sm">{holding.tokenBalance.toLocaleString()}</span>
                 </div>
                 <div className="flex flex-col items-end">
                   <span className="text-gray-500 text-xs">{t('value')}</span>

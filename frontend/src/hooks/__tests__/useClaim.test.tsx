@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useClaim } from '../useClaim';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, TransactionInstruction } from '@solana/web3.js';
 import { useTransactionConfirmation } from '@/hooks/useTransactionConfirmation';
 
 vi.mock('@solana/wallet-adapter-react', () => ({
@@ -15,11 +15,15 @@ vi.mock('@/hooks/useTransactionConfirmation', () => ({
   useTransactionConfirmation: vi.fn(),
 }));
 
-vi.mock('@/lib/solana/pda', () => ({
-  deriveProjectState: vi.fn(() => [new PublicKey('11111111111111111111111111111111'), 255]),
-  deriveInvestorRecord: vi.fn(() => [new PublicKey('11111111111111111111111111111111'), 255]),
-  deriveRevenuePeriod: vi.fn(() => [new PublicKey('11111111111111111111111111111111'), 255]),
-  deriveClaimRecord: vi.fn(() => [new PublicKey('11111111111111111111111111111111'), 255]),
+vi.mock('@/lib/solana/instructions', () => ({
+  buildClaimRevenueInstruction: vi.fn(() =>
+    Promise.resolve(
+      new TransactionInstruction({
+        keys: [],
+        programId: new PublicKey('11111111111111111111111111111111'),
+      })
+    )
+  ),
 }));
 
 describe('useClaim hook', () => {
@@ -61,9 +65,9 @@ describe('useClaim hook', () => {
 
   it('handles successful claim flow', async () => {
     const { result } = renderHook(() => useClaim());
-    
+
     await act(async () => {
-      await result.current.claim('Project111111111111111111111111111111111111', 1);
+      await result.current.claim('11111111111111111111111111111111', 1);
     });
 
     expect(result.current.state).toBe('success');
@@ -73,11 +77,11 @@ describe('useClaim hook', () => {
 
   it('handles successful claimAll flow', async () => {
     const { result } = renderHook(() => useClaim());
-    
+
     await act(async () => {
       await result.current.claimAll([
-        { projectId: 'Proj1', periodIndex: 1 },
-        { projectId: 'Proj1', periodIndex: 2 },
+        { projectId: '11111111111111111111111111111111', periodIndex: 1 },
+        { projectId: '11111111111111111111111111111111', periodIndex: 2 },
       ]);
     });
 
@@ -88,9 +92,9 @@ describe('useClaim hook', () => {
   it('fails if wallet is not connected', async () => {
     (useWallet as any).mockReturnValue({ publicKey: null });
     const { result } = renderHook(() => useClaim());
-    
+
     await act(async () => {
-      await result.current.claim('proj111', 1);
+      await result.current.claim('11111111111111111111111111111111', 1);
     });
 
     expect(result.current.state).toBe('error');
@@ -102,7 +106,7 @@ describe('useClaim hook', () => {
     const { result } = renderHook(() => useClaim());
 
     await act(async () => {
-       await result.current.claim('proj111', 1);
+       await result.current.claim('11111111111111111111111111111111', 1);
     });
 
     expect(result.current.state).toBe('error');

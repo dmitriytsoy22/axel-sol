@@ -34,12 +34,12 @@ describe('ClaimButton', () => {
   const mockPeriod: EnrichedRevenuePeriod = {
     period: {
       index: 1,
-      projectPda: 'Proj1' as any,
-      periodLabel: 'Q1',
+      project: 'Proj1',
       totalDeposited: 100,
       tokenSupplySnapshot: 1000,
-      depositTxSignature: 'sig',
-      createdAt: 1234
+      depositedAt: 1234,
+      bump: 255,
+      pda: 'pda1',
     },
     status: 'claimable',
     claimableShare: 10,

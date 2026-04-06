@@ -1,178 +1,214 @@
-import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-
-// TODO: These are placeholder instruction builders until the actual IDL interface is provided by the blockchain team.
+import { PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js';
+import { TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@solana/spl-token';
+import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
+import type { Axel } from '../../../../target/types/axel';
+import IDL from '../../../../target/idl/axel.json';
+import { PROGRAM_ID } from './connection';
+import {
+  deriveProjectState,
+  deriveRevenueVault,
+  deriveWhitelistEntry,
+  deriveRevenuePeriod,
+  deriveClaimRecord,
+} from './pda';
 
 /**
- * Parameters for building the Invest instruction
+ * Creates an Anchor program instance using the connected wallet.
  */
-export interface InvestInstructionParams {
-  userWallet: PublicKey;
-  projectPda: PublicKey;
-  investorRecordPda: PublicKey;
-  amount: number; // The amount to invest
+function getProgramWithWallet(wallet: any, connection: any): Program<Axel> {
+  const provider = new AnchorProvider(connection, wallet, {
+    preflightCommitment: 'confirmed',
+  });
+  return new Program(IDL as Axel, provider);
 }
 
-/**
- * Builds the transaction instruction for a user to invest in a project.
- * @param params - The instruction parameters
- * @returns TransactionInstruction
- */
-export const buildInvestInstruction = (
-  params: InvestInstructionParams
-): TransactionInstruction => {
-  // TODO: Replace with actual instruction building logic from IDL/setup
-  // Example: program.methods.invest(new BN(params.amount)).accounts({ user: params.userWallet, project: params.projectPda }).instruction()
-  
-  return new TransactionInstruction({
-    keys: [
-      { pubkey: params.userWallet, isSigner: true, isWritable: true },
-      { pubkey: params.projectPda, isSigner: false, isWritable: true },
-      { pubkey: params.investorRecordPda, isSigner: false, isWritable: true },
-    ],
-    programId: new PublicKey('11111111111111111111111111111111'), // System program placeholder
-    data: Buffer.from([]), // Placeholder info
-  });
-};
+/* ── Investor Instructions ─────────────────────────── */
 
-/**
- * Parameters for building the Claim Revenue instruction
- */
-export interface ClaimRevenueInstructionParams {
-  userWallet: PublicKey;
-  projectPda: PublicKey;
-  revenuePeriodPda: PublicKey;
-  claimRecordPda: PublicKey;
-  investorRecordPda: PublicKey;
+export interface BuyTokensParams {
+  wallet: any; // AnchorWallet
+  connection: any;
+  mint: PublicKey;
+  adminPubkey: PublicKey;
+  tokenAmount: number;
 }
 
-/**
- * Builds the transaction instruction for a user to claim their revenue share.
- * @param params - The instruction parameters
- * @returns TransactionInstruction
- */
-export const buildClaimRevenueInstruction = (
-  params: ClaimRevenueInstructionParams
-): TransactionInstruction => {
-  // TODO: Replace with actual instruction building logic from IDL/setup
-  return new TransactionInstruction({
-    keys: [
-      { pubkey: params.userWallet, isSigner: true, isWritable: true },
-      { pubkey: params.projectPda, isSigner: false, isWritable: false },
-      { pubkey: params.revenuePeriodPda, isSigner: false, isWritable: true },
-      { pubkey: params.claimRecordPda, isSigner: false, isWritable: true },
-      { pubkey: params.investorRecordPda, isSigner: false, isWritable: false },
-    ],
-    programId: new PublicKey('11111111111111111111111111111111'), // System program placeholder
-    data: Buffer.from([]), // Placeholder data
-  });
-};
+export async function buildBuyTokensInstruction(
+  params: BuyTokensParams,
+): Promise<TransactionInstruction> {
+  const program = getProgramWithWallet(params.wallet, params.connection);
+  const investor = params.wallet.publicKey;
+  const [projectStatePda] = deriveProjectState(params.mint);
+  const [whitelistPda] = deriveWhitelistEntry(investor);
+  const investorAta = getAssociatedTokenAddressSync(
+    params.mint,
+    investor,
+    false,
+    TOKEN_2022_PROGRAM_ID,
+  );
 
-/**
- * Parameters for building the Deposit Revenue instruction (Admin)
- */
-export interface DepositRevenueInstructionParams {
-  adminWallet: PublicKey;
-  projectPda: PublicKey;
-  revenuePeriodPda: PublicKey;
-  amount: number; // Total revenue amount deposited for the period
-  periodId: number; // The ID of the period
+  return await program.methods
+    .buyTokens(new BN(params.tokenAmount))
+    .accountsPartial({
+      investor,
+      admin: params.adminPubkey,
+      projectState: projectStatePda,
+      mint: params.mint,
+      investorTokenAccount: investorAta,
+      whitelistEntry: whitelistPda,
+      tokenExtensionsProgram: TOKEN_2022_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
 }
 
-/**
- * Builds the transaction instruction for an admin to deposit project revenue.
- * @param params - The instruction parameters
- * @returns TransactionInstruction
- */
-export const buildDepositRevenueInstruction = (
-  params: DepositRevenueInstructionParams
-): TransactionInstruction => {
-  // TODO: Replace with actual instruction building logic from IDL/setup
-  return new TransactionInstruction({
-    keys: [
-      { pubkey: params.adminWallet, isSigner: true, isWritable: true },
-      { pubkey: params.projectPda, isSigner: false, isWritable: true },
-      { pubkey: params.revenuePeriodPda, isSigner: false, isWritable: true },
-    ],
-    programId: new PublicKey('11111111111111111111111111111111'), // System program placeholder 
-    data: Buffer.from([]), // Placeholder data
-  });
-};
-
-/**
- * Parameters for building the Pause Project instruction (Admin)
- */
-export interface PauseProjectInstructionParams {
-  adminWallet: PublicKey;
-  projectPda: PublicKey;
+export interface ClaimRevenueParams {
+  wallet: any;
+  connection: any;
+  mint: PublicKey;
+  periodIndex: number;
 }
 
-/**
- * Builds the transaction instruction for an admin to pause a project.
- * @param params - The instruction parameters
- * @returns TransactionInstruction
- */
-export const buildPauseProjectInstruction = (
-  params: PauseProjectInstructionParams
-): TransactionInstruction => {
-  // TODO: Replace with actual instruction building logic from IDL/setup
-  return new TransactionInstruction({
-    keys: [
-      { pubkey: params.adminWallet, isSigner: true, isWritable: false },
-      { pubkey: params.projectPda, isSigner: false, isWritable: true },
-    ],
-    programId: new PublicKey('11111111111111111111111111111111'), // System program placeholder
-    data: Buffer.from([]), // Placeholder info
-  });
-};
+export async function buildClaimRevenueInstruction(
+  params: ClaimRevenueParams,
+): Promise<TransactionInstruction> {
+  const program = getProgramWithWallet(params.wallet, params.connection);
+  const investor = params.wallet.publicKey;
+  const [projectStatePda] = deriveProjectState(params.mint);
+  const [revenueVaultPda] = deriveRevenueVault(params.mint);
+  const [revenuePeriodPda] = deriveRevenuePeriod(params.mint, params.periodIndex);
+  const [claimRecordPda] = deriveClaimRecord(revenuePeriodPda, investor);
+  const investorAta = getAssociatedTokenAddressSync(
+    params.mint,
+    investor,
+    false,
+    TOKEN_2022_PROGRAM_ID,
+  );
 
-/**
- * Parameters for building the Resume Project instruction (Admin)
- */
-export interface ResumeProjectInstructionParams {
-  adminWallet: PublicKey;
-  projectPda: PublicKey;
+  return await program.methods
+    .claimRevenue(params.periodIndex)
+    .accountsPartial({
+      investor,
+      projectState: projectStatePda,
+      revenuePeriod: revenuePeriodPda,
+      revenueVault: revenueVaultPda,
+      claimRecord: claimRecordPda,
+      investorTokenAccount: investorAta,
+      tokenExtensionsProgram: TOKEN_2022_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
 }
 
-/**
- * Builds the transaction instruction for an admin to resume a project.
- * @param params - The instruction parameters
- * @returns TransactionInstruction
- */
-export const buildResumeProjectInstruction = (
-  params: ResumeProjectInstructionParams
-): TransactionInstruction => {
-  return new TransactionInstruction({
-    keys: [
-      { pubkey: params.adminWallet, isSigner: true, isWritable: false },
-      { pubkey: params.projectPda, isSigner: false, isWritable: true },
-    ],
-    programId: new PublicKey('11111111111111111111111111111111'),
-    data: Buffer.from([]), 
-  });
-};
+/* ── Admin Instructions ────────────────────────────── */
 
-/**
- * Parameters for building the Close Project instruction (Admin)
- */
-export interface CloseProjectInstructionParams {
-  adminWallet: PublicKey;
-  projectPda: PublicKey;
+export interface DepositRevenueParams {
+  wallet: any;
+  connection: any;
+  mint: PublicKey;
+  periodIndex: number;
+  amount: number; // lamports
 }
 
-/**
- * Builds the transaction instruction for an admin to close a project.
- * @param params - The instruction parameters
- * @returns TransactionInstruction
- */
-export const buildCloseProjectInstruction = (
-  params: CloseProjectInstructionParams
-): TransactionInstruction => {
-  return new TransactionInstruction({
-    keys: [
-      { pubkey: params.adminWallet, isSigner: true, isWritable: false },
-      { pubkey: params.projectPda, isSigner: false, isWritable: true },
-    ],
-    programId: new PublicKey('11111111111111111111111111111111'),
-    data: Buffer.from([]), 
-  });
-};
+export async function buildDepositRevenueInstruction(
+  params: DepositRevenueParams,
+): Promise<TransactionInstruction> {
+  const program = getProgramWithWallet(params.wallet, params.connection);
+  const admin = params.wallet.publicKey;
+  const [projectStatePda] = deriveProjectState(params.mint);
+  const [revenueVaultPda] = deriveRevenueVault(params.mint);
+  const [revenuePeriodPda] = deriveRevenuePeriod(params.mint, params.periodIndex);
+
+  return await program.methods
+    .depositRevenue(params.periodIndex, new BN(params.amount))
+    .accountsPartial({
+      admin,
+      projectState: projectStatePda,
+      revenueVault: revenueVaultPda,
+      revenuePeriod: revenuePeriodPda,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+}
+
+export interface PauseResumeParams {
+  wallet: any;
+  connection: any;
+  mint: PublicKey;
+}
+
+export async function buildPauseProjectInstruction(
+  params: PauseResumeParams,
+): Promise<TransactionInstruction> {
+  const program = getProgramWithWallet(params.wallet, params.connection);
+  const [projectStatePda] = deriveProjectState(params.mint);
+
+  return await program.methods
+    .pauseProject()
+    .accountsPartial({
+      admin: params.wallet.publicKey,
+      projectState: projectStatePda,
+    })
+    .instruction();
+}
+
+export async function buildResumeProjectInstruction(
+  params: PauseResumeParams,
+): Promise<TransactionInstruction> {
+  const program = getProgramWithWallet(params.wallet, params.connection);
+  const [projectStatePda] = deriveProjectState(params.mint);
+
+  return await program.methods
+    .resumeProject()
+    .accountsPartial({
+      admin: params.wallet.publicKey,
+      projectState: projectStatePda,
+    })
+    .instruction();
+}
+
+export interface CloseProjectParams {
+  wallet: any;
+  connection: any;
+  mint: PublicKey;
+}
+
+export async function buildCloseProjectInstruction(
+  params: CloseProjectParams,
+): Promise<TransactionInstruction> {
+  const program = getProgramWithWallet(params.wallet, params.connection);
+  const [projectStatePda] = deriveProjectState(params.mint);
+  const [revenueVaultPda] = deriveRevenueVault(params.mint);
+
+  return await program.methods
+    .closeProject()
+    .accountsPartial({
+      admin: params.wallet.publicKey,
+      projectState: projectStatePda,
+      revenueVault: revenueVaultPda,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+}
+
+export interface UpdatePriceParams {
+  wallet: any;
+  connection: any;
+  mint: PublicKey;
+  newPrice: number; // lamports
+}
+
+export async function buildUpdatePriceInstruction(
+  params: UpdatePriceParams,
+): Promise<TransactionInstruction> {
+  const program = getProgramWithWallet(params.wallet, params.connection);
+  const [projectStatePda] = deriveProjectState(params.mint);
+
+  return await program.methods
+    .updatePrice(new BN(params.newPrice))
+    .accountsPartial({
+      admin: params.wallet.publicKey,
+      projectState: projectStatePda,
+    })
+    .instruction();
+}

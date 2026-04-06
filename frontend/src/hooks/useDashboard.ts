@@ -1,13 +1,22 @@
-import { useMemo, useState, useEffect } from 'react';
+'use client';
+
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { PublicKey } from '@solana/web3.js';
 import { useProjectState } from './useProjectState';
-import { useWalletInfo } from './useWalletInfo';
 import { ProjectState } from '@/types/project';
 import { RevenuePeriod } from '@/types/revenue';
+import {
+  fetchInvestorHolding,
+  fetchAllRevenuePeriods,
+  fetchClaimRecord,
+} from '@/lib/solana/readers';
+import { deriveRevenuePeriod } from '@/lib/solana/pda';
 
 export interface Holding {
   project: ProjectState;
-  tokensMinted: number;
-  solInvested: number;
+  tokenBalance: number;
+  ownershipPercentage: number;
 }
 
 export interface EnrichedRevenuePeriod {
@@ -18,30 +27,30 @@ export interface EnrichedRevenuePeriod {
 
 export function useDashboard() {
   const { projects, isLoading: isProjectsLoading, error: projectsError, refetch: refetchProjects } = useProjectState();
-  const { connected } = useWalletInfo();
-  
+  const { connection } = useConnection();
+  const { publicKey, connected } = useWallet();
+
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [revenuePeriods, setRevenuePeriods] = useState<EnrichedRevenuePeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [toggleTracker, setToggleTracker] = useState(0);
+  const [fetchTrigger, setFetchTrigger] = useState(0);
 
-  const refetch = () => {
+  const refetch = useCallback(() => {
     refetchProjects();
-    setToggleTracker(prev => prev + 1);
-  };
+    setFetchTrigger(prev => prev + 1);
+  }, [refetchProjects]);
 
-  // Mocking on-chain data collection
   useEffect(() => {
     let mounted = true;
-    
+
     if (projectsError) {
       setError(projectsError);
       setIsLoading(false);
       return;
     }
 
-    if (!connected || isProjectsLoading || projects.length === 0) {
+    if (!connected || !publicKey || isProjectsLoading || projects.length === 0) {
       if (mounted) {
         setHoldings([]);
         setRevenuePeriods([]);
@@ -53,72 +62,102 @@ export function useDashboard() {
 
     setIsLoading(true);
     setError(null);
-    // Simulate network delay for fetching Investor PDA and Claims from chains
-    const timer = setTimeout(() => {
-      if (!mounted) return;
 
-      // Mock Holdings based on first two projects
-      const mockHoldings: Holding[] = [
-        {
-          project: projects[0],
-          tokensMinted: 50,
-          solInvested: 50 * projects[0].pricePerToken,
-        },
-        {
-          project: projects[1],
-          tokensMinted: 200,
-          solInvested: 200 * projects[1].pricePerToken,
+    async function loadDashboardData() {
+      try {
+        // 1. Fetch token holdings for every project in parallel
+        const holdingResults = await Promise.all(
+          projects.map(async (project): Promise<Holding | null> => {
+            const mint = new PublicKey(project.mint);
+            const holding = await fetchInvestorHolding(
+              connection,
+              publicKey!,
+              mint,
+              project.totalTokenSupply,
+            );
+            if (!holding || holding.tokenBalance === 0) return null;
+            return {
+              project,
+              tokenBalance: holding.tokenBalance,
+              ownershipPercentage: holding.ownershipPercentage,
+            };
+          }),
+        );
+
+        const validHoldings = holdingResults.filter((h): h is Holding => h !== null);
+
+        // 2. For projects the user holds tokens in, fetch revenue periods + claim status
+        const allEnrichedPeriods: EnrichedRevenuePeriod[] = [];
+
+        for (const holding of validHoldings) {
+          if (holding.project.periodCount === 0) continue;
+
+          const mint = new PublicKey(holding.project.mint);
+          const periods = await fetchAllRevenuePeriods(
+            connection,
+            mint,
+            holding.project.periodCount,
+          );
+
+          // Check claim status for each period in parallel
+          const enriched = await Promise.all(
+            periods.map(async (period): Promise<EnrichedRevenuePeriod> => {
+              const [periodPda] = deriveRevenuePeriod(mint, period.index);
+              const claimRecord = await fetchClaimRecord(
+                connection,
+                periodPda,
+                publicKey!,
+              );
+
+              const claimableShare =
+                period.tokenSupplySnapshot > 0
+                  ? (holding.tokenBalance / period.tokenSupplySnapshot) * period.totalDeposited
+                  : 0;
+
+              let status: EnrichedRevenuePeriod['status'];
+              if (claimRecord?.claimed) {
+                status = 'claimed';
+              } else if (holding.project.status === 'active') {
+                status = 'claimable';
+              } else {
+                status = 'unclaimed';
+              }
+
+              return { period, status, claimableShare };
+            }),
+          );
+
+          allEnrichedPeriods.push(...enriched);
         }
-      ];
 
-      // Mock Revenue Periods
-      const mockPeriods: EnrichedRevenuePeriod[] = [
-        {
-          period: {
-            index: 1,
-            projectPda: projects[1].mint, // Use mint as PDA string for mock
-            periodLabel: 'Q1 2026',
-            totalDeposited: 500 * 1_000_000_000, // 500 SOL
-            tokenSupplySnapshot: projects[1].totalTokenSupply,
-            depositTxSignature: 'mock_tx_1',
-            createdAt: Math.floor(Date.now() / 1000) - 86400 * 30, // 30 days ago
-          },
-          status: 'claimed',
-          claimableShare: (200 / projects[1].totalTokenSupply) * (500 * 1_000_000_000), // 20 SOL
-        },
-        {
-          period: {
-            index: 2,
-            projectPda: projects[1].mint,
-            periodLabel: 'Q2 2026',
-            totalDeposited: 600 * 1_000_000_000, // 600 SOL
-            tokenSupplySnapshot: projects[1].totalTokenSupply,
-            depositTxSignature: 'mock_tx_2',
-            createdAt: Math.floor(Date.now() / 1000) - 86400 * 5, // 5 days ago
-          },
-          status: 'claimable',
-          claimableShare: (200 / projects[1].totalTokenSupply) * (600 * 1_000_000_000), // 24 SOL
+        if (mounted) {
+          setHoldings(validHoldings);
+          setRevenuePeriods(allEnrichedPeriods);
+          setIsLoading(false);
         }
-      ];
+      } catch (err) {
+        console.error('Dashboard data fetch error:', err);
+        if (mounted) {
+          setError(err instanceof Error ? err : new Error('Failed to load dashboard data'));
+          setIsLoading(false);
+        }
+      }
+    }
 
-      setHoldings(mockHoldings);
-      setRevenuePeriods(mockPeriods);
-      setIsLoading(false);
-    }, 1000);
+    loadDashboardData();
 
     return () => {
       mounted = false;
-      clearTimeout(timer);
     };
-  }, [connected, isProjectsLoading, projects, projectsError, toggleTracker]);
+  }, [connected, publicKey, isProjectsLoading, projects, projectsError, connection, fetchTrigger]);
 
   const summary = useMemo(() => {
     const totalValue = holdings.reduce(
-      (acc, holding) => acc + holding.tokensMinted * holding.project.pricePerToken,
+      (acc, holding) => acc + holding.tokenBalance * holding.project.pricePerToken,
       0
     );
     const tokensHeld = holdings.reduce(
-      (acc, holding) => acc + holding.tokensMinted,
+      (acc, holding) => acc + holding.tokenBalance,
       0
     );
     const unclaimedRevenue = revenuePeriods

@@ -21,12 +21,11 @@ const messages = {
   InvestModal: {
     title: 'Invest in Token',
     walletBalance: 'Wallet Balance: {balance} SOL',
-    amountToInvest: 'Amount (SOL)',
+    amountToInvest: 'Token Amount',
     youWillReceive: 'You will receive',
-    validationMax: 'Amount exceeds max allowed',
-    validationMin: 'Amount below min limit',
+    totalCost: 'Total Cost',
+    validationMax: 'Amount exceeds available tokens',
     validationBalance: 'Insufficient SOL balance',
-    validationCap: 'Per-investor cap exceeded',
     confirmInvest: 'Confirm Investment',
     statusIdle: 'Confirm',
     statusSuccess: 'Investment Successful!',
@@ -81,10 +80,10 @@ describe('InvestModal', () => {
         <InvestModal
           isOpen={true}
           onClose={mockOnClose}
-          projectId="mockProjectId"
-          pricePerToken={0.1 * 10 ** 9} // 0.1 SOL
-          minInvestment={0.5 * 10 ** 9} // 0.5 SOL
-          maxInvestment={5 * 10 ** 9}   // 5 SOL
+          projectMint="mockMintAddress"
+          adminPubkey="mockAdminPubkey"
+          pricePerToken={100_000_000} // 0.1 SOL
+          tokensRemaining={1000}
           {...props}
         />
       </NextIntlClientProvider>
@@ -94,48 +93,44 @@ describe('InvestModal', () => {
   it('renders modal content correctly', async () => {
     renderModal();
     expect(screen.getByText('Invest in Token')).toBeDefined();
-    expect(screen.getByText('Amount (SOL)')).toBeDefined();
-    
-    // balance loads async, we can check for its appearance
-    await act(async () => {
-      // Allow balance to resolve
-    });
+    expect(screen.getByText('Token Amount')).toBeDefined();
+
+    await act(async () => {});
     expect(screen.getByText('Wallet Balance: 10.0000 SOL')).toBeDefined();
   });
 
-  it('updates token calculations based on input', async () => {
+  it('updates cost calculation based on token input', async () => {
     renderModal();
-    const input = screen.getByPlaceholderText('0.00');
+    const input = screen.getByPlaceholderText('0');
 
-    fireEvent.change(input, { target: { value: '1' } });
-    
-    // 1 SOL / 0.1 SOL price = 10 tokens
-    expect(screen.getByText('10.00')).toBeDefined();
+    fireEvent.change(input, { target: { value: '10' } });
+
+    // 10 tokens * 0.1 SOL = 1.0000 SOL
+    expect(screen.getByText(/1\.0000/)).toBeDefined();
   });
 
-  it('disables invest button if input is below min limit', () => {
-    renderModal();
-    const input = screen.getByPlaceholderText('0.00');
-    fireEvent.change(input, { target: { value: '0.1' } }); // below 0.5 min
+  it('shows validation error if exceeding available tokens', () => {
+    renderModal({ tokensRemaining: 5 });
+    const input = screen.getByPlaceholderText('0');
+    fireEvent.change(input, { target: { value: '10' } }); // exceeds 5 remaining
 
-    expect(screen.getByText('Amount below min limit')).toBeDefined();
+    expect(screen.getByText('Amount exceeds available tokens')).toBeDefined();
     const btn = screen.getByRole('button', { name: /Confirm Investment/i });
     expect(btn.hasAttribute('disabled')).toBeTruthy();
   });
 
   it('calls invest hook method on valid input', async () => {
     renderModal();
-    const input = screen.getByPlaceholderText('0.00');
-    fireEvent.change(input, { target: { value: '1' } }); // valid
+    const input = screen.getByPlaceholderText('0');
+    fireEvent.change(input, { target: { value: '10' } });
 
-    // Wait for async balance to be set to 10
     await act(async () => {});
 
     const btn = screen.getByRole('button', { name: /Confirm Investment/i });
     expect(btn.hasAttribute('disabled')).toBeFalsy();
 
     fireEvent.click(btn);
-    expect(mockInvest).toHaveBeenCalledWith('mockProjectId', 1, 0.5, 5);
+    expect(mockInvest).toHaveBeenCalledWith('mockMintAddress', 10, 'mockAdminPubkey');
   });
 
   it('shows success screen when state is success', () => {
@@ -145,9 +140,9 @@ describe('InvestModal', () => {
       invest: mockInvest,
       reset: mockReset,
     });
-    
+
     renderModal();
     expect(screen.getByText('Investment Successful!')).toBeDefined();
-    expect(screen.queryByPlaceholderText('0.00')).toBeNull();
+    expect(screen.queryByPlaceholderText('0')).toBeNull();
   });
 });

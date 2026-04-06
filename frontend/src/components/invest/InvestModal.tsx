@@ -13,27 +13,27 @@ import { TransactionStatus } from '@/components/ui/TransactionStatus';
 interface InvestModalProps {
   isOpen: boolean;
   onClose: () => void;
-  projectId: string;
-  pricePerToken: number;
-  minInvestment: number;
-  maxInvestment: number;
+  projectMint: string;
+  adminPubkey: string;
+  pricePerToken: number; // lamports
+  tokensRemaining: number;
 }
 
 export function InvestModal({
   isOpen,
   onClose,
-  projectId,
+  projectMint,
+  adminPubkey,
   pricePerToken,
-  minInvestment,
-  maxInvestment,
+  tokensRemaining,
 }: InvestModalProps): JSX.Element {
   const t = useTranslations('InvestModal');
   const tAnchor = useTranslations('AnchorErrors');
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   const { state, errorMsg, invest, reset } = useInvest();
-  
-  const [solAmount, setSolAmount] = useState<string>('');
+
+  const [tokenAmount, setTokenAmount] = useState<string>('');
   const [balance, setBalance] = useState<number>(0);
 
   useEffect(() => {
@@ -44,31 +44,29 @@ export function InvestModal({
 
   useEffect(() => {
     if (!isOpen) {
-      setSolAmount('');
+      setTokenAmount('');
       reset();
     }
   }, [isOpen, reset]);
 
   const pricePerTokenSol = pricePerToken / LAMPORTS_PER_SOL;
-  const numTokens = parseFloat(solAmount) > 0 ? (parseFloat(solAmount) / pricePerTokenSol).toFixed(2) : '0';
-  const amountLamports = parseFloat(solAmount) * LAMPORTS_PER_SOL || 0;
-  
+  const numTokens = parseInt(tokenAmount) || 0;
+  const totalCostSol = numTokens * pricePerTokenSol;
+
   let validationError: string | null = null;
-  if (amountLamports > maxInvestment && solAmount !== '') {
+  if (numTokens > tokensRemaining && tokenAmount !== '') {
     validationError = t('validationMax');
-  } else if (amountLamports < minInvestment && solAmount !== '') {
-    validationError = t('validationMin');
-  } else if (parseFloat(solAmount) > balance) {
+  } else if (totalCostSol > balance && tokenAmount !== '') {
     validationError = t('validationBalance');
   }
 
   const handleInvest = () => {
-    if (!validationError && parseFloat(solAmount) > 0) {
-      invest(projectId, parseFloat(solAmount), minInvestment / LAMPORTS_PER_SOL, maxInvestment / LAMPORTS_PER_SOL);
+    if (!validationError && numTokens > 0) {
+      invest(projectMint, numTokens, adminPubkey);
     }
   };
 
-  const isButtonDisabled = !solAmount || parseFloat(solAmount) <= 0 || !!validationError || (state !== 'idle' && state !== 'error');
+  const isButtonDisabled = !tokenAmount || numTokens <= 0 || !!validationError || (state !== 'idle' && state !== 'error');
 
   let displayError = errorMsg;
   if (errorMsg && errorMsg.startsWith('validation')) {
@@ -102,7 +100,7 @@ export function InvestModal({
         <div className="flex flex-col gap-5">
           <div className="flex items-center justify-between text-sm text-gray-400">
              <span>{t('walletBalance', { balance: balance.toFixed(4) })}</span>
-             <span>Min: {(minInvestment / LAMPORTS_PER_SOL).toFixed(2)} SOL</span>
+             <span>{tokensRemaining.toLocaleString()} tokens available</span>
           </div>
 
           <div className="relative">
@@ -112,17 +110,17 @@ export function InvestModal({
             <div className="relative flex items-center">
               <input
                 type="number"
-                min="0"
-                step="0.1"
-                placeholder="0.00"
-                value={solAmount}
-                onChange={(e) => setSolAmount(e.target.value)}
+                min="1"
+                step="1"
+                placeholder="0"
+                value={tokenAmount}
+                onChange={(e) => setTokenAmount(e.target.value)}
                 disabled={state !== 'idle' && state !== 'error'}
-                className="w-full rounded-xl border border-white/10 bg-black/40 p-4 pr-16 text-lg text-white placeholder-white/30 outline-none transition-all focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 disabled:opacity-50"
+                className="w-full rounded-xl border border-white/10 bg-black/40 p-4 pr-20 text-lg text-white placeholder-white/30 outline-none transition-all focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 disabled:opacity-50"
               />
-              <span className="absolute right-4 font-semibold text-gray-400">SOL</span>
+              <span className="absolute right-4 font-semibold text-gray-400">TKN</span>
             </div>
-            
+
             <div className={`mt-2 flex items-center justify-between text-sm transition-opacity duration-200 ${(validationError || displayError) ? 'opacity-100' : 'opacity-0'}`}>
                <span className="text-red-400 flex items-center gap-1.5 font-medium">
                  {(validationError || displayError) && <AlertCircle size={14} />}
@@ -132,8 +130,8 @@ export function InvestModal({
           </div>
 
           <div className="rounded-xl border border-white/5 bg-white/5 p-4 flex items-center justify-between">
-             <span className="text-gray-400">{t('youWillReceive')}</span>
-             <span className="text-xl font-semibold text-cyan-400">{numTokens} <span className="text-sm font-normal text-cyan-400/70">TKN</span></span>
+             <span className="text-gray-400">{t('totalCost')}</span>
+             <span className="text-xl font-semibold text-cyan-400">{totalCostSol.toFixed(4)} <span className="text-sm font-normal text-cyan-400/70">SOL</span></span>
           </div>
 
           <button

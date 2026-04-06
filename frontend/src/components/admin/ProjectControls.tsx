@@ -23,26 +23,28 @@ export function ProjectControls({ project }: ProjectControlsProps) {
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const { confirmTransaction } = useTransactionConfirmation();
-  
+
   const [activeAction, setActiveAction] = useState<'pause' | 'resume' | 'close' | null>(null);
 
   const handleAction = async (action: 'pause' | 'resume' | 'close') => {
     if (!publicKey) return;
-    
+
     setActiveAction(action);
     try {
-      let instruction: TransactionInstruction;
+      const mint = new PublicKey(project.mint);
       const params = {
-        adminWallet: publicKey,
-        projectPda: PublicKey.default, // Mock
+        wallet: { publicKey, signTransaction: async (tx: any) => tx, signAllTransactions: async (txs: any[]) => txs },
+        connection,
+        mint,
       };
 
+      let instruction: TransactionInstruction;
       if (action === 'pause') {
-        instruction = buildPauseProjectInstruction(params);
+        instruction = await buildPauseProjectInstruction(params);
       } else if (action === 'resume') {
-        instruction = buildResumeProjectInstruction(params);
+        instruction = await buildResumeProjectInstruction(params);
       } else {
-        instruction = buildCloseProjectInstruction(params);
+        instruction = await buildCloseProjectInstruction(params);
       }
 
       const transaction = new Transaction().add(instruction);

@@ -1,12 +1,14 @@
 /**
- * Solana RPC Connection Config & Utilities
+ * Solana RPC Connection & Utilities
  *
- * Exports connection configuration (endpoint, commitment, network),
- * Explorer URL builder, and RPC error wrapping helpers.
- *
- * The actual Connection instance will be created in Task 2
- * when @solana/web3.js is installed.
+ * Provides a singleton Connection instance, Explorer URL builder,
+ * and RPC error wrapping helpers.
  */
+
+import { Connection, PublicKey } from '@solana/web3.js';
+import { AnchorProvider, Program } from '@coral-xyz/anchor';
+import type { Axel } from '../../../../target/types/axel';
+import IDL from '../../../../target/idl/axel.json';
 
 const SOLANA_RPC_URL =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
@@ -14,19 +16,43 @@ const SOLANA_RPC_URL =
 const SOLANA_NETWORK =
   process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
 
-const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || '';
+export const PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_PROGRAM_ID || 'DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi',
+);
 
-/**
- * RPC Connection config.
- * Commitment 'confirmed' — достаточно для чтения PDA-стейта.
- * 'finalized' используем только для подтверждения транзакций.
- */
 export const connectionConfig = {
   endpoint: SOLANA_RPC_URL,
   commitment: 'confirmed' as const,
   network: SOLANA_NETWORK,
-  programId: PROGRAM_ID,
+  programId: PROGRAM_ID.toBase58(),
 };
+
+/** Singleton connection for read-only RPC calls */
+let _connection: Connection | null = null;
+export function getConnection(): Connection {
+  if (!_connection) {
+    _connection = new Connection(SOLANA_RPC_URL, 'confirmed');
+  }
+  return _connection;
+}
+
+/**
+ * Create a read-only Anchor program instance (no wallet signing).
+ * Used for fetching/deserializing on-chain accounts.
+ */
+export function getReadonlyProgram(): Program<Axel> {
+  const connection = getConnection();
+  const provider = new AnchorProvider(
+    connection,
+    {
+      publicKey: PublicKey.default,
+      signTransaction: async () => { throw new Error('readonly'); },
+      signAllTransactions: async () => { throw new Error('readonly'); },
+    } as any,
+    { preflightCommitment: 'confirmed' },
+  );
+  return new Program(IDL as Axel, provider);
+}
 
 /**
  * Solana Explorer URL builder
@@ -46,9 +72,6 @@ export function getExplorerUrl(
 
 /* ── RPC Error Handling ──────────────────────────────── */
 
-/**
- * Known RPC error patterns → user-friendly messages
- */
 const RPC_ERROR_MAP: Record<string, string> = {
   'failed to get recent blockhash': 'Network is congested. Please try again in a moment.',
   'blockhash not found': 'Transaction expired. Please try again.',
@@ -62,12 +85,6 @@ const RPC_ERROR_MAP: Record<string, string> = {
   'transaction was not confirmed': 'Transaction was not confirmed within the timeout period.',
 };
 
-/**
- * Wraps an RPC error into a user-friendly message.
- *
- * @param error - Raw error from RPC call
- * @returns Object with user-friendly message and original error for logging
- */
 export function wrapRpcError(error: unknown): {
   message: string;
   code?: string;
@@ -76,7 +93,6 @@ export function wrapRpcError(error: unknown): {
   const errorMessage =
     error instanceof Error ? error.message : String(error);
 
-  // Match against known patterns
   const lowerMessage = errorMessage.toLowerCase();
   for (const [pattern, friendlyMessage] of Object.entries(RPC_ERROR_MAP)) {
     if (lowerMessage.includes(pattern)) {
@@ -88,7 +104,6 @@ export function wrapRpcError(error: unknown): {
     }
   }
 
-  // Fallback — unknown error
   return {
     message: 'Something went wrong. Please try again.',
     code: 'UNKNOWN_RPC_ERROR',
@@ -96,10 +111,6 @@ export function wrapRpcError(error: unknown): {
   };
 }
 
-/**
- * Safe RPC call wrapper.
- * Catches errors and returns null with a user-friendly error message.
- */
 export async function safeRpcCall<T>(
   fn: () => Promise<T>,
 ): Promise<{ data: T; error: null } | { data: null; error: ReturnType<typeof wrapRpcError> }> {

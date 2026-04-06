@@ -9,11 +9,6 @@ describe('Badge', () => {
     expect(screen.getByText('Test Badge')).toBeInTheDocument();
   });
 
-  it('renders pulsing dot for fundraising status', () => {
-    const { container } = render(<Badge status="fundraising">Funds</Badge>);
-    expect(container.querySelector('.animate-ping')).toBeInTheDocument();
-  });
-
   it('renders pulsing dot for active status', () => {
     const { container } = render(<Badge status="active">Active</Badge>);
     expect(container.querySelector('.animate-ping')).toBeInTheDocument();

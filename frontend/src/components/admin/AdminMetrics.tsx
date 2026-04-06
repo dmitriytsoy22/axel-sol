@@ -40,15 +40,15 @@ export function AdminMetrics({ project }: AdminMetricsProps) {
         </div>
 
         <div className="rounded-xl bg-white/[0.03] p-5">
-          <p className="mb-1 text-sm font-medium text-white/50">{t('solRaised')}</p>
+          <p className="mb-1 text-sm font-medium text-white/50">{t('tokensSold')}</p>
           <p className="text-xl font-medium text-white">
-            {(project.solRaised / 1_000_000_000).toFixed(2)} SOL
+            {project.tokensSold} / {project.totalTokenSupply}
           </p>
         </div>
 
         <div className="rounded-xl bg-white/[0.03] p-5">
-          <p className="mb-1 text-sm font-medium text-white/50">{t('investors')}</p>
-          <p className="text-xl font-medium text-white">{project.investorCount}</p>
+          <p className="mb-1 text-sm font-medium text-white/50">{t('revenuePeriods')}</p>
+          <p className="text-xl font-medium text-white">{project.periodCount}</p>
         </div>
       </div>
     </div>

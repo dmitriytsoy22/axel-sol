@@ -1,17 +1,14 @@
 export interface RevenuePeriod {
   index: number;
-  projectPda: string;
-  periodLabel: string;
+  project: string; // mint pubkey
   totalDeposited: number; // lamports
   tokenSupplySnapshot: number;
-  depositTxSignature: string;
-  createdAt: number; // unix timestamp
+  depositedAt: number; // unix timestamp
+  bump: number;
+  pda: string; // period PDA address
 }
 
 export interface ClaimRecord {
-  wallet: string;
-  periodIndex: number;
-  amountClaimed: number; // lamports
-  claimTxSignature: string;
-  claimedAt: number; // unix timestamp
+  claimed: boolean;
+  bump: number;
 }

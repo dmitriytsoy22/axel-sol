@@ -5,11 +5,6 @@ import { useWalletInfo } from './useWalletInfo';
 import { fetchWhitelistEntry } from '@/lib/solana/readers';
 import { deriveWhitelistEntry } from '@/lib/solana/pda';
 
-// Placeholder program ID for testing, until actual one is provided
-const PROGRAM_ID = new PublicKey('11111111111111111111111111111111');
-// Placeholder project PDA for testing whitelist hook without context 
-const MOCK_PROJECT_PDA = new PublicKey('11111111111111111111111111111111');
-
 export function useWhitelistStatus() {
   const { connected, publicKey } = useWalletInfo();
   const { connection } = useConnection();
@@ -34,7 +29,7 @@ export function useWhitelistStatus() {
 
       try {
         const pubkey = new PublicKey(publicKey);
-        const [pda] = deriveWhitelistEntry(PROGRAM_ID, MOCK_PROJECT_PDA, pubkey);
+        const [pda] = deriveWhitelistEntry(pubkey);
         const entry = await fetchWhitelistEntry(connection, pda);
         
         if (mounted) {
