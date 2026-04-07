@@ -26,7 +26,7 @@ export function AssetHeader({ project }: AssetHeaderProps): React.JSX.Element {
     <div className="flex flex-col gap-6">
       <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100 border border-gray-200">
         <Image 
-          src={project.imageUrl}
+          src={project.imageUrl || '/model1.png'}
           alt={`${project.carMake} ${project.carModel}`}
           fill
           className="object-cover"

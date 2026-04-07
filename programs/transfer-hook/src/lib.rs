@@ -6,10 +6,10 @@ use spl_tlv_account_resolution::{
 use spl_transfer_hook_interface::instruction::ExecuteInstruction;
 
 
-declare_id!("CgbtcZvWngGWNH2uQa8vXfiNSYGpQKVNdx7wDUuMFqmC");
+declare_id!("5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ");
 
 /// The axel main program ID — used to derive WhitelistEntry PDAs
-const AXEL_PROGRAM_ID: Pubkey = pubkey!("DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi");
+const AXEL_PROGRAM_ID: Pubkey = pubkey!("DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M");
 
 /// Whitelist PDA discriminator + approved(bool) + bump(u8) = 8 + 1 + 1 = 10
 const WHITELIST_ENTRY_SIZE: usize = 10;

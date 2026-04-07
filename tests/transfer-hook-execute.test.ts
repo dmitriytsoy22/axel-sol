@@ -35,10 +35,10 @@ import axelIdl from "../target/idl/axel.json" with { type: "json" };
 import hookIdl from "../target/idl/transfer_hook.json" with { type: "json" };
 
 const AXEL_PROGRAM_ID = new PublicKey(
-  "DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi",
+  "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M",
 );
 const TRANSFER_HOOK_PROGRAM_ID = new PublicKey(
-  "CgbtcZvWngGWNH2uQa8vXfiNSYGpQKVNdx7wDUuMFqmC",
+  "5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ",
 );
 
 function findWhitelistPda(wallet: PublicKey): [PublicKey, number] {

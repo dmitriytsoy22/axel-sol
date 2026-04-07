@@ -57,11 +57,9 @@ export function WhitelistManager() {
         : await buildRemoveFromWhitelistInstruction(params);
 
       const transaction = new Transaction().add(instruction);
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
 
       const signature = await sendTransaction(transaction, connection);
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
       await confirmTransaction(
         signature,
         blockhash,

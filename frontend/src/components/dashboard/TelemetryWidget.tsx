@@ -10,11 +10,6 @@ function TelemetryWidgetContent({ projectId }: { projectId: string }): JSX.Eleme
   const t = useTranslations('Telemetry');
   const { data, isLoading, error, isStale } = useTelemetry(projectId);
 
-  if (error) {
-    throw error;
-  }
-
-
   if (isLoading) {
     return (
       <div className="w-full h-32 bg-gray-100 dark:bg-gray-800/50 animate-pulse rounded-2xl mb-8 mt-8" data-testid="telemetry-loading" />

@@ -8,7 +8,7 @@ import BN from "bn.js";
 import axelIdl from "../target/idl/axel.json" with { type: "json" };
 
 const AXEL_PROGRAM_ID = new PublicKey(
-  "DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi",
+  "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M",
 );
 
 function findWhitelistPda(wallet: PublicKey): [PublicKey, number] {

@@ -178,5 +178,38 @@
     "invalidAddress": "Обнаружен неверный адрес Solana.",
     "invalidAmount": "Обнаружена некорректная сумма.",
     "unsanitizedContent": "Потенциально вредоносный контент удален."
+  },
+  "InvestModal": {
+    "title": "Инвестировать в токен",
+    "walletBalance": "Баланс кошелька: {balance} SOL",
+    "amountToInvest": "Количество токенов",
+    "totalCost": "Итого к оплате",
+    "confirmInvest": "Подтвердить инвестицию",
+    "youWillReceive": "Вы получили",
+    "close": "Закрыть",
+    "validationMax": "Превышает доступное количество токенов",
+    "validationBalance": "Недостаточно SOL"
+  },
+  "AnchorErrors": {
+    "InvalidTokenSupplyDivision": "Некорректное деление токенов",
+    "ZeroPricePerShare": "Цена за долю должна быть больше нуля",
+    "ProjectNotActive": "Проект неактивен",
+    "InvestorNotWhitelisted": "Инвестор не в белом списке",
+    "ZeroPurchase": "Количество токенов должно быть больше нуля",
+    "InsufficientVaultBalance": "Недостаточно доступных токенов",
+    "Overflow": "Арифметическое переполнение",
+    "Unauthorized": "Нет доступа",
+    "InvalidRevenueVault": "Несоответствие хранилища дохода",
+    "ZeroDepositAmount": "Сумма депозита должна быть больше нуля",
+    "InvalidPeriodIndex": "Неверный индекс периода",
+    "NoTokensSold": "Токены ещё не проданы",
+    "RevenuePeriodMismatch": "Несоответствие периода дохода",
+    "InvalidTokenAccount": "Некорректный токеновый аккаунт",
+    "ZeroTokenBalance": "Нулевой баланс токенов",
+    "ZeroPayout": "Рассчитанная выплата равна нулю",
+    "ProjectNotPaused": "Проект не на паузе",
+    "UnauthorizedOracle": "Неавторизованный оракул",
+    "TokensStillAvailable": "Токены всё ещё доступны для продажи",
+    "ProjectAlreadyClosed": "Проект уже закрыт"
   }
 }

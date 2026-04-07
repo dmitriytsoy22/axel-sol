@@ -8,6 +8,7 @@ const cspHeader = `
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data: https://images.unsplash.com;
     font-src 'self';
+    connect-src 'self' https://*.helius-rpc.com https://api.devnet.solana.com https://api.mainnet-beta.solana.com http://localhost:*;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
@@ -23,6 +24,10 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'arweave.net',
       },
     ],
   },

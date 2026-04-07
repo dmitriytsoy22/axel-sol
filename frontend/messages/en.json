@@ -178,5 +178,38 @@
     "invalidAddress": "Invalid Solana address detected.",
     "invalidAmount": "Invalid amount detected.",
     "unsanitizedContent": "Potentially malicious content stripped."
+  },
+  "InvestModal": {
+    "title": "Invest in Token",
+    "walletBalance": "Wallet Balance: {balance} SOL",
+    "amountToInvest": "Token Amount",
+    "totalCost": "Total Cost",
+    "confirmInvest": "Confirm Investment",
+    "youWillReceive": "You received",
+    "close": "Close",
+    "validationMax": "Amount exceeds available tokens",
+    "validationBalance": "Insufficient SOL balance"
+  },
+  "AnchorErrors": {
+    "InvalidTokenSupplyDivision": "Invalid token supply division",
+    "ZeroPricePerShare": "Price per share must be greater than zero",
+    "ProjectNotActive": "Project is not active",
+    "InvestorNotWhitelisted": "Investor is not whitelisted",
+    "ZeroPurchase": "Token amount must be greater than zero",
+    "InsufficientVaultBalance": "Not enough tokens available",
+    "Overflow": "Arithmetic overflow",
+    "Unauthorized": "Unauthorized",
+    "InvalidRevenueVault": "Revenue vault mismatch",
+    "ZeroDepositAmount": "Deposit must be greater than zero",
+    "InvalidPeriodIndex": "Invalid period index",
+    "NoTokensSold": "No tokens sold yet",
+    "RevenuePeriodMismatch": "Revenue period mismatch",
+    "InvalidTokenAccount": "Invalid token account",
+    "ZeroTokenBalance": "Zero token balance",
+    "ZeroPayout": "Calculated payout is zero",
+    "ProjectNotPaused": "Project is not paused",
+    "UnauthorizedOracle": "Unauthorized oracle",
+    "TokensStillAvailable": "Tokens still available for sale",
+    "ProjectAlreadyClosed": "Project is already closed"
   }
 }

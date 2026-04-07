@@ -67,7 +67,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
                     <Link href={`/assets/${holding.project.mint}`} className="flex items-center group">
                       <div className="flex-shrink-0 h-10 w-10 relative rounded-md overflow-hidden bg-gray-100">
                         <Image
-                          src={holding.project.imageUrl}
+                          src={holding.project.imageUrl || '/model1.png'}
                           alt={holding.project.carModel}
                           fill
                           sizes="40px"
@@ -109,7 +109,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
               <div className="flex justify-between items-start gap-4">
                 <Link href={`/assets/${holding.project.mint}`} className="flex items-center gap-3">
                   <div className="w-12 h-12 relative rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                    <Image src={holding.project.imageUrl} alt={holding.project.carModel} fill sizes="48px" className="object-cover" />
+                    <Image src={holding.project.imageUrl || '/model1.png'} alt={holding.project.carModel} fill sizes="48px" className="object-cover" />
                   </div>
                   <div className="flex flex-col">
                     <span className="font-semibold text-gray-900 text-sm">{holding.project.carMake} {holding.project.carModel}</span>

@@ -23,7 +23,7 @@ export async function findRevenueVaultPda(
   config: { programAddress?: Address | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
   const {
-    programAddress = "DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi" as Address<"DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi">,
+    programAddress = "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M" as Address<"DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M">,
   } = config;
   return await getProgramDerivedAddress({
     programAddress,

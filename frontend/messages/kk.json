@@ -178,5 +178,38 @@
     "invalidAddress": "Қате Solana мекенжайы анықталды.",
     "invalidAmount": "Қате сома анықталды.",
     "unsanitizedContent": "Зиянды мазмұн болуы мүмкін контент жойылды."
+  },
+  "InvestModal": {
+    "title": "Токенге инвестициялау",
+    "walletBalance": "Әмиян балансы: {balance} SOL",
+    "amountToInvest": "Токен саны",
+    "totalCost": "Жалпы құны",
+    "confirmInvest": "Инвестицияны растау",
+    "youWillReceive": "Сіз алдыңыз",
+    "close": "Жабу",
+    "validationMax": "Қолжетімді токен санынан асып кетті",
+    "validationBalance": "SOL жеткіліксіз"
+  },
+  "AnchorErrors": {
+    "InvalidTokenSupplyDivision": "Токен бөлінуі қате",
+    "ZeroPricePerShare": "Бір үлес бағасы нөлден жоғары болуы керек",
+    "ProjectNotActive": "Жоба белсенді емес",
+    "InvestorNotWhitelisted": "Инвестор ақ тізімде жоқ",
+    "ZeroPurchase": "Токен саны нөлден жоғары болуы керек",
+    "InsufficientVaultBalance": "Жеткілікті токен жоқ",
+    "Overflow": "Арифметикалық толып кету",
+    "Unauthorized": "Рұқсат жоқ",
+    "InvalidRevenueVault": "Табыс қоймасы сәйкес келмейді",
+    "ZeroDepositAmount": "Салым сомасы нөлден жоғары болуы керек",
+    "InvalidPeriodIndex": "Кезең индексі қате",
+    "NoTokensSold": "Токендер әлі сатылмады",
+    "RevenuePeriodMismatch": "Табыс кезеңі сәйкес келмейді",
+    "InvalidTokenAccount": "Токен аккаунты қате",
+    "ZeroTokenBalance": "Токен балансы нөл",
+    "ZeroPayout": "Есептелген төлем нөл",
+    "ProjectNotPaused": "Жоба кідіртілмеген",
+    "UnauthorizedOracle": "Рұқсатсыз оракул",
+    "TokensStillAvailable": "Токендер әлі сатуда",
+    "ProjectAlreadyClosed": "Жоба жабылған"
   }
 }

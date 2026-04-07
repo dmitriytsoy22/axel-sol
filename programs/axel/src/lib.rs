@@ -6,7 +6,7 @@ pub mod state;
 
 pub use instructions::*;
 
-declare_id!("DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi");
+declare_id!("DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M");
 
 #[program]
 pub mod axel {

@@ -50,14 +50,11 @@ export function useInvest(): {
 
         const transaction = new Transaction().add(instruction);
 
-        const latestBlockhash = await connection.getLatestBlockhash('confirmed');
-        transaction.recentBlockhash = latestBlockhash.blockhash;
-        transaction.feePayer = publicKey;
-
         setState('sending');
         const signature = await sendTransaction(transaction, connection);
 
         setState('confirming');
+        const latestBlockhash = await connection.getLatestBlockhash('confirmed');
         const { success, error } = await confirmTransaction(
           signature,
           latestBlockhash.blockhash,

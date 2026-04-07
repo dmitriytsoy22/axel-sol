@@ -6,14 +6,18 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-axel = "DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi"
-transfer_hook = "CgbtcZvWngGWNH2uQa8vXfiNSYGpQKVNdx7wDUuMFqmC"
+axel = "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M"
+transfer_hook = "5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ"
+
+[programs.devnet]
+axel = "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M"
+transfer_hook = "5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [test]

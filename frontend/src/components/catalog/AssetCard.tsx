@@ -36,7 +36,7 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
       <Card className="flex flex-col group cursor-pointer w-full">
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
           <Image
-            src={project.imageUrl}
+            src={project.imageUrl || '/model1.png'}
             alt={`${project.carMake} ${project.carModel}`}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"

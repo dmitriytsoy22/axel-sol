@@ -49,7 +49,7 @@ import {
 } from "../pdas";
 
 export const AXEL_PROGRAM_ADDRESS =
-  "DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi" as Address<"DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi">;
+  "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M" as Address<"DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M">;
 
 export enum AxelAccount {
   ProjectState,
@@ -102,7 +102,7 @@ export function identifyAxelInstruction(
 }
 
 export type ParsedAxelInstruction<
-  TProgram extends string = "DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi",
+  TProgram extends string = "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M",
 > = {
   instructionType: AxelInstruction.InitializeProject;
 } & ParsedInitializeProjectInstruction<TProgram>;

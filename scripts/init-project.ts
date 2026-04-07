@@ -24,10 +24,10 @@ import type { Axel } from "../target/types/axel";
 import IDL from "../target/idl/axel.json" with { type: "json" };
 
 const AXEL_PROGRAM_ID = new PublicKey(
-  "DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi",
+  "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M",
 );
 const TRANSFER_HOOK_PROGRAM_ID = new PublicKey(
-  "CgbtcZvWngGWNH2uQa8vXfiNSYGpQKVNdx7wDUuMFqmC",
+  "5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ",
 );
 const TOKEN_EXTENSIONS_PROGRAM_ID = new PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",

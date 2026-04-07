@@ -11,6 +11,9 @@ interface ConfirmTxResult {
   error?: string;
 }
 
+const POLL_INTERVAL_MS = 2000;
+const MAX_POLLS = 60; // 2 minutes max
+
 export function useTransactionConfirmation() {
   const { connection } = useConnection();
   const { addToast } = useToast();
@@ -20,33 +23,39 @@ export function useTransactionConfirmation() {
   const confirmTransaction = useCallback(
     async (
       signature: string,
-      blockhash: string,
-      lastValidBlockHeight: number,
+      _blockhash?: string,
+      _lastValidBlockHeight?: number,
       titleSuccess?: string,
       messageSuccess?: string
     ): Promise<ConfirmTxResult> => {
       try {
         setTxState('confirming');
-        
-        // Polling confirmTransaction
-        const confirmation = await connection.confirmTransaction(
-          { signature, blockhash, lastValidBlockHeight },
-          'confirmed'
-        );
 
-        if (confirmation.value.err) {
-          throw new Error('Transaction failed to confirm');
+        // Poll getSignatureStatuses instead of using blockhash-based confirmation
+        for (let i = 0; i < MAX_POLLS; i++) {
+          const { value } = await connection.getSignatureStatuses([signature]);
+          const status = value?.[0];
+
+          if (status) {
+            if (status.err) {
+              throw new Error('Transaction failed on-chain');
+            }
+            if (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized') {
+              setTxState('success');
+              addToast({
+                variant: 'success',
+                title: titleSuccess || t('success'),
+                message: messageSuccess,
+                txHash: signature,
+              });
+              return { success: true, signature };
+            }
+          }
+
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
         }
 
-        setTxState('success');
-        addToast({
-          variant: 'success',
-          title: titleSuccess || t('success'),
-          message: messageSuccess,
-          txHash: signature,
-        });
-
-        return { success: true, signature };
+        throw new Error('Transaction confirmation timed out');
       } catch (err: any) {
         console.error('Confirmation Error:', err);
         setTxState('error');

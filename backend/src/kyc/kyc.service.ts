@@ -14,7 +14,7 @@ import { createHash } from 'crypto';
 import { SolanaService } from '../solana/solana.service';
 
 const AXEL_PROGRAM_ID = new PublicKey(
-  'DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi',
+  'DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M',
 );
 
 /** Anchor instruction discriminator for add_to_whitelist */

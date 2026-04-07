@@ -17,7 +17,7 @@ const SOLANA_NETWORK =
   process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
 
 export const PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_PROGRAM_ID || 'DT5hRtTCLNaXwB4vbxL6CYe5g1guZajT4EfGRjd3Bdfi',
+  process.env.NEXT_PUBLIC_PROGRAM_ID || 'DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M',
 );
 
 export const connectionConfig = {

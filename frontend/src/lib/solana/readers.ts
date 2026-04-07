@@ -51,7 +51,8 @@ export async function fetchProjectState(
         carModel = findMetadataField(metadata, 'model');
         carYear = parseInt(findMetadataField(metadata, 'year') || '0', 10);
         vin = findMetadataField(metadata, 'vin');
-        imageUrl = metadata.uri || '';
+        const uri = metadata.uri || '';
+        imageUrl = uri.includes('test-metadata') ? '' : uri;
       }
     } catch (e) {
       console.warn('Failed to read token metadata:', e);
@@ -124,7 +125,8 @@ export async function fetchAllProjects(
         carModel = findMetadataField(metadata, 'model');
         carYear = parseInt(findMetadataField(metadata, 'year') || '0', 10);
         vin = findMetadataField(metadata, 'vin');
-        imageUrl = metadata.uri || '';
+        const uri = metadata.uri || '';
+        imageUrl = uri.includes('test-metadata') ? '' : uri;
       }
     } catch (e) {
       console.warn(`Failed to read token metadata for mint ${mint.toBase58()}:`, e);

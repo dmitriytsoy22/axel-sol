@@ -1,0 +1,10 @@
+{
+  "cluster": "https://api.devnet.solana.com",
+  "admin": "G67xjxBnbN7B3GpX6BsGyPhFyKE8T8kuPGhZkWvvkZzm",
+  "mint": "CEBjRiHfzycVPjXmD4xJbsg7gCQokyzEAigfEQbZqFK8",
+  "projectState": "FcETyegc5PindjcQ67dLUkzfg2XSFpJ5s2XHLj2ANEMR",
+  "revenueVault": "5NJHVEhsANEuXE9w8esD3EHtuE7qXcA4vMmyzNn3V18A",
+  "oracle": "G67xjxBnbN7B3GpX6BsGyPhFyKE8T8kuPGhZkWvvkZzm",
+  "txSignature": "3z8LmnXpmZc6tsJGt7j8kpXXQYN2LDZjJHNghJHzYdaivY8t3wTzLN5qV3qVKXFG3gW5ydGixStoCmtVX87wnegL",
+  "createdAt": "2026-04-07T18:08:29.764Z"
+}

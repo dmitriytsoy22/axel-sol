@@ -14,7 +14,7 @@ export default function AdminPage() {
 
   return (
     <AdminGuard>
-      <main className="min-h-screen pt-24 pb-16">
+      <main className="min-h-screen pt-24 pb-16 bg-slate-950">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-8 relative">
             <div className="absolute -top-12 -left-12 h-64 w-64 rounded-full bg-cyan-500/10 blur-[100px]" />
