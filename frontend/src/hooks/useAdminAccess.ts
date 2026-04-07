@@ -7,8 +7,7 @@ import { ProjectState } from '@/types/project';
 
 /**
  * Hook to determine if the currently connected wallet is the admin of any project.
- * For now, it checks if the wallet matches the `admin` field of the first project
- * in the mock data, but could easily be adapted to a specific project.
+ * Checks if the wallet matches the `admin` field on the on-chain ProjectState.
  */
 export function useAdminAccess(): {
   isAdmin: boolean;

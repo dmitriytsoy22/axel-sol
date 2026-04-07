@@ -6,9 +6,9 @@ import { useTelemetry } from '@/hooks/useTelemetry';
 import { Activity, Route, Banknote, Car, AlertTriangle } from 'lucide-react';
 import { RpcErrorBoundary } from '@/components/shared/RpcErrorBoundary';
 
-function TelemetryWidgetContent(): JSX.Element | null {
+function TelemetryWidgetContent({ projectId }: { projectId: string }): JSX.Element | null {
   const t = useTranslations('Telemetry');
-  const { data, isLoading, error, isStale } = useTelemetry();
+  const { data, isLoading, error, isStale } = useTelemetry(projectId);
 
   if (error) {
     throw error;
@@ -133,11 +133,11 @@ function TelemetryWidgetContent(): JSX.Element | null {
   );
 }
 
-export function TelemetryWidget(): JSX.Element {
-  const { refetch } = useTelemetry();
+export function TelemetryWidget({ projectId }: { projectId: string }): JSX.Element {
+  const { refetch } = useTelemetry(projectId);
   return (
     <RpcErrorBoundary onReset={refetch}>
-      <TelemetryWidgetContent />
+      <TelemetryWidgetContent projectId={projectId} />
     </RpcErrorBoundary>
   );
 }

@@ -57,13 +57,12 @@ export function DepositRevenueForm({ project }: DepositRevenueFormProps) {
     setIsDepositing(true);
     try {
       // Create instruction
-      const instruction = buildDepositRevenueInstruction({
-        adminWallet: publicKey,
-        // Mock project PDA mapping
-        projectPda: PublicKey.default,
-        revenuePeriodPda: PublicKey.default,
-        amount: netProfit * 1_000_000_000, // Lamports
-        periodId: 1, // Mock
+      const instruction = await buildDepositRevenueInstruction({
+        wallet: { publicKey, signTransaction: async (tx: any) => tx, signAllTransactions: async (txs: any[]) => txs },
+        connection,
+        mint: new PublicKey(project.mint),
+        periodIndex: project.periodCount,
+        amount: Math.floor(netProfit * 1_000_000_000),
       });
 
       const transaction = new Transaction().add(instruction);

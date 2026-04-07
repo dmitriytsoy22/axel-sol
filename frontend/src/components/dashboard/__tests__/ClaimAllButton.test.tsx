@@ -35,12 +35,12 @@ describe('ClaimAllButton', () => {
     {
       period: {
         index: 1,
-        projectPda: 'Proj1' as any,
-        periodLabel: 'Q1',
+        project: 'Proj1',
         totalDeposited: 100,
         tokenSupplySnapshot: 1000,
-        depositTxSignature: 'sig',
-        createdAt: 1234
+        depositedAt: 1234,
+        bump: 255,
+        pda: 'pda1',
       },
       status: 'claimable',
       claimableShare: 10,
@@ -48,12 +48,12 @@ describe('ClaimAllButton', () => {
     {
       period: {
         index: 2,
-        projectPda: 'Proj2' as any,
-        periodLabel: 'Q2',
+        project: 'Proj2',
         totalDeposited: 100,
         tokenSupplySnapshot: 1000,
-        depositTxSignature: 'sig',
-        createdAt: 1234
+        depositedAt: 1234,
+        bump: 254,
+        pda: 'pda2',
       },
       status: 'claimed',
       claimableShare: 10,

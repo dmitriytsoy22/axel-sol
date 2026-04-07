@@ -27,7 +27,7 @@ export default function PayoutsPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">{t('totalClaimed')}</p>
-                <p className="text-2xl font-bold text-gray-900">${summary.totalClaimed.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">{summary.totalClaimed.toFixed(4)} SOL</p>
               </div>
             </div>
           </Card>
@@ -39,7 +39,7 @@ export default function PayoutsPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">{t('unclaimed')}</p>
-                <p className="text-2xl font-bold text-gray-900">${summary.unclaimed.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">{summary.unclaimed.toFixed(4)} SOL</p>
               </div>
             </div>
           </Card>

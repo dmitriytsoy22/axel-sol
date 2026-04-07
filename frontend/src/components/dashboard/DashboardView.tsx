@@ -44,7 +44,9 @@ function DashboardContent(): JSX.Element {
           unclaimedRevenue={summary.unclaimedRevenue} 
         />
       )}
-      <TelemetryWidget />
+      {holdings.length > 0 && (
+        <TelemetryWidget projectId={holdings[0].project.mint} />
+      )}
       <HoldingsTable holdings={holdings} />
       <RevenuePeriodsCard periods={revenuePeriods} />
     </div>

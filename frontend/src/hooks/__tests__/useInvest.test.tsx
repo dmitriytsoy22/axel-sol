@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useInvest } from '../useInvest';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, TransactionInstruction } from '@solana/web3.js';
 import { NextIntlClientProvider } from 'next-intl';
 import { ToastProvider } from '@/components/ui/toast/ToastProvider';
 
@@ -30,22 +30,26 @@ vi.mock('@solana/wallet-adapter-react', () => ({
   useConnection: vi.fn(),
 }));
 
-vi.mock('@/lib/solana/pda', () => ({
-  deriveProjectState: vi.fn(() => {
-    const { PublicKey } = require('@solana/web3.js');
-    return [new PublicKey('11111111111111111111111111111111'), 255];
-  }),
-  deriveInvestorRecord: vi.fn(() => {
-    const { PublicKey } = require('@solana/web3.js');
-    return [new PublicKey('11111111111111111111111111111111'), 255];
-  }),
+vi.mock('@/hooks/useTransactionConfirmation', () => ({
+  useTransactionConfirmation: vi.fn(() => ({
+    confirmTransaction: vi.fn().mockResolvedValue({ success: true, error: null }),
+  })),
+}));
+
+vi.mock('@/lib/solana/instructions', () => ({
+  buildBuyTokensInstruction: vi.fn(() =>
+    Promise.resolve(
+      new TransactionInstruction({
+        keys: [],
+        programId: new PublicKey('11111111111111111111111111111111'),
+      })
+    )
+  ),
 }));
 
 describe('useInvest hook', () => {
   const mockSendTransaction = vi.fn();
-  const mockGetBalance = vi.fn();
   const mockGetLatestBlockhash = vi.fn();
-  const mockConfirmTransaction = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -57,19 +61,15 @@ describe('useInvest hook', () => {
 
     (useConnection as any).mockReturnValue({
       connection: {
-        getBalance: mockGetBalance,
         getLatestBlockhash: mockGetLatestBlockhash,
-        confirmTransaction: mockConfirmTransaction,
       },
     });
 
-    mockGetBalance.mockResolvedValue(10 * 10 ** 9); // 10 SOL
     mockGetLatestBlockhash.mockResolvedValue({
       blockhash: 'dummy',
       lastValidBlockHeight: 123,
     });
     mockSendTransaction.mockResolvedValue('signature_id');
-    mockConfirmTransaction.mockResolvedValue({ value: { err: null } });
   });
 
   it('initializes with idle state', () => {
@@ -80,59 +80,48 @@ describe('useInvest hook', () => {
 
   it('handles successful investment flow', async () => {
     const { result } = renderHook(() => useInvest(), { wrapper });
-    
+
     await act(async () => {
-      await result.current.invest('Project111111111111111111111111111111111111', 1, 0.5, 5); // 1 SOL
+      await result.current.invest(
+        '11111111111111111111111111111111',
+        10,
+        '11111111111111111111111111111111'
+      );
     });
 
     expect(result.current.state).toBe('success');
-    expect(mockGetBalance).toHaveBeenCalled();
     expect(mockSendTransaction).toHaveBeenCalled();
   });
 
-  it('fails if amount < minInvestment', async () => {
+  it('fails if wallet is not connected', async () => {
+    (useWallet as any).mockReturnValue({ publicKey: null });
     const { result } = renderHook(() => useInvest(), { wrapper });
-    
+
     await act(async () => {
-      await result.current.invest('proj111', 0.1, 0.5, 5);
+      await result.current.invest(
+        '11111111111111111111111111111111',
+        10,
+        '11111111111111111111111111111111'
+      );
     });
 
     expect(result.current.state).toBe('error');
-    expect(result.current.errorMsg).toBe('validationMin');
+    expect(result.current.errorMsg).toBe('Wallet not connected');
   });
 
-  it('fails if amount > maxInvestment', async () => {
-    const { result } = renderHook(() => useInvest(), { wrapper });
-    
-    await act(async () => {
-      await result.current.invest('proj111', 10, 0.5, 5);
-    });
-
-    expect(result.current.state).toBe('error');
-    expect(result.current.errorMsg).toBe('validationMax');
-  });
-
-  it('fails if balance is insufficient', async () => {
-    mockGetBalance.mockResolvedValue(0.1 * 10 ** 9); // 0.1 SOL
-    const { result } = renderHook(() => useInvest(), { wrapper });
-    
-    await act(async () => {
-      await result.current.invest('proj111', 1, 0.5, 5);
-    });
-
-    expect(result.current.state).toBe('error');
-    expect(result.current.errorMsg).toBe('validationBalance');
-  });
-
-  it('returns an Anchor error specific translation string if error pattern matches', async () => {
-    mockSendTransaction.mockRejectedValue(new Error('Simulation failed: Instruction failed. Custom Error: 0x1770'));
+  it('returns Anchor error code if error pattern matches', async () => {
+    mockSendTransaction.mockRejectedValue(new Error('Simulation failed: Custom Error: 0x1770'));
     const { result } = renderHook(() => useInvest(), { wrapper });
 
     await act(async () => {
-       await result.current.invest('proj111', 1, 0.5, 5);
+      await result.current.invest(
+        '11111111111111111111111111111111',
+        10,
+        '11111111111111111111111111111111'
+      );
     });
 
     expect(result.current.state).toBe('error');
-    expect(result.current.errorMsg).toBe('0x1770'); // Expected to be mapped out to "Project is not in Fundraising state." by consumer
+    expect(result.current.errorMsg).toBe('0x1770');
   });
 });

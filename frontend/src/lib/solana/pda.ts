@@ -1,122 +1,89 @@
 import { PublicKey } from '@solana/web3.js';
+import { PROGRAM_ID } from './connection';
 
 /**
- * TODO: Real PDA derivation seeds will be provided by Dev B (Smart Contract Developer).
- * The current seeds are placeholders for frontend development.
- */
-
-/**
- * Derives the PDA for a Project State.
- * 
- * @param programId - The smart contract program ID
- * @param projectSeed - A unique identifier/seed for the project
- * @returns The PDA PublicKey and bump seed
+ * Derives the ProjectState PDA.
+ * Seeds: ["project", mint]
  */
 export function deriveProjectState(
-  programId: PublicKey,
-  projectSeed: string
+  mint: PublicKey,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from('project'), // TODO: placeholder seed
-      Buffer.from(projectSeed)
-    ],
-    programId
+    [Buffer.from('project'), mint.toBuffer()],
+    PROGRAM_ID,
   );
 }
 
 /**
- * Derives the PDA for an Investor's Record within a specific project.
- * 
- * @param programId - The smart contract program ID
- * @param projectPda - The PDA of the project
- * @param walletPubkey - The public key of the investor's wallet
- * @returns The PDA PublicKey and bump seed
+ * Derives the Revenue Vault PDA (system-owned, holds SOL).
+ * Seeds: ["revenue", mint]
  */
-export function deriveInvestorRecord(
-  programId: PublicKey,
-  projectPda: PublicKey,
-  walletPubkey: PublicKey
+export function deriveRevenueVault(
+  mint: PublicKey,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from('investor'), // TODO: placeholder seed
-      projectPda.toBuffer(),
-      walletPubkey.toBuffer()
-    ],
-    programId
+    [Buffer.from('revenue'), mint.toBuffer()],
+    PROGRAM_ID,
   );
 }
 
 /**
- * Derives the PDA for a Whitelist Entry for a specific project.
- * 
- * @param programId - The smart contract program ID
- * @param projectPda - The PDA of the project
- * @param walletPubkey - The public key of the user being whitelisted
- * @returns The PDA PublicKey and bump seed
+ * Derives a WhitelistEntry PDA.
+ * Seeds: ["whitelist", wallet]
  */
 export function deriveWhitelistEntry(
-  programId: PublicKey,
-  projectPda: PublicKey,
-  walletPubkey: PublicKey
+  wallet: PublicKey,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from('whitelist'), // TODO: placeholder seed
-      projectPda.toBuffer(),
-      walletPubkey.toBuffer()
-    ],
-    programId
+    [Buffer.from('whitelist'), wallet.toBuffer()],
+    PROGRAM_ID,
   );
 }
 
 /**
- * Derives the PDA for a Revenue Period of a project.
- * 
- * @param programId - The smart contract program ID
- * @param projectPda - The PDA of the project
- * @param periodIndex - The index or ID of the specific revenue period
- * @returns The PDA PublicKey and bump seed
+ * Derives a RevenuePeriod PDA.
+ * Seeds: ["revenue_period", mint, period_index_le]
  */
 export function deriveRevenuePeriod(
-  programId: PublicKey,
-  projectPda: PublicKey,
-  periodIndex: number
+  mint: PublicKey,
+  periodIndex: number,
 ): [PublicKey, number] {
-  // Convert periodIndex to an 8-byte LE buffer, assuming u64 representation on-chain
-  const periodBuffer = Buffer.alloc(8);
-  periodBuffer.writeBigUInt64LE(BigInt(periodIndex), 0);
+  const indexBuffer = Buffer.alloc(4);
+  indexBuffer.writeUInt32LE(periodIndex);
 
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from('revenue_period'), // TODO: placeholder seed
-      projectPda.toBuffer(),
-      periodBuffer
-    ],
-    programId
+    [Buffer.from('revenue_period'), mint.toBuffer(), indexBuffer],
+    PROGRAM_ID,
   );
 }
 
 /**
- * Derives the PDA for a Claim Record by an investor for a specific revenue period.
- * 
- * @param programId - The smart contract program ID
- * @param periodPda - The PDA of the revenue period
- * @param walletPubkey - The public key of the investor claiming revenue
- * @returns The PDA PublicKey and bump seed
+ * Derives a ClaimRecord PDA.
+ * Seeds: ["claim", revenue_period_pda, wallet]
  */
 export function deriveClaimRecord(
-  programId: PublicKey,
-  periodPda: PublicKey,
-  walletPubkey: PublicKey
+  revenuePeriodPda: PublicKey,
+  wallet: PublicKey,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from('claim_record'), // TODO: placeholder seed
-      periodPda.toBuffer(),
-      walletPubkey.toBuffer()
-    ],
-    programId
+    [Buffer.from('claim'), revenuePeriodPda.toBuffer(), wallet.toBuffer()],
+    PROGRAM_ID,
+  );
+}
+
+/**
+ * Derives a TelemetryRecord PDA.
+ * Seeds: ["telemetry", mint, date_le]
+ */
+export function deriveTelemetryRecord(
+  mint: PublicKey,
+  date: number,
+): [PublicKey, number] {
+  const dateBuffer = Buffer.alloc(4);
+  dateBuffer.writeUInt32LE(date);
+
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('telemetry'), mint.toBuffer(), dateBuffer],
+    PROGRAM_ID,
   );
 }

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { TelemetryData } from '@/types/telemetry';
 
-export function useTelemetry(staleTimeoutMs = 60 * 60 * 1000): {
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
+export function useTelemetry(projectId: string, staleTimeoutMs = 60 * 60 * 1000): {
   data: TelemetryData | null;
   isLoading: boolean;
   error: Error | null;
@@ -31,7 +33,7 @@ export function useTelemetry(staleTimeoutMs = 60 * 60 * 1000): {
         // Simulate network delay
         await new Promise(resolve => setTimeout(resolve, 800));
 
-        const response = await fetch('/telemetry/latest');
+        const response = await fetch(`${API_BASE_URL}/telemetry/latest/${projectId}`);
         if (!response.ok) {
           throw new Error('Failed to fetch telemetry data');
         }

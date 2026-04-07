@@ -2,7 +2,7 @@
 
 **Role:** russh (Backend) (NestJS, minimal — no database)
 **Prepared by:** Product Owner / System Analyst
-**Last updated:** 2026-03-28
+**Last updated:** 2026-04-06 (post-implementation refresh)
 
 ---
 
@@ -64,37 +64,38 @@ Yandex Pro API
 
 **Business goal:** Daily proof that the tokenized taxi is actually operating — verifiable on-chain by any investor.
 
-#### US-B01 — Yandex Pro Daily Ingestion
+#### US-B01 — Yandex Pro Daily Ingestion [DONE]
 
 > As the platform oracle, I want to automatically fetch daily taxi earnings from Yandex Pro API and push a cryptographic proof to Solana so that investors can verify the asset is generating real income.
 
-**Acceptance Criteria:**
+**Status: DONE**
 
-- Scheduled `@Cron` job runs daily at 01:00 (configurable via env var)
-- Authenticates with Yandex Pro API using `vehicle_id` and `api_key` from environment secrets (never hardcoded)
-- Fetches for previous calendar day: `daily_revenue` (tenge), `mileage_km`, `trips_count`, `car_status` (active / maintenance / inactive)
-- Validates response: logs and retries if fields missing or revenue is negative; alerts Sentry after 3 consecutive failures
+- `@Cron` job runs daily at 01:00 (configurable via `CRON_SCHEDULE` env var)
+- `YandexFleetService` calls Yandex Fleet API (`POST /v1/parks/orders/list`) with `X-Client-ID` + `X-API-Key` auth
+- Fetches previous day's completed orders, filters by vehicle license plate (Cyrillic → Latin normalization)
+- Deducts 22% Yandex commission + 2% tx costs (NET_INCOME_FACTOR = 0.76)
 - Computes SHA-256 hash of canonical JSON: `{ date, vehicle_id, daily_revenue, mileage_km, trips_count, car_status }`
-- Signs hash with oracle Ed25519 keypair (loaded from secrets manager at startup, never from env var directly)
-- Calls `record_telemetry` on-chain via `@solana/web3.js`; stores the resulting tx signature in memory (last 30 days rolling, no DB)
-- On RPC failure: retries once with backoff; logs warning but does not throw — oracle failure should not crash the service
+- Oracle keypair loaded from file at startup (`ORACLE_KEYPAIR_PATH`); calls `record_telemetry` on-chain
+- In-memory rolling cache (last 30 days per project, no DB)
+- Retries once on failure; falls back to deterministic simulation if Yandex credentials not configured
+- Orders cached for 5 minutes to prevent Yandex rate limiting; paginates with cursor for large result sets
 
 **Priority:** Must Have | **Phase:** 2
 
 ---
 
-#### US-B02 — Telemetry Read Endpoint
+#### US-B02 — Telemetry Read Endpoint [DONE]
 
 > As a frontend consumer, I want to fetch today's car telemetry figures so that investors can see live earnings on the dashboard.
 
-**Acceptance Criteria:**
+**Status: DONE**
 
-- `GET /telemetry/latest/:project_id` returns the most recent ingested record:
-  `{ date, daily_revenue, mileage_km, trips_count, car_status, solana_tx_signature }`
+- `GET /telemetry/latest/:projectId` returns most recent ingested record:
+  `{ date, dailyRevenue, mileageKm, tripsCount, carStatus, dataHash, solanaTxSignature, stale, available }`
 - Response served from in-memory cache (last result of cron job); no DB query
-- If no data ingested yet today: returns yesterday's record with `{ stale: true }`
+- If no data ingested yet today: returns yesterday's record with `stale: true`
 - If no records at all: returns `{ available: false }`
-- `solana_tx_signature` allows frontend to link to Solana Explorer for verification
+- `solanaTxSignature` allows frontend to link to Solana Explorer for verification
 
 **Priority:** Must Have | **Phase:** 2
 
@@ -104,22 +105,22 @@ Yandex Pro API
 
 **Business goal:** When a KYC provider approves an investor, automatically whitelist them on-chain so they can invest without any manual admin action.
 
-#### US-B03 — KYC Approval Webhook
+#### US-B03 — KYC Approval Webhook [DONE]
 
 > As the platform, I want to receive KYC approval events from Sumsub and immediately whitelist the approved wallet on-chain so that investors can invest as soon as they pass KYC.
 
-**Acceptance Criteria:**
+**Status: DONE**
 
 - `POST /kyc/webhook` receives Sumsub webhook payload
-- Verifies request signature using Sumsub webhook secret (reject with `401` if invalid)
-- Extracts `wallet_address` from the applicant's `externalUserId` field (wallet address is passed to Sumsub at KYC initiation)
+- Verifies HMAC-SHA256 signature from `x-payload-digest` header using `SUMSUB_WEBHOOK_SECRET` (rejects with 401 if invalid; skips check if secret not configured)
+- Extracts wallet address from `externalUserId` field (passed to Sumsub at KYC initiation)
 - On `applicantReviewed` event with `reviewResult.reviewAnswer = GREEN`:
-  - Calls `add_to_whitelist` instruction on-chain (whitelist PDA)
-  - Calls Freeze Authority to unfreeze the investor's token account (if tokens exist)
-  - Logs success with wallet address and Solana tx signature
-- On `RED` result or any other event: logs and returns `200` (webhook must always return 200 to Sumsub)
-- If on-chain call fails: retries once; if still failing, logs to Sentry with full context for manual resolution
-- Idempotent: calling twice for the same wallet is safe (on-chain `add_to_whitelist` is a no-op if already whitelisted)
+  - Loads admin keypair from `ADMIN_KEYPAIR_PATH`
+  - Builds and submits `add_to_whitelist` transaction on-chain
+  - Returns Solana tx signature in response
+- On `RED` result or any other event type: logs and returns 200 (no on-chain action)
+- Retries once on on-chain failure
+- Idempotent: `add_to_whitelist` uses `init_if_needed` — calling twice for the same wallet is safe
 
 **Priority:** Must Have | **Phase:** 2
 
@@ -127,15 +128,15 @@ Yandex Pro API
 
 ### Epic 3: Operations & Health
 
-#### US-B04 — Health Check
+#### US-B04 — Health Check [DONE]
 
 > As the DevOps operator, I want a health check endpoint so that I can monitor that the service is running and connected to Solana RPC.
 
-**Acceptance Criteria:**
+**Status: DONE**
 
-- `GET /health` returns `{ status: "ok", rpc: "connected", oracle: "loaded" }` (503 if RPC unreachable or oracle keypair failed to load)
-- `oracle: "loaded"` confirms the signing keypair was loaded successfully at startup — does NOT expose the key
-- Response time < 200ms
+- `GET /health` returns `{ status: "ok", rpc: "connected", oracle: "loaded" | "not_configured" }`
+- Returns 503 if RPC unreachable
+- `oracle` field confirms whether the signing keypair was loaded at startup — does NOT expose the key
 
 **Priority:** Must Have | **Phase:** 2
 
@@ -169,17 +170,41 @@ Yandex Pro API
 
 ---
 
+## Implementation Status
+
+### DONE
+
+| Item | Files |
+| --- | --- |
+| NestJS scaffold + config module | `backend/src/main.ts`, `backend/src/app.module.ts` |
+| Solana RPC service (global) | `backend/src/solana/solana.service.ts` |
+| Health check endpoint | `backend/src/health/health.controller.ts` |
+| Yandex Fleet API client | `backend/src/yandex/yandex-fleet.service.ts` |
+| Telemetry cron + oracle submission | `backend/src/telemetry/telemetry-cron.service.ts` |
+| Telemetry read endpoint | `backend/src/telemetry/telemetry.controller.ts` |
+| KYC webhook + on-chain whitelist | `backend/src/kyc/kyc.service.ts`, `backend/src/kyc/kyc.controller.ts` |
+
+### TO DO (post-MVP)
+
+| Item | Priority |
+| --- | --- |
+| Sentry error tracking integration | Hardening |
+| Staging deploy (Railway/Render) | Deploy |
+| End-to-end integration testing with Sumsub mock | Integration |
+
+---
+
 ## Phase Delivery Schedule
 
-| Phase | Days | Stories | Key Deliverable |
-| --- | --- | --- | --- |
-| 1 | 1–5 | Setup | NestJS scaffold, env config module, `@solana/web3.js` connected to devnet |
-| 2 | 6–12 | US-B01, US-B02, US-B03, US-B04 | All 3 endpoints + oracle cron working on devnet |
-| 3 | 13–18 | Integration | End-to-end: Sumsub mock → webhook → on-chain whitelist; cron → record_telemetry verified on Explorer |
-| 5 | 24–29 | Hardening | Sentry alerts, retry logic, startup keypair validation, health check |
-| 6 | 30–34 | Deploy | Staging deploy (Railway/Render), smoke test webhook + cron |
+| Phase | Stories | Status |
+| --- | --- | --- |
+| 1 | Setup (scaffold, env, RPC) | DONE |
+| 2 | US-B01, US-B02, US-B03, US-B04 | DONE |
+| 3 | Integration testing | TODO (post-MVP) |
+| 5 | Hardening (Sentry, retries) | TODO (post-MVP) |
+| 6 | Staging deploy | TODO (post-MVP) |
 
-**Phases 4 is skipped** — no reporting, no auth, no admin endpoints to build.
+**Phase 4 is skipped** — no reporting, no auth, no admin endpoints to build.
 
 ---
 
@@ -187,10 +212,10 @@ Yandex Pro API
 
 | Dependency | Provider | Needed By | Blocking? |
 | --- | --- | --- | --- |
-| `record_telemetry` instruction + program ID | ndrkbrg (On-chain) | Phase 2 | Yes — oracle cron calls this |
-| `add_to_whitelist` instruction signature | ndrkbrg (On-chain) | Phase 2 | Yes — KYC webhook calls this |
-| Freeze Authority keypair / multisig interface | ndrkbrg (On-chain) | Phase 2 | Yes — unfreeze after KYC |
-| Sumsub account + webhook secret | Platform ops | Phase 2 | Yes — webhook can't be tested without it |
+| `record_telemetry` instruction + program ID | ndrkbrg (On-chain) | Phase 2 | DONE |
+| `add_to_whitelist` instruction signature | ndrkbrg (On-chain) | Phase 2 | DONE |
+| Freeze Authority keypair / multisig interface | ndrkbrg (On-chain) | Phase 2 | DONE (program PDA is freeze authority) |
+| Sumsub account + webhook secret | Platform ops | Integration | Yes — webhook can't be tested without it |
 
 ---
 

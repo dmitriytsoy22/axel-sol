@@ -23,7 +23,6 @@ function HomePageContent(): JSX.Element {
 
   const statuses: { value: ProjectStatus | 'all'; label: string }[] = [
     { value: 'all', label: tCatalog('filterAll') },
-    { value: 'fundraising', label: tCatalog('statusFundraising') },
     { value: 'active', label: tCatalog('statusActive') },
     { value: 'paused', label: tCatalog('statusPaused') },
     { value: 'closed', label: tCatalog('statusClosed') },

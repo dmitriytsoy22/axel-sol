@@ -28,7 +28,7 @@ export function ClaimButton({ period, onSuccess }: ClaimButtonProps): JSX.Elemen
   }, [state, errorMsg, addToast, reset, onSuccess, t]);
 
   const handleClaim = () => {
-    claim(period.period.projectPda.toString(), period.period.index);
+    claim(period.period.project, period.period.index);
   };
 
   return (

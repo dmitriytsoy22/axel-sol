@@ -36,13 +36,12 @@ describe('HoldingsTable', () => {
           carMake: 'Toyota',
           carModel: 'Camry',
           carYear: 2024,
-          licensePlate: 'ABC',
           imageUrl: '/img.png',
           status: 'active' as const,
           pricePerToken: 1_000_000_000,
         } as any,
-        tokensMinted: 100,
-        solInvested: 1_000_000_000,
+        tokenBalance: 100,
+        ownershipPercentage: 1,
       },
       {
         project: {
@@ -50,13 +49,12 @@ describe('HoldingsTable', () => {
           carMake: 'Tesla',
           carModel: 'Model 3',
           carYear: 2023,
-          licensePlate: 'DEF',
           imageUrl: '/img2.png',
-          status: 'inactive' as const,
+          status: 'closed' as const,
           pricePerToken: 2_000_000_000,
         } as any,
-        tokensMinted: 50,
-        solInvested: 2_000_000_000,
+        tokenBalance: 50,
+        ownershipPercentage: 0.5,
       }
     ];
 
@@ -69,6 +67,6 @@ describe('HoldingsTable', () => {
 
     // Check mint2
     expect(screen.getAllByText('Tesla Model 3')[0]).toBeInTheDocument();
-    expect(screen.getAllByText(/inactive/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/closed/i)[0]).toBeInTheDocument();
   });
 });

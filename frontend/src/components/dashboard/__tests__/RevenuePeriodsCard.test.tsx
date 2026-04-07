@@ -28,12 +28,12 @@ describe('RevenuePeriodsCard', () => {
       {
         period: {
           index: 1,
-          projectPda: 'mint1',
-          periodLabel: 'Q1 2026',
+          project: 'mint1',
           totalDeposited: 500 * 1_000_000_000,
           tokenSupplySnapshot: 1000,
-          depositTxSignature: 'tx1',
-          createdAt: 1000000,
+          depositedAt: 1000000,
+          bump: 255,
+          pda: 'pda1',
         },
         status: 'claimable' as const,
         claimableShare: 20 * 1_000_000_000, // 20 SOL
@@ -41,9 +41,9 @@ describe('RevenuePeriodsCard', () => {
     ];
 
     renderWithTranslations(<RevenuePeriodsCard periods={mockPeriods} />);
-    
+
     expect(screen.getByText('Revenue Periods')).toBeInTheDocument();
-    expect(screen.getByText('Q1 2026')).toBeInTheDocument();
+    expect(screen.getByText(/Period 1/)).toBeInTheDocument();
     expect(screen.getByText('20 SOL')).toBeInTheDocument();
     expect(screen.getByText('Claim Now')).toBeInTheDocument();
   });

@@ -14,26 +14,24 @@ describe('AssetHeader', () => {
     carMake: 'Tesla',
     carModel: 'Model S',
     carYear: 2023,
-    status: 'fundraising',
     vin: '5YJ3E1EA0NF',
-    licensePlate: 'ABC 123',
+    status: 'active',
     imageUrl: '/mock-image.png',
     // Dummy values for the rest
-    admin: 'addr', mint: 'addr', escrowVault: 'addr', revenueVault: 'addr', 
-    totalTokenSupply: 1, tokensRemaining: 1, pricePerToken: 1, 
-    minInvestment: 1, maxInvestment: 1, solRaised: 1, minRaise: 1, 
-    maxRaise: 1, deadline: 1, investorCount: 1,
+    admin: 'addr', mint: 'addr', revenueVault: 'addr',
+    totalTokenSupply: 1, tokensRemaining: 1, pricePerToken: 1,
+    tokensSold: 0, periodCount: 0,
+    oraclePubkey: 'addr', bump: 0, revenueVaultBump: 0,
   };
 
   it('renders correctly', () => {
     render(<AssetHeader project={mockProject} />);
-    
+
     expect(screen.getByText(/Tesla Model S/i)).toBeInTheDocument();
     expect(screen.getByText('2023')).toBeInTheDocument();
     expect(screen.getByText('5YJ3E1EA0NF')).toBeInTheDocument();
-    expect(screen.getByText('ABC 123')).toBeInTheDocument();
-    
+
     // Status translation check
-    expect(screen.getByText('translated_statusFundraising')).toBeInTheDocument();
+    expect(screen.getByText('translated_statusActive')).toBeInTheDocument();
   });
 });

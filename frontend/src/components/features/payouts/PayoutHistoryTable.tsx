@@ -23,7 +23,7 @@ export function PayoutHistoryTable({ data, isLoading }: PayoutHistoryTableProps)
       header: t('tableDeposited'),
       accessorKey: 'deposited',
       sortable: true,
-      cell: (item) => `$${item.deposited.toLocaleString()}`
+      cell: (item) => `${item.deposited.toFixed(4)} SOL`
     },
     {
       header: t('tableShare'),
@@ -35,7 +35,7 @@ export function PayoutHistoryTable({ data, isLoading }: PayoutHistoryTableProps)
       header: t('tableClaim'),
       accessorKey: 'claimAmount',
       sortable: true,
-      cell: (item) => <span className="font-medium text-[#00D1FF]">+${item.claimAmount.toLocaleString()}</span>
+      cell: (item) => <span className="font-medium text-[#00D1FF]">+{item.claimAmount.toFixed(4)} SOL</span>
     },
     {
       header: t('tableStatus'),

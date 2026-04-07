@@ -7,19 +7,15 @@ interface BadgeProps {
 }
 
 export function Badge({ status, children }: BadgeProps): JSX.Element {
-  const isPulsing = status === 'fundraising' || status === 'active';
-  
+  const isPulsing = status === 'active';
+
   const getStatusClasses = (): string => {
     switch (status) {
-      case 'fundraising':
-        return 'bg-brand-primary text-white';
       case 'active':
         return 'bg-green-500 text-white';
       case 'paused':
         return 'bg-yellow-500 text-white';
       case 'closed':
-      case 'finalized':
-      case 'initializing':
         return 'bg-gray-300 text-gray-700';
     }
   };

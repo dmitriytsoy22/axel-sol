@@ -73,8 +73,8 @@ describe('PayoutsPage', () => {
     expect(screen.getByText('Unclaimed')).toBeInTheDocument();
     expect(screen.getByText('Periods')).toBeInTheDocument();
     
-    expect(screen.getByText('$5,200')).toBeInTheDocument();
-    expect(screen.getByText('$400')).toBeInTheDocument();
+    expect(screen.getByText('5200.0000 SOL')).toBeInTheDocument();
+    expect(screen.getByText('400.0000 SOL')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
     
     expect(screen.getByTestId('payout-table-mock')).toBeInTheDocument();

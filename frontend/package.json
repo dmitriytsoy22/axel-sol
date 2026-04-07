@@ -12,12 +12,15 @@
     "test:cov": "vitest run --coverage"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
     "@hookform/resolvers": "^5.2.2",
+    "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
     "@solana/wallet-adapter-wallets": "^0.19.37",
     "@solana/web3.js": "^1.98.4",
+    "bn.js": "^5.2.3",
     "lucide-react": "^1.7.0",
     "next": "^14.2.21",
     "next-intl": "^4.8.3",
@@ -31,6 +34,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/bn.js": "^5.2.0",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

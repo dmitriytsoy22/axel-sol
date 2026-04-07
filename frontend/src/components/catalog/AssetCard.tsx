@@ -16,30 +16,27 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
 
   const getStatusText = (status: ProjectState['status']): string => {
     switch (status) {
-      case 'fundraising': return t('statusFundraising');
       case 'active': return t('statusActive');
       case 'paused': return t('statusPaused');
       case 'closed': return t('statusClosed');
-      case 'finalized': return t('statusFinalized');
-      case 'initializing': return t('statusInitializing');
       default: return status;
     }
   };
 
-  const progress = project.maxRaise > 0 
-    ? (project.solRaised / project.maxRaise) * 100 
-    : 0;
+  const totalValue = project.totalTokenSupply * project.pricePerToken;
+  const soldValue = project.tokensSold * project.pricePerToken;
+  const progress = totalValue > 0 ? (soldValue / totalValue) * 100 : 0;
 
-  const solRaisedFormatted = (project.solRaised / 1_000_000_000).toLocaleString();
-  const maxRaiseFormatted = (project.maxRaise / 1_000_000_000).toLocaleString();
+  const soldFormatted = (soldValue / 1_000_000_000).toLocaleString();
+  const totalFormatted = (totalValue / 1_000_000_000).toLocaleString();
   const priceFormatted = (project.pricePerToken / 1_000_000_000).toLocaleString();
 
   return (
     <Link href={`/assets/${project.mint}`} className="w-full flex">
       <Card className="flex flex-col group cursor-pointer w-full">
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
-          <Image 
-            src={project.imageUrl} 
+          <Image
+            src={project.imageUrl}
             alt={`${project.carMake} ${project.carModel}`}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -51,19 +48,19 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
             </Badge>
           </div>
         </div>
-        
+
         <div className="p-5 flex flex-col flex-1">
           <div className="mb-4">
             <h3 className="text-xl font-semibold text-gray-900 mb-1">
               {project.carMake} {project.carModel} <span className="text-gray-500 font-normal">{project.carYear}</span>
             </h3>
-            <p className="text-sm text-gray-500">{project.vin.slice(0, 10)}... • {project.licensePlate}</p>
+            <p className="text-sm text-gray-500">{project.vin.slice(0, 10)}...</p>
           </div>
 
           <div className="mb-5 flex-1">
             <div className="flex justify-between items-end mb-2">
               <span className="text-sm text-gray-500">{t('raised')}</span>
-              <span className="text-sm font-medium text-gray-900">{solRaisedFormatted} / {maxRaiseFormatted} SOL</span>
+              <span className="text-sm font-medium text-gray-900">{soldFormatted} / {totalFormatted} SOL</span>
             </div>
             <ProgressBar progress={progress} />
           </div>
@@ -74,7 +71,7 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
               <span className="text-lg font-semibold text-brand-primary">{priceFormatted} SOL</span>
             </div>
             <button className="px-5 py-2.5 bg-brand-primary text-white rounded-full text-sm font-medium hover:bg-cyan-600 transition-colors">
-              {project.status === 'fundraising' ? t('investBtn') : t('viewBtn')}
+              {project.status === 'active' ? t('investBtn') : t('viewBtn')}
             </button>
           </div>
         </div>
