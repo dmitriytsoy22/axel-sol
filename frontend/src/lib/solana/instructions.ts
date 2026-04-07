@@ -212,3 +212,42 @@ export async function buildUpdatePriceInstruction(
     })
     .instruction();
 }
+
+/* ── Whitelist Instructions ───────────────────────── */
+
+export interface WhitelistParams {
+  wallet: any;
+  connection: any;
+  targetWallet: PublicKey;
+}
+
+export async function buildAddToWhitelistInstruction(
+  params: WhitelistParams,
+): Promise<TransactionInstruction> {
+  const program = getProgramWithWallet(params.wallet, params.connection);
+  const [whitelistPda] = deriveWhitelistEntry(params.targetWallet);
+
+  return await program.methods
+    .addToWhitelist(params.targetWallet)
+    .accountsPartial({
+      admin: params.wallet.publicKey,
+      whitelistEntry: whitelistPda,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+}
+
+export async function buildRemoveFromWhitelistInstruction(
+  params: WhitelistParams,
+): Promise<TransactionInstruction> {
+  const program = getProgramWithWallet(params.wallet, params.connection);
+  const [whitelistPda] = deriveWhitelistEntry(params.targetWallet);
+
+  return await program.methods
+    .removeFromWhitelist(params.targetWallet)
+    .accountsPartial({
+      admin: params.wallet.publicKey,
+      whitelistEntry: whitelistPda,
+    })
+    .instruction();
+}

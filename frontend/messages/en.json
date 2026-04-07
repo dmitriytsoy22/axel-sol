@@ -167,7 +167,12 @@
     "resumeProject": "Resume Project",
     "closeProject": "Close Project",
     "pauseWarning": "Investors won't be able to buy or claim tokens.",
-    "closeWarning": "Irreversible action. Closes the project permanently."
+    "closeWarning": "Irreversible action. Closes the project permanently.",
+    "whitelistTitle": "Whitelist Management",
+    "whitelistDesc": "Approve or remove investor wallets. Approved wallets can buy and transfer tokens.",
+    "walletAddress": "Wallet Address",
+    "whitelistAdd": "Approve",
+    "whitelistRemove": "Remove"
   },
   "Security": {
     "invalidAddress": "Invalid Solana address detected.",

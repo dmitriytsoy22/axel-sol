@@ -6,6 +6,7 @@ import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { AdminMetrics } from '@/components/admin/AdminMetrics';
 import { DepositRevenueForm } from '@/components/admin/DepositRevenueForm';
 import { ProjectControls } from '@/components/admin/ProjectControls';
+import { WhitelistManager } from '@/components/admin/WhitelistManager';
 
 export default function AdminPage() {
   const t = useTranslations('Admin');
@@ -26,6 +27,7 @@ export default function AdminPage() {
             {project && isAdmin && (
               <>
                 <AdminMetrics project={project} />
+                <WhitelistManager />
                 <DepositRevenueForm project={project} />
                 <ProjectControls project={project} />
               </>

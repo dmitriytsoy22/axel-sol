@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -10,6 +10,7 @@ import { FundingProgress } from '@/components/asset/FundingProgress';
 import { InvestmentDetails } from '@/components/asset/InvestmentDetails';
 import { RevenueProjection } from '@/components/asset/RevenueProjection';
 import { InvestButton } from '@/components/asset/InvestButton';
+import { InvestModal } from '@/components/invest/InvestModal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ArrowLeft } from 'lucide-react';
 import { RpcErrorBoundary } from '@/components/shared/RpcErrorBoundary';
@@ -20,6 +21,7 @@ function AssetDetailsContent(): React.JSX.Element {
   const t = useTranslations('Asset');
   
   const { projects, isLoading, error, refetch } = useProjectState();
+  const [isInvestModalOpen, setIsInvestModalOpen] = useState(false);
 
   if (error) {
     throw error;
@@ -115,9 +117,9 @@ function AssetDetailsContent(): React.JSX.Element {
           
           {/* Desktop Invest Button */}
           <div className="hidden md:block mt-2">
-            <InvestButton 
-              isKycCompleted={true} 
-              onInvestClick={() => console.log('Invest Clicked')} 
+            <InvestButton
+              isKycCompleted={true}
+              onInvestClick={() => setIsInvestModalOpen(true)}
             />
           </div>
         </div>
@@ -125,11 +127,21 @@ function AssetDetailsContent(): React.JSX.Element {
 
       {/* Mobile Sticky Invest Area */}
       <div className="fixed bottom-0 left-0 right-0 p-4 pb-safe bg-white/80 backdrop-blur-xl border-t border-gray-100 md:hidden z-40">
-        <InvestButton 
-          isKycCompleted={true} 
-          onInvestClick={() => console.log('Invest Clicked')} 
+        <InvestButton
+          isKycCompleted={true}
+          onInvestClick={() => setIsInvestModalOpen(true)}
         />
       </div>
+
+      {/* Invest Modal */}
+      <InvestModal
+        isOpen={isInvestModalOpen}
+        onClose={() => setIsInvestModalOpen(false)}
+        projectMint={project.mint}
+        adminPubkey={project.admin}
+        pricePerToken={project.pricePerToken}
+        tokensRemaining={project.tokensRemaining}
+      />
     </div>
   );
 }

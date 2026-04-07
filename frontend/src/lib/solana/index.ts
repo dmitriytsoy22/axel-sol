@@ -34,4 +34,6 @@ export {
   buildResumeProjectInstruction,
   buildCloseProjectInstruction,
   buildUpdatePriceInstruction,
+  buildAddToWhitelistInstruction,
+  buildRemoveFromWhitelistInstruction,
 } from './instructions';

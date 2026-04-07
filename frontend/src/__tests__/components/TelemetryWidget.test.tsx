@@ -28,7 +28,7 @@ const messages = {
 const renderWidget = () => {
   return render(
     <NextIntlClientProvider messages={messages} locale="en">
-      <TelemetryWidget />
+      <TelemetryWidget projectId="testMintAddress" />
     </NextIntlClientProvider>
   );
 };
