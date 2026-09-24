@@ -7,8 +7,8 @@
 
 import { Connection, PublicKey } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@coral-xyz/anchor';
-import type { Axel } from '../../../../target/types/axel';
-import IDL from '../../../../target/idl/axel.json';
+import type { Axel } from './idl/axel';
+import IDL from './idl/axel.json';
 
 const SOLANA_RPC_URL =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';

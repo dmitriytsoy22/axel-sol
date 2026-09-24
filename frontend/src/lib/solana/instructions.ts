@@ -1,8 +1,8 @@
 import { PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
-import type { Axel } from '../../../../target/types/axel';
-import IDL from '../../../../target/idl/axel.json';
+import type { Axel } from './idl/axel';
+import IDL from './idl/axel.json';
 import { PROGRAM_ID } from './connection';
 import {
   deriveProjectState,

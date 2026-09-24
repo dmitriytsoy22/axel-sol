@@ -8,12 +8,12 @@ const cspHeader = `
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data: https://images.unsplash.com;
     font-src 'self';
-    connect-src 'self' https://*.helius-rpc.com https://api.devnet.solana.com https://api.mainnet-beta.solana.com http://localhost:*;
+    connect-src 'self' https://*.helius-rpc.com wss://*.helius-rpc.com https://api.devnet.solana.com wss://api.devnet.solana.com https://api.mainnet-beta.solana.com wss://api.mainnet-beta.solana.com http://localhost:*;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
     frame-ancestors 'none';
-    upgrade-insecure-requests;
+    ${process.env.NODE_ENV === 'production' ? 'upgrade-insecure-requests;' : ''}
 `;
 
 /** @type {import('next').NextConfig} */

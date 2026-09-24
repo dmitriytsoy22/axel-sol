@@ -1,0 +1,1349 @@
+{
+  "address": "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M",
+  "metadata": {
+    "name": "axel",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "add_to_whitelist",
+      "discriminator": [
+        157,
+        211,
+        52,
+        54,
+        144,
+        81,
+        5,
+        55
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "whitelist_entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "buy_tokens",
+      "discriminator": [
+        189,
+        21,
+        230,
+        133,
+        247,
+        2,
+        110,
+        42
+      ],
+      "accounts": [
+        {
+          "name": "investor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "writable": true
+        },
+        {
+          "name": "project_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "investor_token_account",
+          "writable": true
+        },
+        {
+          "name": "whitelist_entry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "investor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_extensions_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "claim_revenue",
+      "discriminator": [
+        4,
+        22,
+        151,
+        70,
+        183,
+        79,
+        73,
+        189
+      ],
+      "accounts": [
+        {
+          "name": "investor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "revenue_period",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  112,
+                  101,
+                  114,
+                  105,
+                  111,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              },
+              {
+                "kind": "arg",
+                "path": "period_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "revenue_vault",
+          "writable": true
+        },
+        {
+          "name": "claim_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_period"
+              },
+              {
+                "kind": "account",
+                "path": "investor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "investor_token_account"
+        },
+        {
+          "name": "token_extensions_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "period_index",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "close_project",
+      "discriminator": [
+        117,
+        209,
+        53,
+        106,
+        93,
+        55,
+        112,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "project_state"
+          ]
+        },
+        {
+          "name": "project_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "revenue_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  101,
+                  110,
+                  117,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "deposit_revenue",
+      "discriminator": [
+        224,
+        212,
+        82,
+        100,
+        60,
+        240,
+        220,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "project_state"
+          ]
+        },
+        {
+          "name": "project_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "revenue_vault",
+          "writable": true
+        },
+        {
+          "name": "revenue_period",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  112,
+                  101,
+                  114,
+                  105,
+                  111,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              },
+              {
+                "kind": "arg",
+                "path": "period_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "period_index",
+          "type": "u32"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_project",
+      "discriminator": [
+        69,
+        126,
+        215,
+        37,
+        20,
+        60,
+        73,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "revenue_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  101,
+                  110,
+                  117,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_extensions_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "InitializeProjectParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "pause_project",
+      "discriminator": [
+        8,
+        68,
+        240,
+        82,
+        45,
+        162,
+        129,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "project_state"
+          ]
+        },
+        {
+          "name": "project_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "record_telemetry",
+      "discriminator": [
+        42,
+        253,
+        255,
+        103,
+        185,
+        29,
+        208,
+        94
+      ],
+      "accounts": [
+        {
+          "name": "oracle",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "telemetry_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  101,
+                  108,
+                  101,
+                  109,
+                  101,
+                  116,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              },
+              {
+                "kind": "arg",
+                "path": "date"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "date",
+          "type": "u32"
+        },
+        {
+          "name": "data_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "remove_from_whitelist",
+      "discriminator": [
+        7,
+        144,
+        216,
+        239,
+        243,
+        236,
+        193,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "whitelist_entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "wallet"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "resume_project",
+      "discriminator": [
+        11,
+        74,
+        18,
+        128,
+        57,
+        187,
+        127,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "project_state"
+          ]
+        },
+        {
+          "name": "project_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "revoke_mint_authority",
+      "discriminator": [
+        140,
+        52,
+        61,
+        238,
+        209,
+        157,
+        189,
+        32
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "project_state"
+          ]
+        },
+        {
+          "name": "project_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "token_extensions_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_price",
+      "discriminator": [
+        61,
+        34,
+        117,
+        155,
+        75,
+        34,
+        123,
+        208
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "project_state"
+          ]
+        },
+        {
+          "name": "project_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project_state.mint",
+                "account": "ProjectState"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_price_per_share",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ClaimRecord",
+      "discriminator": [
+        57,
+        229,
+        0,
+        9,
+        65,
+        62,
+        96,
+        7
+      ]
+    },
+    {
+      "name": "ProjectState",
+      "discriminator": [
+        41,
+        49,
+        200,
+        239,
+        125,
+        191,
+        219,
+        242
+      ]
+    },
+    {
+      "name": "RevenuePeriod",
+      "discriminator": [
+        56,
+        54,
+        193,
+        254,
+        205,
+        149,
+        212,
+        70
+      ]
+    },
+    {
+      "name": "TelemetryRecord",
+      "discriminator": [
+        141,
+        116,
+        168,
+        113,
+        181,
+        239,
+        96,
+        44
+      ]
+    },
+    {
+      "name": "WhitelistEntry",
+      "discriminator": [
+        51,
+        70,
+        173,
+        81,
+        219,
+        192,
+        234,
+        62
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidTokenSupplyDivision",
+      "msg": "Car cost must be exactly divisible by price per share"
+    },
+    {
+      "code": 6001,
+      "name": "ZeroPricePerShare",
+      "msg": "Price per share must be greater than zero"
+    },
+    {
+      "code": 6002,
+      "name": "ProjectNotActive",
+      "msg": "Project is not Active"
+    },
+    {
+      "code": 6003,
+      "name": "InvestorNotWhitelisted",
+      "msg": "Investor is not whitelisted"
+    },
+    {
+      "code": 6004,
+      "name": "ZeroPurchase",
+      "msg": "Token amount must be greater than zero"
+    },
+    {
+      "code": 6005,
+      "name": "InsufficientVaultBalance",
+      "msg": "Vault does not have enough tokens"
+    },
+    {
+      "code": 6006,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6007,
+      "name": "Unauthorized",
+      "msg": "Unauthorized: signer is not admin"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidRevenueVault",
+      "msg": "Revenue vault address mismatch"
+    },
+    {
+      "code": 6009,
+      "name": "ZeroDepositAmount",
+      "msg": "Deposit amount must be greater than zero"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidPeriodIndex",
+      "msg": "Period index does not match expected next period"
+    },
+    {
+      "code": 6011,
+      "name": "NoTokensSold",
+      "msg": "No tokens have been sold yet"
+    },
+    {
+      "code": 6012,
+      "name": "RevenuePeriodMismatch",
+      "msg": "Revenue period does not belong to this project"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidTokenAccount",
+      "msg": "Invalid token account"
+    },
+    {
+      "code": 6014,
+      "name": "ZeroTokenBalance",
+      "msg": "Investor holds zero tokens"
+    },
+    {
+      "code": 6015,
+      "name": "ZeroPayout",
+      "msg": "Calculated payout is zero"
+    },
+    {
+      "code": 6016,
+      "name": "ProjectNotPaused",
+      "msg": "Project is not Paused"
+    },
+    {
+      "code": 6017,
+      "name": "UnauthorizedOracle",
+      "msg": "Signer is not the registered oracle"
+    },
+    {
+      "code": 6018,
+      "name": "TokensStillAvailable",
+      "msg": "Cannot revoke mint authority while tokens are still available for sale"
+    },
+    {
+      "code": 6019,
+      "name": "ProjectAlreadyClosed",
+      "msg": "Project is already closed"
+    }
+  ],
+  "types": [
+    {
+      "name": "ClaimRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claimed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeProjectParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "car_cost_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "price_per_share_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "transfer_hook_program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracle_pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_name",
+            "type": "string"
+          },
+          {
+            "name": "token_symbol",
+            "type": "string"
+          },
+          {
+            "name": "token_uri",
+            "type": "string"
+          },
+          {
+            "name": "vin",
+            "type": "string"
+          },
+          {
+            "name": "make",
+            "type": "string"
+          },
+          {
+            "name": "model",
+            "type": "string"
+          },
+          {
+            "name": "year",
+            "type": "u16"
+          },
+          {
+            "name": "valuation_sol",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProjectState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "revenue_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_supply",
+            "docs": [
+              "Total token supply (max that can ever be minted)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tokens_sold",
+            "docs": [
+              "Tokens sold so far"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "price_per_share",
+            "docs": [
+              "Price per share in lamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "ProjectStatus"
+              }
+            }
+          },
+          {
+            "name": "period_count",
+            "docs": [
+              "Number of completed revenue distribution periods"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "oracle_pubkey",
+            "docs": [
+              "Oracle authority that can submit telemetry"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "revenue_vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProjectStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Paused"
+          },
+          {
+            "name": "Closed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevenuePeriod",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "project",
+            "type": "pubkey"
+          },
+          {
+            "name": "period_index",
+            "type": "u32"
+          },
+          {
+            "name": "total_deposited",
+            "docs": [
+              "Total revenue deposited for this period (lamports)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "token_supply_snapshot",
+            "docs": [
+              "Token supply snapshot at time of deposit"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "deposited_at",
+            "docs": [
+              "When the revenue was deposited (Unix timestamp)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TelemetryRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "project",
+            "type": "pubkey"
+          },
+          {
+            "name": "date",
+            "docs": [
+              "Date identifier (e.g. 20260401 for 2026-04-01)"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "data_hash",
+            "docs": [
+              "SHA-256 hash of the Yandex Pro telemetry data"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "oracle_pubkey",
+            "docs": [
+              "Oracle that submitted this record"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "recorded_at",
+            "docs": [
+              "When recorded (Unix timestamp)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WhitelistEntry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "approved",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
