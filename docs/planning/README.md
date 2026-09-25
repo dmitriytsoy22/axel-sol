@@ -29,7 +29,7 @@ The Russian project overview, [../ru/project-overview.md](../ru/project-overview
 | Sign-In with Solana (SIWS) (`plan_frontend.md`, `plan_backend.md`, `development_plan.md`) | Not implemented. The admin panel compares the connected wallet with `ProjectState.admin`. |
 | Sentry, Pino structured logging, Joi env validation, fail-fast startup (`development_plan.md`, `plan_backend.md`) | None of these are in the backend. It uses the NestJS `Logger`, and missing keys only log a warning and disable the feature. |
 | Phantom and Backpack wallets (`development_plan.md`, `plan_frontend.md`) | Phantom and Solflare |
-| `RwaClient` SDK with `invest()`, `harvestTransferFees()`, `unfreezeAccount()` (`development_plan.md`) | Not written. The Codama output in `sdk/generated` is stale (see [../api.md](../api.md#codama-sdk-sdkgenerated)). |
+| `RwaClient` SDK with `invest()`, `harvestTransferFees()`, `unfreezeAccount()` (`development_plan.md`) | Not written. The stale v1 Codama output was removed; `sdk/axel-v2` is a generated client of the v2 program (see [../v2.md](../v2.md#idl-and-typescript-client)). |
 | `close_project` does "cleanup and rent reclaim" (spec §4) | It sweeps the revenue vault to the admin and sets status Closed. No accounts are closed. |
 | Deposit snapshot "prevents manipulation (buying tokens right before payout)" (`ru/project-overview.md`) | Only the denominator is snapshotted. Payouts use the claimant's current balance ([limitation 2](../architecture.md#known-limitations)). |
 | Routes: `/` landing page and `/assets` catalog (`ru/project-overview.md`) | `/` is the catalog. There is no `/assets` index route, only `/assets/[id]`. |

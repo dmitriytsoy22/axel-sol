@@ -343,13 +343,6 @@ export async function buyShares(wallet: AnchorWallet, mint: PublicKey, shares: n
 }
 ```
 
-## Codama SDK (`sdk/generated`)
+## Codama SDK (`sdk/axel-v2`)
 
-`npm run generate` runs `scripts/generate-clients.ts`. The script reads `target/idl/axel.json` (created by `anchor build`) and renders a `@solana/kit` client with `@codama/renderers-js` into `sdk/generated/`.
-
-**The committed output is stale.** It was generated in commit `fb4051c` (2026-04-02) from the Phase 1 IDL, and it does not match the deployed program:
-- It contains only `initializeProject`, with an `escrowVault` account and PDA that no longer exist.
-- Its `ProjectState` still has the old fundraising fields: `escrowVault`, `minRaise`, `maxRaise`, `solRaised` and `deadline`.
-- Its error list includes codes such as `MinRaiseExceedsCarCost` and `DeadlineInPast`.
-
-Nothing in `frontend/`, `backend/`, `tests/` or `scripts/` imports it. Before using it, rebuild the program and run `npm run generate`. That needs the Rust / Anchor toolchain.
+The Codama client covers the v2 program only. `npm run generate` runs `scripts/generate-clients.ts`, which reads `target/idl/axel_v2.json` and renders a `@solana/kit` client into `sdk/axel-v2/src/generated`. See [v2.md](v2.md#idl-and-typescript-client). The stale v1 output that used to live in `sdk/generated` was removed; v1 clients use the vendored IDL in `frontend/src/lib/solana/idl/` with Anchor.

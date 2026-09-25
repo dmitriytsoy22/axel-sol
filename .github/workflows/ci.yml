@@ -66,3 +66,107 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  programs:
+    name: Programs (build, Rust tests, v2 tests on LiteSVM, IDL and SDK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RUST_VERSION: 1.89.0
+      AGAVE_VERSION: 2.3.13
+      ANCHOR_VERSION: 0.32.1
+      # Matches [workspace.metadata.solana] tools-version in Cargo.toml.
+      PLATFORM_TOOLS_VERSION: v1.52
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal --component rustfmt,clippy
+          rustup default "$RUST_VERSION"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache Agave CLI, platform-tools and Anchor CLI
+        id: solana-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana
+            ~/.local/share/anchor
+          key: solana-${{ runner.os }}-agave-${{ env.AGAVE_VERSION }}-tools-${{ env.PLATFORM_TOOLS_VERSION }}-anchor-${{ env.ANCHOR_VERSION }}
+
+      - name: Install Agave CLI and Anchor CLI
+        if: steps.solana-cache.outputs.cache-hit != 'true'
+        run: |
+          sh -c "$(curl -sSfL "https://release.anza.xyz/v${AGAVE_VERSION}/install")"
+          mkdir -p ~/.local/share/anchor
+          curl -sSfL -o ~/.local/share/anchor/anchor \
+            "https://github.com/solana-foundation/anchor/releases/download/v${ANCHOR_VERSION}/anchor-${ANCHOR_VERSION}-x86_64-unknown-linux-gnu"
+          chmod +x ~/.local/share/anchor/anchor
+
+      - name: Add the CLIs to PATH
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/share/anchor" >> "$GITHUB_PATH"
+
+      - name: Show tool versions
+        run: |
+          rustc --version
+          solana --version
+          anchor --version
+
+      - name: Build programs
+        run: anchor build
+
+      - name: Check formatting of axel-v2
+        run: cargo fmt -p axel-v2 --check
+
+      - name: Lint axel-v2
+        run: cargo clippy -p axel-v2 --all-targets -- -D warnings
+
+      - name: Rust tests of axel-v2
+        run: cargo test -p axel-v2
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            tests-v2/package-lock.json
+            sdk/axel-v2/package-lock.json
+
+      - name: v2 program tests on LiteSVM
+        run: npm run test:v2
+
+      - name: Check the IDL vendored in the frontend and the SDK match the build
+        run: |
+          npm ci --no-audit --no-fund
+          npm run export-idl
+          npm run generate
+          changes="$(git status --porcelain -- frontend/src/lib/solana/idl-v2 sdk/axel-v2)"
+          if [ -n "$changes" ]; then
+            echo "::error::Committed IDL or SDK is stale. Run anchor build, npm run export-idl and npm run generate."
+            echo "$changes"
+            git diff --stat -- frontend/src/lib/solana/idl-v2 sdk/axel-v2
+            exit 1
+          fi
+
+      - name: SDK typecheck and tests
+        working-directory: sdk/axel-v2
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
+
+      - name: Program size and deploy rent
+        run: |
+          size="$(stat -c %s target/deploy/axel_v2.so)"
+          rent="$(( (size + 128) * 6960 ))"
+          {
+            echo "### axel_v2 program"
+            echo "- ELF size: ${size} bytes"
+            echo "- Deploy rent, upper estimate (size + 128) x 6960 lamports: ${rent} lamports ($(awk "BEGIN { printf \"%.3f\", ${rent} / 1e9 }") SOL)"
+          } >> "$GITHUB_STEP_SUMMARY"

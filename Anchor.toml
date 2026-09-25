@@ -7,10 +7,12 @@ skip-lint = false
 
 [programs.localnet]
 axel = "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M"
+axel_v2 = "AXLcoEH3vJXUSL7nEr1T4d77NarThcbVrnbBzBR8XPZi"
 transfer_hook = "5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ"
 
 [programs.devnet]
 axel = "DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M"
+axel_v2 = "AXLcoEH3vJXUSL7nEr1T4d77NarThcbVrnbBzBR8XPZi"
 transfer_hook = "5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ"
 
 [registry]

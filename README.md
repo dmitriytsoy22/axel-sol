@@ -96,12 +96,12 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 | On-chain programs | Rust 1.89.0 · Anchor 0.32.1 (`anchor-lang`, `anchor-spl`) · `spl-token-2022` 8 · `spl-transfer-hook-interface` 0.9 · `spl-tlv-account-resolution` 0.9 · `spl-token-metadata-interface` 0.7 |
 | Token standard | SPL Token-2022: TransferHook, DefaultAccountState, PermanentDelegate, TransferFeeConfig, MetadataPointer, TokenMetadata |
 | Program tests | `node:test` + `tsx` · `@coral-xyz/anchor` · `@solana/spl-token` 0.4 against a local validator (12 files, 49 tests) |
-| Client SDK | Codama (`npm run generate` → `sdk/generated`) |
+| Client SDK | Codama (`npm run generate` → `sdk/axel-v2`, the v2 program) |
 | Frontend | Next.js 14.2 · React 18.3 · TypeScript 5 · Tailwind CSS 3.4 · `@coral-xyz/anchor` 0.32.1 · `@solana/web3.js` 1.98 · `@solana/spl-token` 0.4.14 · Solana Wallet Adapter (Phantom, Solflare) · `next-intl` 4.8 · React Hook Form 7 + Zod 3 |
 | Frontend tests | Vitest 3.2 · Testing Library · jsdom |
 | Backend | NestJS 11 · `@nestjs/schedule` 5 · `@nestjs/config` 4 · `@solana/web3.js` 1.98 · `@coral-xyz/anchor` 0.32.1 |
 | External services | Yandex Fleet API (telemetry source) · Sumsub (KYC webhook) |
-| CI | GitHub Actions: frontend lint, typecheck, unit tests and build; backend build |
+| CI | GitHub Actions: frontend lint, typecheck, unit tests and build; backend build; programs build, Rust and LiteSVM tests, IDL and SDK freshness |
 | AI tools | Claude Code (coding assistant) · Google Stitch (UI drafts) |
 
 ---
@@ -268,21 +268,23 @@ axel-sol/
 │   │       │                       # update_price, revoke_mint_authority, close_project
 │   │       ├── investor/           # buy_tokens, claim_revenue
 │   │       └── oracle/             # record_telemetry
-│   └── transfer-hook/src/lib.rs    # execute, fallback, initialize_extra_account_meta_list
+│   ├── transfer-hook/src/lib.rs    # execute, fallback, initialize_extra_account_meta_list
+│   └── axel-v2/src/                # v2: escrowed raise, KYC registry, transfer hook, attested revenue, recovery (docs/v2.md)
 ├── tests/                          # 12 node:test files for both programs (local validator)
+├── tests-v2/                       # v2 program tests on LiteSVM
 ├── scripts/                        # init-project.ts, generate-clients.ts, last-project.json
-├── sdk/generated/                  # Codama TypeScript client (stale, see docs/api.md)
+├── sdk/axel-v2/                    # Codama TypeScript client of the v2 program (docs/v2.md)
 ├── migrations/deploy.ts            # Anchor scaffold, unused
 ├── backend/src/                    # NestJS: health, kyc, telemetry, yandex, solana modules
 ├── frontend/
 │   ├── src/app/[locale]/           # /, /assets/[id], /dashboard, /payouts, /admin
 │   ├── src/components/             # admin, asset, catalog, dashboard, invest, kyc, layout, payouts, ui, wallet
 │   ├── src/hooks/                  # chain reads and transaction hooks
-│   ├── src/lib/solana/             # connection, PDAs, readers, instruction builders, idl/ (vendored)
+│   ├── src/lib/solana/             # connection, PDAs, readers, instruction builders, idl/ and idl-v2/ (vendored)
 │   └── messages/                   # en.json, ru.json, kk.json
-├── docs/                           # product, architecture, api, roadmap; planning/ and ru/ (historical)
+├── docs/                           # product, architecture, api, v2, roadmap; planning/ and ru/ (historical)
 ├── assets/                         # logo, hero, screenshots
-├── .github/workflows/ci.yml        # frontend and backend CI
+├── .github/workflows/ci.yml        # frontend, backend and programs CI
 ├── Anchor.toml · Cargo.toml · rust-toolchain.toml · package.json
 └── LICENSE · CONTRIBUTING.md · SECURITY.md
 ```
