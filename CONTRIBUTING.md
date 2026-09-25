@@ -79,6 +79,9 @@ npm run export-idl                       # copy target/idl/axel_v2.json and targ
 npm run generate                         # regenerate sdk/axel-v2 from target/idl/axel_v2.json
 npm --prefix sdk/axel-v2 ci && npm --prefix sdk/axel-v2 test   # generated client against the IDL
 npx tsx scripts/init-project.ts --cluster devnet   # create a project; admin = ~/.config/solana/id.json
+npm run test:seed                        # v2 demo seed unit tests (no validator)
+npm run seed:validator                   # local validator with axel_v2 as upgradeable program (needs anchor build)
+npm run seed -- --scale tiny             # seed it; needs DEMO_SEED_SECRET, see scripts/seed-devnet/README.md
 ```
 
 `Anchor.toml` sets `[provider] cluster = "devnet"`, so a plain `anchor test` would deploy to devnet. Pass `--provider.cluster localnet` when running tests. The tests, `scripts/`, and the root `npm run lint` import from `target/`, which only exists after `anchor build`.

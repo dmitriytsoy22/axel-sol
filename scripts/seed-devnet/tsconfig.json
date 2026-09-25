@@ -5,10 +5,11 @@
     "moduleResolution": "bundler",
     "strict": true,
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
-    "outDir": "dist",
-    "rootDir": "."
+    "noEmit": true,
+    "types": ["node"]
   },
-  "include": ["tests/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["node_modules", "target", "dist", "scripts/seed-devnet"]
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "out"]
 }

@@ -1,0 +1,23 @@
+{
+  "name": "axel-seed-devnet",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "node --import tsx seed.ts",
+    "verify": "node --import tsx verify-invariants.ts",
+    "validator": "node --import tsx validator.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "0.32.1",
+    "@solana/spl-token": "0.4.14",
+    "@solana/spl-token-metadata": "0.1.6",
+    "@solana/web3.js": "1.98.4",
+    "@types/bn.js": "5.2.0",
+    "@types/node": "26.6.2",
+    "bn.js": "5.2.5",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

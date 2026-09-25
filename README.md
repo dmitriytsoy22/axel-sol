@@ -265,7 +265,7 @@ npm ci
 npm run dev                                    # http://localhost:3000
 ```
 
-That chain is for reading: its wallets have no saved keys, and it has no telemetry, so "Check the car's data yourself" has nothing to verify on it. The demo seed (`scripts/seed-devnet`, once merged) fills a local validator with every project state, telemetry and a pending recovery, and publishes the files the check reads; serve its `--data-dir` and set `NEXT_PUBLIC_PUBLISHED_DATA_URL` to it, and `NEXT_PUBLIC_PAYMENT_MINT_SYMBOLS=<tKZT mint>:tKZT`. Every variable is described in [docs/api.md](docs/api.md#frontend-environment).
+That chain is for reading: its wallets have no saved keys, and it has no telemetry, so "Check the car's data yourself" has nothing to verify on it. The demo seed ([`scripts/seed-devnet`](scripts/seed-devnet/README.md)) fills a local validator with every project state, telemetry and a pending recovery, and publishes the files the check reads; serve its `--data-dir` and set `NEXT_PUBLIC_PUBLISHED_DATA_URL` to it, and `NEXT_PUBLIC_PAYMENT_MINT_SYMBOLS=<tKZT mint>:tKZT`. Every variable is described in [docs/api.md](docs/api.md#frontend-environment).
 
 To run the judge demo routes on that seeded chain, set `NEXT_PUBLIC_DEMO_ACCESS=1` and the demo keys the seed derived (`DEMO_SEED_SECRET=… node scripts/demo-env.mjs --cluster localnet --fleet <demo.demo_fleet>` in `frontend/` prints them), fund the faucet key it prints (`solana airdrop` on a local validator), and open `/demo`. The routes and Blinks are described in [docs/api.md](docs/api.md#judge-demo-api).
 
@@ -299,6 +299,19 @@ cargo test -p axel-v2                       # v2: math, dates, telemetry chain, 
 npm run test:v2                             # v2: the program on LiteSVM, no validator needed
 ```
 
+**Demo data for v2** (a fictional fleet in every project state, on a local validator)
+
+```bash
+anchor build -p axel_v2
+npm run seed:validator                             # separate terminal
+export DEMO_SEED_SECRET=$(openssl rand -hex 32)
+npm run seed -- --cluster localnet --scale small   # tiny, small or full; --dry-run prints the SOL budget
+npm run seed:verify -- --cluster localnet          # proof of solvency (I1–I5) for every project
+npm run test:seed                                  # the seed's unit tests, no validator
+```
+
+How the seed works, its outputs and its assumptions: [scripts/seed-devnet/README.md](scripts/seed-devnet/README.md).
+
 `npm test` runs `node --import tsx/esm --test tests/**/*.ts` against a validator at `http://127.0.0.1:8899`. `Anchor.toml` sets the provider cluster to devnet, so always pass `--provider.cluster localnet`. To create a v1 project on a cluster: `npm run init-project -- --cluster devnet` (admin = `~/.config/solana/id.json`). CI builds all programs and runs the v2 Rust and LiteSVM tests (530); the v1 tests (49) need a local validator and run locally only.
 
 More detail: [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -324,6 +337,7 @@ axel-sol/
 ├── tests/                          # 12 node:test files for both programs (local validator)
 ├── tests-v2/                       # v2 program tests on LiteSVM; scripts/ exports the frontend fixture and runs it on a local validator
 ├── scripts/                        # init-project.ts, generate-clients.ts, last-project.json
+│   └── seed-devnet/                # v2 demo seed: plan, executor, SOL budget, proof-of-solvency check
 ├── sdk/axel-v2/                    # Codama TypeScript client of the v2 program (docs/v2.md)
 ├── migrations/deploy.ts            # Anchor scaffold, unused
 ├── backend/src/                    # NestJS: health, kyc, fleet, telemetry, reports, indexer, solana modules
@@ -387,6 +401,7 @@ Done so far:
 - Moved the frontend to v2: a client for `axel_v2` (PDAs, readers, the revenue math on BigInt, instruction builders including hooked transfers, error messages for every program code), hooks for the raise, refunds, claims, transfers, positions, payout history and roles, amounts in the payment token, and the admin console on the program's roles. The v1 client was removed from the UI.
 - Built the judge demo path and Blinks: `/api/demo` routes (signed access with demo KYC, test tenge and SOL; shares from the desk through the transfer hook; simulated months deposited by the operator and attested by the oracle; limits in Upstash Redis; optional Turnstile), a `/demo` page that walks a judge through buy → shares → payout → claim → verify → solvency, and spec-compliant invest and claim Actions with `actions.json`. Checked end to end in a browser against a seeded local chain, with a wallet that really signs.
 - Built the v2 screens: raise progress with a soft-cap marker, live escrow balance and a state timeline; a refund dialog that settles a failed raise first; in-browser verification of each car's telemetry chain, income reports and purchase papers; a live Proof of solvency page; the recovery flows (proposal, the owner's veto, execution); and the console split into platform admin, operator and KYC. Checked in EN / RU / KK at phone and desktop widths against a seeded local chain.
+- Wrote the v2 demo seed ([`scripts/seed-devnet`](scripts/seed-devnet/README.md)). From a seed string it plans a fictional fleet in every project state: backfilled telemetry, attested deposits, claims, transfers, a failed raise with refunds and a share recovery. Every economic figure is labeled as an assumption. The executor is idempotent and resumable, the dry run prices the SOL budget with live rent, and a proof-of-solvency check verifies I1–I5 for every project. It ran end to end on a local validator; devnet is still to come.
 
 In progress during the hackathon (**planned, not done yet**):
 - [ ] Public frontend deployment on devnet (the judge demo path and Blinks are built and checked on a local chain)
@@ -412,6 +427,7 @@ In progress during the hackathon (**planned, not done yet**):
 - [x] Frontend on the v2 program: stablecoin amounts, the six project states, KYC records, escrowed buys, refunds, claims, transfers
 - [x] Frontend v2 screens: in-browser verification of telemetry and reports, Proof of solvency, recovery flows, console split by role
 - [x] Judge demo path and Solana Actions (Blinks), checked on a local chain
+- [x] v2 demo seed with a proof-of-solvency check, run on a local validator
 - [ ] Public deployment on devnet
 - [ ] End-to-end devnet demo, including a holder-to-holder transfer
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key
