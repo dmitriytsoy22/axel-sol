@@ -119,4 +119,14 @@ pub enum AxelError {
     CheckpointAhead,
     #[msg("Basis points exceed 10000")]
     InvalidBps,
+
+    // Primary market
+    #[msg("Token metadata is empty, too long, duplicated or uses a reserved key")]
+    InvalidMetadata,
+    #[msg("Operator and oracle must be different keys")]
+    RoleConflict,
+    #[msg("Acquisition document hash must not be empty")]
+    InvalidDocumentHash,
+    #[msg("Vault holds less than the amount it owes")]
+    VaultShortfall,
 }

@@ -36,3 +36,22 @@ pub const MAX_JURISDICTION: u16 = 999;
 
 #[constant]
 pub const MAX_TELEMETRY_ENTRIES: u8 = 20;
+
+/// Shares are whole units.
+#[constant]
+pub const SHARE_DECIMALS: u8 = 0;
+
+/// Bounds on the share mint's token metadata. They keep `create_project` inside one
+/// transaction and bound the compute spent on metadata writes.
+#[constant]
+pub const MAX_NAME_LEN: u8 = 32;
+#[constant]
+pub const MAX_SYMBOL_LEN: u8 = 10;
+#[constant]
+pub const MAX_URI_LEN: u8 = 200;
+#[constant]
+pub const MAX_METADATA_FIELDS: u8 = 8;
+#[constant]
+pub const MAX_METADATA_KEY_LEN: u8 = 16;
+#[constant]
+pub const MAX_METADATA_VALUE_LEN: u8 = 64;

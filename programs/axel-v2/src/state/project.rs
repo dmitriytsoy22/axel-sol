@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
 
+use crate::constants::PROJECT_SEED;
+use crate::errors::AxelError;
+
 /// One tokenized car, PDA `["project", share_mint]`. `share_mint` sits at offset 8.
 #[account]
 #[derive(InitSpace)]
@@ -60,6 +63,22 @@ impl Project {
 
     pub fn allows_demo(&self) -> bool {
         self.flags & Self::FLAG_ALLOW_DEMO != 0
+    }
+
+    /// Seeds with which the project PDA signs as mint, freeze and vault authority.
+    pub fn signer_seeds(&self) -> [&[u8]; 3] {
+        [
+            PROJECT_SEED,
+            self.share_mint.as_ref(),
+            core::slice::from_ref(&self.bump),
+        ]
+    }
+
+    /// Shares minted in the raise and not refunded: the share mint's supply.
+    pub fn outstanding_shares(&self) -> Result<u64> {
+        self.shares_sold
+            .checked_sub(self.shares_refunded)
+            .ok_or_else(|| AxelError::Overflow.into())
     }
 }
 

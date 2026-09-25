@@ -55,12 +55,19 @@ export function expectError(result: TxResult, name: ErrorName): void {
 
 const eventParser = new EventParser(PROGRAM_ID, program.coder);
 
+/** Every event of this kind emitted by the transaction, in order. */
+export function eventsOf<N extends EventName>(result: TransactionMetadata, name: N): Array<IdlEvents<AxelV2>[N]> {
+  return [...eventParser.parseLogs(result.logs())]
+    .filter((event) => event.name === name)
+    .map((event) => event.data as IdlEvents<AxelV2>[N]);
+}
+
 /** Returns the single event of this kind emitted by the transaction. */
 export function expectEvent<N extends EventName>(
   result: TransactionMetadata,
   name: N,
 ): IdlEvents<AxelV2>[N] {
-  const events = [...eventParser.parseLogs(result.logs())].filter((event) => event.name === name);
+  const events = eventsOf(result, name);
   assert.equal(events.length, 1, `expected exactly one ${name} event, got ${events.length}`);
-  return events[0].data as IdlEvents<AxelV2>[N];
+  return events[0];
 }

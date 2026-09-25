@@ -63,7 +63,7 @@ anchor build                             # target/deploy/*.so, target/idl, targe
 anchor test --provider.cluster localnet  # local validator + tests/**/*.ts
 npm run lint                             # tsc --noEmit over tests/ and scripts/ (needs anchor build)
 cargo test -p axel-v2                    # v2 math (unit + proptest) and account layouts
-npm run test:v2                          # v2 program on LiteSVM (needs anchor build; installs tests-v2 deps on first run)
+npm run test:v2                          # v2 program on LiteSVM (needs anchor build; reinstalls tests-v2 deps when its lockfile changes)
 npm run generate                         # regenerate sdk/generated from target/idl/axel.json
 npx tsx scripts/init-project.ts --cluster devnet   # create a project; admin = ~/.config/solana/id.json
 ```

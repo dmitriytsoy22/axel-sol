@@ -6,8 +6,10 @@ use anchor_lang::prelude::*;
 pub mod constants;
 pub mod errors;
 pub mod events;
+pub mod hook;
 pub mod instructions;
 pub mod math;
+pub mod payment_mint;
 pub mod state;
 
 pub use instructions::*;
@@ -49,5 +51,42 @@ pub mod axel_v2 {
         params: SetInvestorParams,
     ) -> Result<()> {
         ctx.accounts.handle(wallet, params, ctx.bumps.investor)
+    }
+
+    /// Creates a share mint, its transfer hook accounts, the project and its escrow and
+    /// revenue vaults, and opens the raise. Admin only.
+    pub fn create_project(ctx: Context<CreateProject>, params: CreateProjectParams) -> Result<()> {
+        ctx.accounts.handle(params, &ctx.bumps)
+    }
+
+    /// Buys shares in an open raise; payment goes to the escrow. Moves the project to
+    /// Funded when the last share is sold.
+    pub fn buy_shares(ctx: Context<BuyShares>, shares: u64, max_total_cost: u64) -> Result<()> {
+        ctx.accounts
+            .handle(shares, max_total_cost, ctx.bumps.position)
+    }
+
+    /// Settles a raise whose outcome is certain: Funded or Failed. Anyone may call it.
+    pub fn finalize_raise(ctx: Context<FinalizeRaise>) -> Result<()> {
+        ctx.accounts.handle()
+    }
+
+    /// Pays a funded raise out to the treasury and the operator and starts operation.
+    /// Admin only, before the activation deadline.
+    pub fn activate_project(
+        ctx: Context<ActivateProject>,
+        acquisition_doc_hash: [u8; 32],
+    ) -> Result<()> {
+        ctx.accounts.handle(acquisition_doc_hash)
+    }
+
+    /// Fails a raise that has not been activated, opening refunds. Admin only.
+    pub fn cancel_raise(ctx: Context<CancelRaise>) -> Result<()> {
+        ctx.accounts.handle()
+    }
+
+    /// Burns the owner's shares of a failed raise and returns what they cost.
+    pub fn refund(ctx: Context<Refund>) -> Result<()> {
+        ctx.accounts.handle()
     }
 }

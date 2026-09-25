@@ -43,6 +43,10 @@ export function bn(value: bigint | number): BN {
   return new BN(value.toString());
 }
 
+export function big(value: BN): bigint {
+  return BigInt(value.toString());
+}
+
 export function programDataAddress(programId: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync([programId.toBuffer()], BPF_LOADER_UPGRADEABLE_ID)[0];
 }
@@ -112,14 +116,23 @@ export class TestEnv {
     this.svm.setClock(clock);
   }
 
-  /** Signs with every signer (the first pays fees) and executes one transaction. */
-  send(instructions: TransactionInstruction[], signers: Keypair[]): TxResult {
+  warpTo(timestamp: bigint): void {
+    this.warp(timestamp - this.now());
+  }
+
+  /** A transaction signed by every signer; the first one pays the fees. */
+  transaction(instructions: TransactionInstruction[], signers: Keypair[]): Transaction {
     const tx = new Transaction({
       feePayer: signers[0].publicKey,
       recentBlockhash: this.svm.latestBlockhash(),
     }).add(...instructions);
     tx.sign(...signers);
-    const result = this.svm.sendTransaction(tx);
+    return tx;
+  }
+
+  /** Signs with every signer (the first pays fees) and executes one transaction. */
+  send(instructions: TransactionInstruction[], signers: Keypair[]): TxResult {
+    const result = this.svm.sendTransaction(this.transaction(instructions, signers));
     // A new blockhash lets the next identical transaction run instead of being deduplicated.
     this.svm.expireBlockhash();
     return result;

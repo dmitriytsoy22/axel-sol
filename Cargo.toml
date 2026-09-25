@@ -15,3 +15,7 @@ codegen-units = 1
 
 [workspace.metadata.solana]
 tools-version = "v1.52"
+
+# Smaller ELF, cheaper deploy; most compute is spent in token program CPIs anyway.
+[profile.release.package.axel-v2]
+opt-level = "s"

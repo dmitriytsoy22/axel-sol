@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --import tsx/esm --test tests/**/*.ts",
-    "pretest:v2": "[ -d tests-v2/node_modules ] || npm --prefix tests-v2 ci --no-audit --no-fund",
+    "pretest:v2": "[ tests-v2/node_modules/.package-lock.json -nt tests-v2/package-lock.json ] || npm --prefix tests-v2 ci --no-audit --no-fund",
     "test:v2": "npm --prefix tests-v2 test",
     "build": "anchor build",
     "generate": "npx tsx scripts/generate-clients.ts",

@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::errors::AxelError;
+
 /// KYC record of one wallet, PDA `["investor", wallet]`. `wallet` sits at offset 8.
 #[account]
 #[derive(InitSpace)]
@@ -28,6 +30,24 @@ impl Investor {
 
     pub fn is_demo(&self) -> bool {
         self.flags & Self::FLAG_DEMO != 0
+    }
+
+    /// Fails unless this wallet may acquire shares of a project that does or does not
+    /// accept DEMO investors.
+    pub fn require_eligible(&self, now: i64, project_allows_demo: bool) -> Result<()> {
+        match self.status {
+            InvestorStatus::Active => {}
+            InvestorStatus::Frozen => return err!(AxelError::InvestorFrozen),
+            InvestorStatus::None | InvestorStatus::Revoked => {
+                return err!(AxelError::InvestorNotActive)
+            }
+        }
+        require!(self.expires_at > now, AxelError::InvestorExpired);
+        require!(
+            project_allows_demo || !self.is_demo(),
+            AxelError::DemoNotAllowed
+        );
+        Ok(())
     }
 }
 
