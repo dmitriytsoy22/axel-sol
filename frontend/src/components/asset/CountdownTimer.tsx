@@ -22,7 +22,11 @@ export function CountdownTimer({ deadline }: CountdownTimerProps): React.JSX.Ele
 
   // If deadline passed
   if (timeLeft <= 0) {
-    return <span className="font-mono text-gray-500 font-semibold text-lg" data-testid="timer-ended">00:00:00:00</span>;
+    return (
+      <span data-testid="timer-ended" className="text-title font-semibold tabular-nums text-muted-foreground">
+        00:00:00:00
+      </span>
+    );
   }
 
   const days = Math.floor(timeLeft / 86400);
@@ -32,15 +36,14 @@ export function CountdownTimer({ deadline }: CountdownTimerProps): React.JSX.Ele
 
   const pad = (n: number) => n.toString().padStart(2, '0');
 
-  // Less than 24h = 86400 seconds
+  // Under a day left reads amber, not red: red is kept for errors, and a deadline is not one.
   const isUrgent = timeLeft < 86400;
 
   return (
     <span
       data-testid="timer-active"
-      className={`font-mono font-semibold text-lg tabular-nums tracking-tight ${
-        isUrgent ? 'text-[#FF3B30]' : 'text-gray-900'
-      }`}
+      data-urgent={isUrgent}
+      className={`text-title font-semibold tabular-nums ${isUrgent ? 'text-warning' : 'text-foreground'}`}
     >
       {pad(days)}:{pad(hours)}:{pad(minutes)}:{pad(seconds)}
     </span>

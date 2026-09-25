@@ -9,11 +9,8 @@ export async function generateMetadata({ params: { locale } }: { params: { local
 
 export default function DashboardPage(): JSX.Element {
   return (
-    <div className="min-h-[80vh] w-full mt-10">
-      <div className="max-w-[1200px] mx-auto px-5 w-full">
-        <DashboardView />
-      </div>
+    <div className="page-container pb-24 pt-10 md:pt-14">
+      <DashboardView />
     </div>
   );
 }
-

@@ -1,14 +1,18 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
-import { usePathname, useRouter, Link } from '@/i18n/routing';
-import { useLocale } from 'next-intl';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { usePathname, Link } from '@/i18n/routing';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWalletInfo } from '@/hooks/useWalletInfo';
-import { Link as LinkIcon, Menu, X } from 'lucide-react';
-import { NAV_LINKS } from './constants';
+import { Copy, LogOut, Menu, Wallet, X } from 'lucide-react';
+import { buttonClasses } from '@/components/ui/Button';
+import { ConnectionStatus } from '@/components/shared/ConnectionStatus';
+import { formatNumber } from '@/lib/format';
+import { LOCALE_OPTIONS, NAV_LINKS, isActiveLink } from './constants';
+import { useSwitchLocale } from './NavLanguageSwitcher';
+import { useCopyAddress } from './NavWalletMenu';
 
 interface NavMobileMenuProps {
   isOpen: boolean;
@@ -19,144 +23,194 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
   const tNav = useTranslations('Navigation');
   const tCommon = useTranslations('Common');
   const pathname = usePathname();
-  const router = useRouter();
   const locale = useLocale();
+  const switchLocale = useSwitchLocale();
 
   const { disconnect, connected } = useWallet();
+  const { setVisible } = useWalletModal();
   const { truncatedAddress, balance, publicKey } = useWalletInfo();
+  const { copied, copy } = useCopyAddress(publicKey);
 
-  const [copied, setCopied] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const switchLocale = useCallback((newLocale: string) => {
-    router.replace(pathname as any, { locale: newLocale });
-  }, [pathname, router]);
+  const close = useCallback(() => {
+    setIsOpen(false);
+    toggleRef.current?.focus();
+  }, [setIsOpen]);
 
-  const { setVisible } = useWalletModal();
+  useEffect(() => {
+    if (!isOpen) return;
+    const panel = panelRef.current;
+    if (!panel) return;
 
-  const handleConnect = useCallback(() => {
+    const focusables = () =>
+      Array.from(panel.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'));
+    focusables()[0]?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = [toggleRef.current, ...focusables()].filter(
+        (item): item is HTMLElement => item !== null,
+      );
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    // Growing past md hides the panel; close it so the scroll lock does not linger.
+    const desktop = window.matchMedia('(min-width: 768px)');
+    const onDesktop = (event: MediaQueryListEvent) => {
+      if (event.matches) setIsOpen(false);
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    desktop.addEventListener('change', onDesktop);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      desktop.removeEventListener('change', onDesktop);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen, close, setIsOpen]);
+
+  const handleConnect = () => {
+    setIsOpen(false);
     setVisible(true);
-  }, [setVisible]);
+  };
 
-  const handleDisconnect = useCallback(async () => {
+  const handleDisconnect = async () => {
     await disconnect();
-  }, [disconnect]);
-
-  const handleCopyAddress = useCallback(async () => {
-    if (!publicKey) return;
-    try {
-      await navigator.clipboard.writeText(publicKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      console.error('[AXEL] Failed to copy address');
-    }
-  }, [publicKey]);
+  };
 
   return (
     <>
       <button
+        ref={toggleRef}
         id="mobile-menu-toggle"
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+        aria-label={isOpen ? tNav('closeMenu') : tNav('openMenu')}
         onClick={() => setIsOpen(!isOpen)}
-        className="sm:hidden flex flex-col justify-center items-center w-[44px] h-[44px] cursor-pointer border-none bg-transparent text-text-primary"
-        aria-label={isOpen ? 'Close menu' : 'Open menu'}
+        className="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-control text-foreground transition-colors duration-fast ease-move hover:bg-secondary md:hidden"
       >
-        {isOpen ? <X size={24} strokeWidth={1.5} /> : <Menu size={24} strokeWidth={1.5} />}
+        {isOpen ? (
+          <X aria-hidden="true" className="h-6 w-6" strokeWidth={1.75} />
+        ) : (
+          <Menu aria-hidden="true" className="h-6 w-6" strokeWidth={1.75} />
+        )}
       </button>
 
       {isOpen && (
         <div
-          className="fixed inset-0 z-[99] bg-black/20 sm:hidden"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-
-      <div
-        className={`
-          fixed top-[52px] right-0 bottom-0 w-[280px] z-sticky
-          bg-white shadow-xl
-          transform transition-transform duration-slow ease-out
-          sm:hidden
-          ${isOpen ? 'translate-x-0' : 'translate-x-full'}
-        `}
-        style={{
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        }}
-      >
-        <div className="flex flex-col p-6 gap-2">
-          {NAV_LINKS.map(({ href, labelKey }) => {
-            const isActive = pathname === href || pathname.startsWith(href + '/');
-            return (
+          id={panelId}
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={tNav('main')}
+          className="fixed inset-x-0 bottom-0 top-16 z-sticky flex animate-fade-in flex-col overflow-y-auto border-t border-border bg-background md:hidden"
+        >
+          <nav aria-label={tNav('main')} className="page-container flex flex-col pt-4">
+            {NAV_LINKS.map(({ href, labelKey }) => (
               <Link
                 key={href}
-                href={href as any}
-                className={`
-                  text-[17px] font-semibold no-underline py-3
-                  transition-colors duration-fast
-                  ${isActive ? 'text-text-primary font-bold' : 'text-text-secondary hover:text-text-primary'}
-                `}
+                href={href}
+                onClick={() => setIsOpen(false)}
+                aria-current={isActiveLink(pathname, href) ? 'page' : undefined}
+                className="flex min-h-14 items-center border-b border-border text-h4 font-semibold text-muted-foreground no-underline transition-colors duration-fast ease-move hover:text-foreground aria-[current=page]:text-foreground"
               >
                 {tNav(labelKey)}
               </Link>
-            );
-          })}
+            ))}
+          </nav>
 
-          <div className="h-px bg-border-subtle my-3" />
-
-          <div className="flex flex-col gap-2">
-            <span className="text-[13px] uppercase tracking-widest text-text-tertiary">Language</span>
-            <button onClick={() => switchLocale('en')} className="text-left text-[17px] font-normal text-text-secondary hover:text-text-primary transition-colors cursor-pointer border-none bg-transparent py-1">{locale === 'en' && '✓ '}English</button>
-            <button onClick={() => switchLocale('ru')} className="text-left text-[17px] font-normal text-text-secondary hover:text-text-primary transition-colors cursor-pointer border-none bg-transparent py-1">{locale === 'ru' && '✓ '}Русский</button>
-            <button onClick={() => switchLocale('kk')} className="text-left text-[17px] font-normal text-text-secondary hover:text-text-primary transition-colors cursor-pointer border-none bg-transparent py-1">{locale === 'kk' && '✓ '}Қазақша</button>
+          <div className="page-container mt-8">
+            <p className="text-overline uppercase text-subtle-foreground">{tNav('language')}</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {LOCALE_OPTIONS.map(({ code, label }) => (
+                <button
+                  key={code}
+                  type="button"
+                  lang={code}
+                  aria-pressed={code === locale}
+                  onClick={() => switchLocale(code)}
+                  className="h-11 rounded-control border border-border text-small font-medium text-muted-foreground transition-colors duration-fast ease-move hover:text-foreground aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {connected && truncatedAddress ? (
-            <div className="flex flex-col gap-3 mt-4">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-[14px] font-medium text-text-primary">
-                  {truncatedAddress}
-                </span>
-                {balance !== null && (
-                  <span className="text-[13px] text-text-secondary">
-                    {balance.toFixed(2)} SOL
-                  </span>
-                )}
+          <div className="page-container mt-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            <p className="text-overline uppercase text-subtle-foreground">{tNav('wallet')}</p>
+            {mounted && connected && truncatedAddress ? (
+              <div className="mt-3 rounded-card border border-border bg-card p-4">
+                <div className="flex items-baseline justify-between gap-4">
+                  <span className="font-mono text-small text-foreground">{truncatedAddress}</span>
+                  {balance !== null && (
+                    <span className="text-small tabular-nums text-muted-foreground">
+                      {formatNumber(balance, locale, 2)} SOL
+                    </span>
+                  )}
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={copy}
+                    className={buttonClasses({ variant: 'secondary' })}
+                  >
+                    <Copy aria-hidden="true" strokeWidth={1.75} />
+                    <span aria-live="polite">
+                      {copied ? tCommon('copied') : tCommon('copyAddress')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDisconnect}
+                    className={buttonClasses({ variant: 'outline', className: 'text-destructive' })}
+                  >
+                    <LogOut aria-hidden="true" strokeWidth={1.75} />
+                    {tCommon('disconnect')}
+                  </button>
+                </div>
               </div>
+            ) : (
               <button
-                onClick={handleCopyAddress}
-                className="text-left text-[14px] text-text-secondary hover:text-text-primary transition-colors duration-fast cursor-pointer border-none bg-transparent py-1"
+                type="button"
+                onClick={handleConnect}
+                className={buttonClasses({ size: 'lg', className: 'mt-3 w-full' })}
               >
-                {copied ? tCommon('copied') : tCommon('copyAddress')}
+                <Wallet aria-hidden="true" strokeWidth={1.75} />
+                {tCommon('connect')}
               </button>
-              <button
-                onClick={handleDisconnect}
-                className="text-left text-[14px] text-semantic-error hover:opacity-80 transition-opacity duration-fast cursor-pointer border-none bg-transparent py-1"
-              >
-                {tCommon('disconnect')}
-              </button>
+            )}
+            <div className="mt-6">
+              <ConnectionStatus />
             </div>
-          ) : mounted ? (
-            <button
-              onClick={handleConnect}
-              className="flex items-center justify-center space-x-2 w-full mt-4 text-brand-primary-active bg-brand-primary-light hover:bg-[#B5F5FC] text-[16px] font-medium transition-colors duration-fast cursor-pointer border-none rounded-xl py-3"
-            >
-              <LinkIcon size={20} strokeWidth={2} />
-              <span>{tCommon('connect')}</span>
-            </button>
-          ) : (
-            <div className="flex items-center justify-center space-x-2 w-full mt-4 text-text-secondary bg-surface-secondary text-[16px] font-medium rounded-xl py-3 border border-border-subtle">
-              <LinkIcon size={20} strokeWidth={2} />
-              <span>{tCommon('connect')}</span>
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 };

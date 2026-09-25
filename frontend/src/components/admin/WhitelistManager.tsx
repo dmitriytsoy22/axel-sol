@@ -1,19 +1,22 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction } from '@solana/web3.js';
-import { Loader2, UserPlus, UserMinus, ShieldCheck } from 'lucide-react';
+import { CircleCheck, Loader2 } from 'lucide-react';
 
 import {
   buildAddToWhitelistInstruction,
   buildRemoveFromWhitelistInstruction,
 } from '@/lib/solana/instructions';
 import { useTransactionConfirmation } from '@/hooks/useTransactionConfirmation';
+import { Button } from '@/components/ui/Button';
+import { shortAddress } from '@/lib/format';
 
 export function WhitelistManager() {
   const t = useTranslations('Admin');
+  const formId = useId();
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const { confirmTransaction } = useTransactionConfirmation();
@@ -23,15 +26,17 @@ export function WhitelistManager() {
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
 
+  const trimmed = walletAddress.trim();
   const isValidAddress = (() => {
     try {
-      if (!walletAddress.trim()) return false;
-      new PublicKey(walletAddress.trim());
+      if (!trimmed) return false;
+      new PublicKey(trimmed);
       return true;
     } catch {
       return false;
     }
   })();
+  const showInvalid = trimmed.length > 0 && !isValidAddress;
 
   const handleAction = async (action: 'add' | 'remove') => {
     if (!publicKey || !isValidAddress) return;
@@ -41,7 +46,7 @@ export function WhitelistManager() {
     setLastResult(null);
 
     try {
-      const targetWallet = new PublicKey(walletAddress.trim());
+      const targetWallet = new PublicKey(trimmed);
       const params = {
         wallet: {
           publicKey,
@@ -52,9 +57,10 @@ export function WhitelistManager() {
         targetWallet,
       };
 
-      const instruction = action === 'add'
-        ? await buildAddToWhitelistInstruction(params)
-        : await buildRemoveFromWhitelistInstruction(params);
+      const instruction =
+        action === 'add'
+          ? await buildAddToWhitelistInstruction(params)
+          : await buildRemoveFromWhitelistInstruction(params);
 
       const transaction = new Transaction().add(instruction);
 
@@ -64,40 +70,42 @@ export function WhitelistManager() {
         signature,
         blockhash,
         lastValidBlockHeight,
-        action === 'add' ? t('whitelistAdd') : t('whitelistRemove'),
+        action === 'add' ? t('approvedToast') : t('removedToast'),
       );
 
+      const address = shortAddress(trimmed);
       setLastResult(
-        action === 'add'
-          ? `${walletAddress.slice(0, 8)}... approved`
-          : `${walletAddress.slice(0, 8)}... removed`,
+        action === 'add' ? t('approvedResult', { address }) : t('removedResult', { address }),
       );
       setWalletAddress('');
     } catch (err: any) {
       console.error(`Whitelist ${action} failed:`, err);
-      setError(err?.message || 'Transaction failed');
+      setError(err?.message || t('actionFailed'));
     } finally {
       setActiveAction(null);
     }
   };
 
+  const inputId = `${formId}-wallet`;
+  const hintId = `${formId}-hint`;
+
   return (
-    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-xl">
-      <div className="mb-6 flex items-center space-x-2">
-        <ShieldCheck className="h-5 w-5 text-cyan-400" />
-        <h2 className="font-display text-xl font-medium tracking-tight text-white">
-          {t('whitelistTitle')}
-        </h2>
-      </div>
+    <section
+      aria-labelledby={`${formId}-title`}
+      className="rounded-card border border-border bg-card p-6 shadow-sm md:p-8"
+    >
+      <h2 id={`${formId}-title`} className="text-title font-semibold text-foreground">
+        {t('whitelistTitle')}
+      </h2>
+      <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">{t('whitelistDesc')}</p>
 
-      <p className="mb-4 text-sm text-white/50">{t('whitelistDesc')}</p>
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-        <div className="flex-1 space-y-2">
-          <label className="text-sm font-medium text-white/70">
-            {t('walletAddress')}
-          </label>
+      <div className="mt-6">
+        <label htmlFor={inputId} className="text-small font-medium text-foreground">
+          {t('walletAddress')}
+        </label>
+        <div className="mt-2 flex flex-col gap-3 sm:flex-row">
           <input
+            id={inputId}
             type="text"
             value={walletAddress}
             onChange={(e) => {
@@ -105,47 +113,52 @@ export function WhitelistManager() {
               setError(null);
               setLastResult(null);
             }}
-            placeholder="Enter Solana wallet address..."
+            placeholder={t('walletPlaceholder')}
+            autoComplete="off"
+            spellCheck={false}
             disabled={activeAction !== null}
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 font-mono text-sm text-white placeholder-white/30 transition-colors focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 disabled:opacity-50"
+            aria-invalid={showInvalid}
+            aria-describedby={hintId}
+            className="h-12 w-full min-w-0 rounded-control border border-input bg-card px-4 font-mono text-body text-foreground placeholder:font-sans placeholder:text-subtle-foreground transition-colors duration-fast ease-move focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-50 aria-[invalid=true]:border-destructive sm:flex-1"
           />
+          <div className="flex gap-3">
+            <Button
+              size="lg"
+              onClick={() => handleAction('add')}
+              disabled={activeAction !== null || !isValidAddress}
+              className="flex-1 sm:flex-none"
+            >
+              {activeAction === 'add' && (
+                <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
+              )}
+              {t('whitelistAdd')}
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => handleAction('remove')}
+              disabled={activeAction !== null || !isValidAddress}
+              className="flex-1 sm:flex-none"
+            >
+              {activeAction === 'remove' && (
+                <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
+              )}
+              {t('whitelistRemove')}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={() => handleAction('add')}
-            disabled={activeAction !== null || !isValidAddress}
-            className="flex items-center space-x-2 rounded-lg bg-cyan-500/10 px-4 py-2.5 text-sm font-medium text-cyan-400 transition-colors hover:bg-cyan-500/20 disabled:opacity-50 disabled:hover:bg-cyan-500/10"
-          >
-            {activeAction === 'add' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <UserPlus className="h-4 w-4" />
-            )}
-            <span>{t('whitelistAdd')}</span>
-          </button>
-
-          <button
-            onClick={() => handleAction('remove')}
-            disabled={activeAction !== null || !isValidAddress}
-            className="flex items-center space-x-2 rounded-lg bg-red-500/10 px-4 py-2.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50 disabled:hover:bg-red-500/10"
-          >
-            {activeAction === 'remove' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <UserMinus className="h-4 w-4" />
-            )}
-            <span>{t('whitelistRemove')}</span>
-          </button>
+        <div id={hintId} aria-live="polite" className="mt-2 text-small">
+          {showInvalid && <p className="text-destructive">{t('invalidAddress')}</p>}
+          {error && <p className="text-destructive">{error}</p>}
+          {lastResult && (
+            <p className="flex items-center gap-1.5 text-success">
+              <CircleCheck aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+              {lastResult}
+            </p>
+          )}
         </div>
       </div>
-
-      {error && (
-        <p className="mt-3 text-sm text-red-400">{error}</p>
-      )}
-      {lastResult && (
-        <p className="mt-3 text-sm text-cyan-400">{lastResult}</p>
-      )}
-    </div>
+    </section>
   );
 }

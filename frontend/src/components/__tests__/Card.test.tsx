@@ -8,18 +8,13 @@ describe('Card', () => {
     render(
       <Card>
         <div>Inner Content</div>
-      </Card>
+      </Card>,
     );
     expect(screen.getByText('Inner Content')).toBeInTheDocument();
   });
 
-  it('applies default classes and custom classes', () => {
-    const { container } = render(
-      <Card className="test-card-class">Content</Card>
-    );
-    const div = container.firstChild as HTMLElement;
-    expect(div.className).toContain('bg-white');
-    expect(div.className).toContain('rounded-2xl');
-    expect(div.className).toContain('test-card-class');
+  it("keeps the caller's classes", () => {
+    render(<Card className="test-card-class">Content</Card>);
+    expect(screen.getByText('Content')).toHaveClass('test-card-class');
   });
 });

@@ -1,2 +1,9 @@
-// Catalog components: AssetCard
-// Will be implemented in Task 4 (Catalog).
+export { AssetCard } from './AssetCard';
+export { CatalogHero } from './CatalogHero';
+export { ChainStats } from './ChainStats';
+export { VehicleSection } from './VehicleSection';
+export { HowItWorks } from './HowItWorks';
+export { VerifySection } from './VerifySection';
+export { DevnetDisclosure } from './DevnetDisclosure';
+export { vehiclePhoto } from './vehiclePhoto';
+export { catalogStats } from './catalogStats';

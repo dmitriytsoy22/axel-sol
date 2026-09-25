@@ -1,36 +1,24 @@
 import React, { ReactNode } from 'react';
 import { ProjectStatus } from '@/types/project';
+import { Pill, type PillTone } from './Pill';
 
 interface BadgeProps {
   status: ProjectStatus;
   children: ReactNode;
+  className?: string;
 }
 
-export function Badge({ status, children }: BadgeProps): JSX.Element {
-  const isPulsing = status === 'active';
+const TONE: Record<ProjectStatus, PillTone> = {
+  active: 'success',
+  paused: 'warning',
+  closed: 'neutral',
+};
 
-  const getStatusClasses = (): string => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-500 text-white';
-      case 'paused':
-        return 'bg-yellow-500 text-white';
-      case 'closed':
-        return 'bg-gray-300 text-gray-700';
-    }
-  };
-
+/** A car project's status. */
+export function Badge({ status, children, className = '' }: BadgeProps): JSX.Element {
   return (
-    <div className="inline-flex items-center rounded-full px-3 py-1 space-x-2">
-      {isPulsing && (
-        <span className="relative flex h-2 w-2">
-          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${getStatusClasses()}`}></span>
-          <span className={`relative inline-flex rounded-full h-2 w-2 ${getStatusClasses()}`}></span>
-        </span>
-      )}
-      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusClasses()}`}>
-        {children}
-      </span>
-    </div>
+    <Pill tone={TONE[status]} className={className}>
+      {children}
+    </Pill>
   );
 }

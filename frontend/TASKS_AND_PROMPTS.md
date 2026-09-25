@@ -79,7 +79,7 @@ AXEL — RWA токенизация на Solana. On-chain first. Проект и
 
 ## Дизайн + i18n
 > **ВАЖНО:** ВЕЗДЕ используй `next-intl` для текстов! Никаких захардкоженных строк. Apple-like минимализм.
-- Ссылайся на `frontend/DESIGN_SYSTEM.md`. Light theme, Primary #06B6D4, pill кнопки, frosted glass Navbar.
+- Follow `frontend/design.md`, the design source of truth (it replaced `DESIGN_SYSTEM.md`).
 
 ## Задание
 1. Установи Wallet Adapter зависимости.

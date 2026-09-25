@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { Loader2 } from 'lucide-react';
@@ -12,11 +12,13 @@ import { Loader2 } from 'lucide-react';
 import { ProjectState } from '@/types/project';
 import { buildDepositRevenueInstruction } from '@/lib/solana/instructions';
 import { useTransactionConfirmation } from '@/hooks/useTransactionConfirmation';
+import { Button } from '@/components/ui/Button';
+import { formatSolAmount } from '@/lib/format';
 
 const depositSchema = z.object({
-  grossRevenue: z.number().min(0, "Must be positive"),
-  expenses: z.number().min(0, "Must be positive"),
-  maintenanceReserve: z.number().min(0, "Must be positive"),
+  grossRevenue: z.number().min(0, 'mustBePositive'),
+  expenses: z.number().min(0, 'mustBePositive'),
+  maintenanceReserve: z.number().min(0, 'mustBePositive'),
 });
 
 type DepositFormValues = z.infer<typeof depositSchema>;
@@ -25,8 +27,12 @@ interface DepositRevenueFormProps {
   project: ProjectState;
 }
 
+const FIELDS = ['grossRevenue', 'expenses', 'maintenanceReserve'] as const;
+
 export function DepositRevenueForm({ project }: DepositRevenueFormProps) {
   const t = useTranslations('Admin');
+  const locale = useLocale();
+  const formId = useId();
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const { confirmTransaction } = useTransactionConfirmation();
@@ -51,14 +57,25 @@ export function DepositRevenueForm({ project }: DepositRevenueFormProps) {
   const maintenanceReserve = watch('maintenanceReserve') || 0;
   const netProfit = grossRevenue - expenses - maintenanceReserve;
 
+  // The program accepts deposits only for an active car with at least one share sold.
+  const blockedReason =
+    project.status !== 'active'
+      ? t('depositNeedsActive')
+      : project.tokensSold === 0
+        ? t('depositNeedsHolders')
+        : null;
+
   const onSubmit = async (data: DepositFormValues) => {
     if (!publicKey) return;
 
     setIsDepositing(true);
     try {
-      // Create instruction
       const instruction = await buildDepositRevenueInstruction({
-        wallet: { publicKey, signTransaction: async (tx: any) => tx, signAllTransactions: async (txs: any[]) => txs },
+        wallet: {
+          publicKey,
+          signTransaction: async (tx: any) => tx,
+          signAllTransactions: async (txs: any[]) => txs,
+        },
         connection,
         mint: new PublicKey(project.mint),
         periodIndex: project.periodCount,
@@ -69,12 +86,7 @@ export function DepositRevenueForm({ project }: DepositRevenueFormProps) {
 
       const signature = await sendTransaction(transaction, connection);
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-      await confirmTransaction(
-        signature,
-        blockhash,
-        lastValidBlockHeight,
-        t('depositRevenue')
-      );
+      await confirmTransaction(signature, blockhash, lastValidBlockHeight, t('depositDone'));
     } catch (err) {
       console.error('Failed to deposit revenue:', err);
     } finally {
@@ -83,87 +95,79 @@ export function DepositRevenueForm({ project }: DepositRevenueFormProps) {
   };
 
   return (
-    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-xl">
-      <div className="mb-6">
-        <h2 className="font-display text-xl font-medium tracking-tight text-white">
-          {t('depositRevenue')}
-        </h2>
-        <p className="mt-1 text-sm text-white/50">{t('depositDesc')}</p>
-      </div>
+    <section
+      aria-labelledby={`${formId}-title`}
+      className="rounded-card border border-border bg-card p-6 shadow-sm md:p-8"
+    >
+      <h2 id={`${formId}-title`} className="text-title font-semibold text-foreground">
+        {t('depositRevenue')}
+      </h2>
+      <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">
+        {t('depositDesc', { index: project.periodCount })}
+      </p>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-white/70">
-              {t('grossRevenue')}
-            </label>
-            <input
-              type="number"
-              step="0.001"
-              disabled={isDepositing}
-              {...register('grossRevenue', { valueAsNumber: true })}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-white transition-colors focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-            />
-            {errors.grossRevenue && (
-              <p className="text-sm text-red-500">{errors.grossRevenue.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-white/70">
-              {t('expenses')}
-            </label>
-            <input
-              type="number"
-              step="0.001"
-              disabled={isDepositing}
-              {...register('expenses', { valueAsNumber: true })}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-white transition-colors focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-            />
-            {errors.expenses && (
-              <p className="text-sm text-red-500">{errors.expenses.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-white/70">
-              {t('maintenanceReserve')}
-            </label>
-            <input
-              type="number"
-              step="0.001"
-              disabled={isDepositing}
-              {...register('maintenanceReserve', { valueAsNumber: true })}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-white transition-colors focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-            />
-            {errors.maintenanceReserve && (
-              <p className="text-sm text-red-500">
-                {errors.maintenanceReserve.message}
-              </p>
-            )}
-          </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-6">
+        <div className="grid gap-5 sm:grid-cols-3">
+          {FIELDS.map((field) => {
+            const inputId = `${formId}-${field}`;
+            const error = errors[field];
+            return (
+              <div key={field}>
+                <label htmlFor={inputId} className="text-small font-medium text-foreground">
+                  {t(field)}
+                </label>
+                <div className="relative mt-2">
+                  <input
+                    id={inputId}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.001"
+                    disabled={isDepositing || !!blockedReason}
+                    aria-invalid={!!error}
+                    aria-describedby={error ? `${inputId}-error` : undefined}
+                    {...register(field, { valueAsNumber: true })}
+                    className="no-spinner h-12 w-full rounded-control border border-input bg-card pl-4 pr-14 text-body tabular-nums text-foreground transition-colors duration-fast ease-move focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-50 aria-[invalid=true]:border-destructive"
+                  />
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-small text-muted-foreground">
+                    SOL
+                  </span>
+                </div>
+                {error?.message && (
+                  <p id={`${inputId}-error`} className="mt-2 text-small text-destructive">
+                    {t(error.message)}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        <div className="pt-4 mt-6 border-t border-white/10">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white/50">{t('netProfit')}</p>
-              <p className={`text-2xl font-display font-medium ${netProfit < 0 ? 'text-red-400' : 'text-cyan-400'}`}>
-                {netProfit.toFixed(3)} SOL
-              </p>
-            </div>
-            
-            <button
-              type="submit"
-              disabled={isDepositing || netProfit <= 0}
-              className="flex items-center space-x-2 rounded-xl bg-cyan-500 px-6 py-3 font-medium text-slate-900 transition-all hover:bg-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] disabled:opacity-50 disabled:hover:bg-cyan-500 disabled:hover:shadow-none"
+        <div className="mt-6 flex flex-col gap-6 border-t border-border pt-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-small text-muted-foreground">{t('netProfit')}</p>
+            <p
+              aria-live="polite"
+              className={`mt-1 text-h4 font-semibold tabular-nums ${netProfit < 0 ? 'text-destructive' : 'text-foreground'}`}
             >
-              {isDepositing && <Loader2 className="h-4 w-4 animate-spin" />}
-              <span>{isDepositing ? t('depositing') : t('depositBtn')}</span>
-            </button>
+              {formatSolAmount(netProfit, locale)}
+            </p>
+            <p className="mt-1 max-w-[44ch] text-small text-muted-foreground">
+              {blockedReason ?? t('netHint')}
+            </p>
           </div>
+
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isDepositing || netProfit <= 0 || !!blockedReason}
+          >
+            {isDepositing && (
+              <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
+            )}
+            {isDepositing ? t('depositing') : t('depositBtn')}
+          </Button>
         </div>
       </form>
-    </div>
+    </section>
   );
 }

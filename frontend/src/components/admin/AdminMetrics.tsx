@@ -1,56 +1,78 @@
 'use client';
 
 import React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ProjectState } from '@/types/project';
+import { Badge } from '@/components/ui/Badge';
+import { ExplorerLink } from '@/components/ui/ExplorerLink';
+import { formatNumber } from '@/lib/format';
 
 interface AdminMetricsProps {
   project: ProjectState;
 }
 
+/** The operator's header: which car this console manages and where it stands on-chain. */
 export function AdminMetrics({ project }: AdminMetricsProps) {
   const t = useTranslations('Admin');
+  const tCat = useTranslations('Catalog');
+  const locale = useLocale();
+
+  const statusLabel: Record<ProjectState['status'], string> = {
+    active: tCat('statusActive'),
+    paused: tCat('statusPaused'),
+    closed: tCat('statusClosed'),
+  };
+
+  const items = [
+    {
+      label: t('metricStatus'),
+      value: <Badge status={project.status}>{statusLabel[project.status]}</Badge>,
+    },
+    {
+      label: t('tokensSold'),
+      value: t('ofTotal', {
+        part: formatNumber(project.tokensSold, locale),
+        whole: formatNumber(project.totalTokenSupply, locale),
+      }),
+    },
+    { label: t('revenuePeriods'), value: formatNumber(project.periodCount, locale) },
+    {
+      label: t('incomeVault'),
+      value: <ExplorerLink address={project.revenueVault} srLabel={t('openInExplorer')} />,
+    },
+  ];
 
   return (
-    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-xl">
-      <h2 className="mb-6 font-display text-xl font-medium tracking-tight text-white">
-        {t('projectMetrics')}
-      </h2>
+    <section aria-labelledby="admin-title" className="theme-ink">
+      <div className="page-container pb-8 pt-10 md:pb-10 md:pt-14">
+        <p className="text-overline uppercase text-muted-foreground">{t('overline')}</p>
+        <h1
+          id="admin-title"
+          className="mt-3 font-heading text-h2 font-medium text-foreground md:text-h1"
+        >
+          {project.carMake} {project.carModel}{' '}
+          <span className="tabular-nums text-muted-foreground">{project.carYear}</span>
+        </h1>
+        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-muted-foreground">
+          {t('shareToken')}
+          <ExplorerLink address={project.mint} srLabel={t('openInExplorer')} />
+        </p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl bg-white/[0.03] p-5">
-          <p className="mb-1 text-sm font-medium text-white/50">{t('metricStatus')}</p>
-          <div className="flex items-center space-x-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span
-                className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
-                  project.status === 'active' ? 'bg-cyan-400' : 'bg-white/40'
-                }`}
-              />
-              <span
-                className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-                  project.status === 'active' ? 'bg-cyan-500' : 'bg-white/60'
-                }`}
-              />
-            </span>
-            <span className="text-xl font-medium capitalize text-white">
-              {project.status}
-            </span>
-          </div>
-        </div>
-
-        <div className="rounded-xl bg-white/[0.03] p-5">
-          <p className="mb-1 text-sm font-medium text-white/50">{t('tokensSold')}</p>
-          <p className="text-xl font-medium text-white">
-            {project.tokensSold} / {project.totalTokenSupply}
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-white/[0.03] p-5">
-          <p className="mb-1 text-sm font-medium text-white/50">{t('revenuePeriods')}</p>
-          <p className="text-xl font-medium text-white">{project.periodCount}</p>
-        </div>
+        <dl
+          aria-label={t('metricsLabel')}
+          className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-foreground/15 pt-6 md:grid-cols-4 md:gap-x-0"
+        >
+          {items.map(({ label, value }) => (
+            <div
+              key={label}
+              className="flex flex-col gap-2 md:border-l md:border-foreground/15 md:px-6 md:first:border-l-0 md:first:pl-0"
+            >
+              <dt className="text-small text-muted-foreground">{label}</dt>
+              <dd className="text-title font-semibold tabular-nums text-foreground">{value}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
-    </div>
+    </section>
   );
 }

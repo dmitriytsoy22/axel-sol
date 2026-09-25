@@ -1,61 +1,34 @@
 import React from 'react';
-import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { ProjectState } from '@/types/project';
 import { Badge } from '@/components/ui/Badge';
-import { useTranslations } from 'next-intl';
 
 interface AssetHeaderProps {
   project: ProjectState;
 }
 
-export function AssetHeader({ project }: AssetHeaderProps): React.JSX.Element {
+/** The car's name, status and VIN, all from its token metadata and project account. */
+export function AssetHeader({ project }: AssetHeaderProps): JSX.Element {
   const tCat = useTranslations('Catalog');
   const tAsset = useTranslations('Asset');
 
-  // Helper to map status to translation key
-  const getStatusTranslation = (status: string) => {
-    switch (status) {
-      case 'active': return tCat('statusActive');
-      case 'paused': return tCat('statusPaused');
-      case 'closed': return tCat('statusClosed');
-      default: return status;
-    }
+  const statusLabel: Record<ProjectState['status'], string> = {
+    active: tCat('statusActive'),
+    paused: tCat('statusPaused'),
+    closed: tCat('statusClosed'),
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100 border border-gray-200">
-        <Image 
-          src={project.imageUrl || '/model1.png'}
-          alt={`${project.carMake} ${project.carModel}`}
-          fill
-          className="object-cover"
-          sizes="(max-width: 768px) 100vw, 50vw"
-          priority
-        />
-      </div>
-      
-      <div className="flex flex-col gap-2 relative">
-        <div className="flex justify-between items-start gap-4">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 leading-tight">
-            {project.carMake} {project.carModel} <span className="text-gray-500 font-normal">{project.carYear}</span>
-          </h1>
-          <Badge status={project.status}>
-            {getStatusTranslation(project.status)}
-          </Badge>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-2">
-          <div className="flex flex-col">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{tAsset('vin')}</span>
-            <span className="text-sm text-gray-900 font-mono">{project.vin}</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{tAsset('status')}</span>
-            <span className="text-sm text-gray-900 font-mono capitalize">{project.status}</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <header>
+      <Badge status={project.status}>{statusLabel[project.status]}</Badge>
+      <h1 className="mt-4 font-heading text-h2 font-medium text-foreground md:text-h1">
+        {project.carMake} {project.carModel}{' '}
+        <span className="tabular-nums text-muted-foreground">{project.carYear}</span>
+      </h1>
+      <p className="mt-3 flex flex-wrap gap-x-2 text-small text-muted-foreground">
+        {tAsset('vin')}
+        <span className="break-all font-mono text-foreground">{project.vin}</span>
+      </p>
+    </header>
   );
 }

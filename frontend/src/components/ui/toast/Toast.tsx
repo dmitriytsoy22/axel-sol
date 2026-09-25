@@ -1,6 +1,7 @@
 import React from 'react';
-import { CheckCircle2, XCircle, Info, ExternalLink, X } from 'lucide-react';
+import { CircleCheck, CircleX, Info, ArrowUpRight, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { getExplorerUrl } from '@/lib/solana/connection';
 
 export type ToastVariant = 'success' | 'error' | 'info';
 
@@ -13,47 +14,45 @@ export interface ToastProps {
   onClose: (id: string) => void;
 }
 
+const ICONS = {
+  success: <CircleCheck className="h-5 w-5 text-success" strokeWidth={1.75} />,
+  error: <CircleX className="h-5 w-5 text-destructive" strokeWidth={1.75} />,
+  info: <Info className="h-5 w-5 text-primary" strokeWidth={1.75} />,
+};
+
 export function Toast({ id, variant, title, message, txHash, onClose }: ToastProps): JSX.Element {
   const t = useTranslations('Toast');
 
-  const icons = {
-    success: <CheckCircle2 className="h-6 w-6 text-green-400" />,
-    error: <XCircle className="h-6 w-6 text-red-400" />,
-    info: <Info className="h-6 w-6 text-blue-400" />
-  };
-
   return (
-    <div className="pointer-events-auto flex w-full max-w-sm overflow-hidden rounded-2xl bg-gray-900/90 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl animate-in slide-in-from-top-4 fade-in duration-300">
-      <div className="flex w-full p-4">
-        <div className="flex items-start flex-1 w-0">
-          <div className="flex-shrink-0 pt-0.5">{icons[variant]}</div>
-          <div className="ml-3 flex-1">
-            <p className="text-sm font-semibold text-white">{title}</p>
-            {message && <p className="mt-1 text-sm text-gray-400">{message}</p>}
-            {txHash && (
-              <a
-                href={`https://explorer.solana.com/tx/${txHash}?cluster=devnet`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {t('viewExplorer')} <ExternalLink size={12} />
-              </a>
-            )}
-          </div>
-        </div>
-        <div className="ml-4 flex flex-shrink-0">
-          <button
-            type="button"
-            className="inline-flex rounded-md text-gray-400 hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-colors"
-            onClick={() => onClose(id)}
+    <div
+      className="pointer-events-auto flex w-full max-w-sm animate-slide-down gap-3 rounded-card border border-border bg-popover py-3 pl-4 pr-2 text-popover-foreground shadow-md motion-reduce:animate-none"
+    >
+      <span aria-hidden="true" className="mt-0.5 shrink-0">
+        {ICONS[variant]}
+      </span>
+      <div className="min-w-0 flex-1 py-0.5">
+        <p className="text-small font-semibold text-foreground">{title}</p>
+        {message && <p className="mt-1 break-words text-small text-muted-foreground">{message}</p>}
+        {txHash && (
+          <a
+            href={getExplorerUrl(txHash, 'tx')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 hover:underline md:min-h-0"
           >
-            <span className="sr-only">Close</span>
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
+            {t('viewExplorer')}
+            <ArrowUpRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+          </a>
+        )}
       </div>
+      <button
+        type="button"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-muted-foreground transition-colors duration-fast ease-move hover:bg-secondary hover:text-foreground"
+        onClick={() => onClose(id)}
+        aria-label={t('close')}
+      >
+        <X aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+      </button>
     </div>
   );
 }

@@ -8,12 +8,15 @@ interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
   title?: string;
+  closeLabel?: string;
 }
 
-export function Modal({ isOpen, onClose, children, title }: ModalProps) {
+const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+/* A dialog on paper. Below sm it is a bottom sheet, so the action sits in thumb reach. */
+export function Modal({ isOpen, onClose, children, title, closeLabel = 'Close' }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Focus trap
   useEffect(() => {
     if (!isOpen) return;
 
@@ -24,84 +27,71 @@ export function Modal({ isOpen, onClose, children, title }: ModalProps) {
       }
 
       if (e.key === 'Tab') {
-        const focusableElements = modalRef.current?.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
+        const focusableElements = modalRef.current?.querySelectorAll(FOCUSABLE);
         if (!focusableElements || focusableElements.length === 0) return;
 
         const firstElement = focusableElements[0] as HTMLElement;
-        const lastElement = focusableElements[
-          focusableElements.length - 1
-        ] as HTMLElement;
+        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
 
-        if (e.shiftKey) {
-          if (document.activeElement === firstElement) {
-            e.preventDefault();
-            lastElement.focus();
-          }
-        } else {
-          if (document.activeElement === lastElement) {
-            e.preventDefault();
-            firstElement.focus();
-          }
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
         }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
 
-    // Initial focus
-    const focusable = modalRef.current?.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-    if (focusable && focusable.length > 0) {
-      (focusable[0] as HTMLElement).focus();
-    }
+    // Focus the first control inside the content, not the close button.
+    const focusable = modalRef.current?.querySelectorAll<HTMLElement>(
+      `[data-modal-body] :is(${FOCUSABLE})`,
+    );
+    focusable?.[0]?.focus();
 
-    // Body scroll lock
     document.body.style.overflow = 'hidden';
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/40 backdrop-blur-[20px] transition-opacity animate-in fade-in duration-200"
+    <div className="fixed inset-0 z-modal flex items-end justify-center sm:items-center sm:p-6">
+      <div
+        className="absolute inset-0 animate-fade-in bg-ink-950/50 motion-reduce:animate-none"
         onClick={onClose}
         aria-hidden="true"
       />
-      
-      {/* Modal Content - scale animation handled via inline tailwind class for simplicity and performance */}
-      <div 
+
+      <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={title ? "modal-title" : undefined}
-        className="relative z-10 w-full max-w-lg rounded-2xl border border-white/10 bg-[#0F1115]/90 p-6 shadow-2xl transition-all animate-in zoom-in-95 slide-in-from-bottom-2 duration-300"
-        style={{
-          animationFillMode: 'forwards'
-        }}
+        aria-labelledby={title ? 'modal-title' : undefined}
+        className="relative w-full max-w-md animate-fade-in rounded-t-panel border border-border bg-popover px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5 text-popover-foreground shadow-lg motion-reduce:animate-none sm:rounded-panel sm:pb-6"
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-4">
           {title && (
-            <h2 id="modal-title" className="text-xl font-semibold text-white">
+            <h2 id="modal-title" className="text-title font-semibold text-foreground">
               {title}
             </h2>
           )}
           <button
+            type="button"
             onClick={onClose}
-            className="ml-auto rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
-            aria-label="Close modal"
+            className="-mr-3 ml-auto inline-flex h-11 w-11 items-center justify-center rounded-control text-muted-foreground transition-colors duration-fast ease-move hover:bg-secondary hover:text-foreground"
+            aria-label={closeLabel}
           >
-            <X size={20} />
+            <X aria-hidden="true" className="h-5 w-5" strokeWidth={1.75} />
           </button>
         </div>
-        <div className="max-h-[80vh] overflow-y-auto">
+        <div data-modal-body className="max-h-[75svh] overflow-y-auto">
           {children}
         </div>
       </div>

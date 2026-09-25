@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { TelemetryWidget } from '@/components/dashboard/TelemetryWidget';
+import { TelemetryWidget } from '@/components/asset/TelemetryWidget';
 import { NextIntlClientProvider } from 'next-intl';
 
 // Mock messages
@@ -16,7 +16,10 @@ const messages = {
     trips: 'Trips',
     emptyState: 'Telemetry data is currently unavailable.',
     staleData: 'Last updated: {time}',
-    loading: "Loading telemetry..."
+    loading: "Loading telemetry...",
+    lead: 'Daily figures from the tracker.',
+    status: 'Status',
+    km: 'km'
   },
   RpcError: {
     title: 'Connection Error',
@@ -72,7 +75,8 @@ describe('TelemetryWidget', () => {
 
     expect(screen.getByText('Live Telemetry')).toBeInTheDocument();
     expect(screen.getByText('In Service')).toBeInTheDocument();
-    expect(screen.getByText('153.25')).toBeInTheDocument();
+    // Income is in tenge, never dollars.
+    expect(screen.getByText('₸153.25')).toBeInTheDocument();
   });
 
   it('renders empty state when available: false', async () => {

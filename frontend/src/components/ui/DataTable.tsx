@@ -7,22 +7,43 @@ export interface ColumnDef<T> {
   header: string;
   accessorKey: keyof T | string;
   sortable?: boolean;
+  /** Numbers and amounts align right so their digits line up. */
+  align?: 'left' | 'right';
   cell?: (item: T) => React.ReactNode;
+}
+
+export interface DataTableLabels {
+  page: string;
+  of: string;
+  previous: string;
+  next: string;
 }
 
 interface DataTableProps<T> {
   data: T[];
   columns: ColumnDef<T>[];
   pageSize?: number;
-  emptyMessage?: string;
+  emptyMessage?: React.ReactNode;
+  labels?: DataTableLabels;
   className?: string;
 }
+
+const DEFAULT_LABELS: DataTableLabels = {
+  page: 'Page',
+  of: 'of',
+  previous: 'Previous Page',
+  next: 'Next Page',
+};
+
+const pagerButton =
+  'inline-flex h-11 w-11 items-center justify-center rounded-control border border-border bg-card text-foreground transition-colors duration-fast ease-move hover:bg-secondary disabled:pointer-events-none disabled:opacity-40 md:h-10 md:w-10';
 
 export function DataTable<T>({
   data,
   columns,
   pageSize = 10,
   emptyMessage = 'No data available',
+  labels = DEFAULT_LABELS,
   className = '',
 }: DataTableProps<T>): JSX.Element {
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,14 +62,14 @@ export function DataTable<T>({
       }
       return { key, direction: 'asc' };
     });
-    setCurrentPage(1); // Reset to first page on sort
+    setCurrentPage(1);
   };
 
   const sortedData = useMemo(() => {
     if (!sortConfig.key) return data;
 
     return [...data].sort((a, b) => {
-      // Cast explicitly since accessorKey can be nested or complex, but we assume flat for simplicity
+      // Columns sort on flat fields of the row.
       const aValue = (a as Record<string, any>)[sortConfig.key!];
       const bValue = (b as Record<string, any>)[sortConfig.key!];
 
@@ -70,60 +91,84 @@ export function DataTable<T>({
     return sortedData.slice(startIndex, startIndex + pageSize);
   }, [sortedData, currentPage, pageSize]);
 
+  const renderCell = (col: ColumnDef<T>, row: T) =>
+    col.cell ? col.cell(row) : (row as Record<string, any>)[col.accessorKey as string];
+
   return (
-    <div className={`w-full bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${className}`}>
-      {/* Desktop Table View */}
-      <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead className="bg-gray-50 border-b border-gray-100">
+    <div
+      className={`w-full overflow-hidden rounded-card border border-border bg-card shadow-sm ${className}`}
+    >
+      {/* relative: screen-reader-only text inside cells is absolutely positioned; without a
+          containing block here it escapes the scroller and widens the whole page. */}
+      <div className="relative hidden overflow-x-auto sm:block">
+        <table className="w-full whitespace-nowrap text-left text-small">
+          <thead className="border-b border-border bg-muted">
             <tr>
-              {columns.map((col, idx) => (
-                <th
-                  key={idx}
-                  className={`px-6 py-4 font-medium text-gray-500 uppercase tracking-wider ${
-                    col.sortable ? 'cursor-pointer select-none hover:bg-gray-100 transition-colors' : ''
-                  }`}
-                  onClick={() => col.sortable && handleSort(col.accessorKey as string)}
-                >
-                  <div className="flex items-center gap-2">
-                    {col.header}
-                    {col.sortable && (
-                      <div className="flex flex-col">
-                        <ChevronUp
-                          className={`w-3 h-3 -mb-1 ${
-                            sortConfig.key === col.accessorKey && sortConfig.direction === 'asc'
-                              ? 'text-[#00D1FF]'
-                              : 'text-gray-300'
-                          }`}
-                        />
-                        <ChevronDown
-                          className={`w-3 h-3 ${
-                            sortConfig.key === col.accessorKey && sortConfig.direction === 'desc'
-                              ? 'text-[#00D1FF]'
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      </div>
+              {columns.map((col, idx) => {
+                const key = col.accessorKey as string;
+                const isSorted = sortConfig.key === key;
+                const alignRight = col.align === 'right';
+                return (
+                  <th
+                    key={idx}
+                    scope="col"
+                    aria-sort={
+                      isSorted
+                        ? sortConfig.direction === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : undefined
+                    }
+                    // Baseline alignment keeps every header label on one line of text, whether
+                    // its sort icon sits before it (right-aligned numbers) or after it.
+                    className={`px-4 py-3 align-baseline font-medium text-muted-foreground first:pl-6 last:pr-6 ${alignRight ? 'text-right' : ''}`}
+                  >
+                    {col.sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSort(key)}
+                        className={`inline-flex items-baseline gap-1.5 rounded-control transition-colors duration-fast ease-move hover:text-foreground ${alignRight ? 'flex-row-reverse' : ''}`}
+                      >
+                        {col.header}
+                        <span aria-hidden="true" className="flex flex-col self-center">
+                          <ChevronUp
+                            className={`-mb-1 h-3 w-3 ${isSorted && sortConfig.direction === 'asc' ? 'text-foreground' : 'text-subtle-foreground/50'}`}
+                            strokeWidth={2}
+                          />
+                          <ChevronDown
+                            className={`h-3 w-3 ${isSorted && sortConfig.direction === 'desc' ? 'text-foreground' : 'text-subtle-foreground/50'}`}
+                            strokeWidth={2}
+                          />
+                        </span>
+                      </button>
+                    ) : (
+                      col.header
                     )}
-                  </div>
-                </th>
-              ))}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-border">
             {currentData.length > 0 ? (
               currentData.map((row, rowIndex) => (
-                <tr key={rowIndex} className="hover:bg-gray-50/50 transition-colors duration-200">
+                <tr key={rowIndex}>
                   {columns.map((col, colIndex) => (
-                    <td key={colIndex} className="px-6 py-4 text-gray-900">
-                      {col.cell ? col.cell(row) : (row as Record<string, any>)[col.accessorKey as string]}
+                    <td
+                      key={colIndex}
+                      className={`px-4 py-3.5 tabular-nums text-foreground first:pl-6 last:pr-6 ${col.align === 'right' ? 'text-right' : ''}`}
+                    >
+                      {renderCell(col, row)}
                     </td>
                   ))}
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length} className="px-6 py-8 text-center text-gray-400">
+                <td
+                  colSpan={columns.length}
+                  className="px-6 py-10 text-center text-muted-foreground"
+                >
                   {emptyMessage}
                 </td>
               </tr>
@@ -132,50 +177,50 @@ export function DataTable<T>({
         </table>
       </div>
 
-      {/* Mobile Cards View */}
-      <div className="sm:hidden flex flex-col divide-y divide-gray-100">
+      {/* Below sm each row becomes a stack of label and value. */}
+      <div className="flex flex-col divide-y divide-border sm:hidden">
         {currentData.length > 0 ? (
           currentData.map((row, rowIndex) => (
-            <div key={rowIndex} className="p-4 flex flex-col gap-3 hover:bg-gray-50/50 transition-colors duration-200">
+            <dl key={rowIndex} className="flex flex-col gap-2 p-4">
               {columns.map((col, colIndex) => (
-                <div key={colIndex} className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">{col.header}</span>
-                  <span className="text-gray-900 text-right break-words pl-4">
-                    {col.cell ? col.cell(row) : (row as Record<string, any>)[col.accessorKey as string]}
-                  </span>
+                <div key={colIndex} className="flex items-center justify-between gap-4 text-small">
+                  <dt className="text-muted-foreground">{col.header}</dt>
+                  <dd className="break-words text-right tabular-nums text-foreground">
+                    {renderCell(col, row)}
+                  </dd>
                 </div>
               ))}
-            </div>
+            </dl>
           ))
         ) : (
-          <div className="px-6 py-8 text-center text-gray-400">
-            {emptyMessage}
-          </div>
+          <div className="px-6 py-10 text-center text-muted-foreground">{emptyMessage}</div>
         )}
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50">
-          <div className="text-sm text-gray-500">
-            Page <span className="font-medium text-gray-900">{currentPage}</span> of{' '}
-            <span className="font-medium text-gray-900">{totalPages}</span>
+        <div className="flex items-center justify-between gap-4 border-t border-border bg-muted px-4 py-3 sm:px-6">
+          <div className="text-small text-muted-foreground">
+            {labels.page} <span className="font-medium text-foreground">{currentPage}</span>{' '}
+            {labels.of} <span className="font-medium text-foreground">{totalPages}</span>
           </div>
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-              aria-label="Previous Page"
+              className={pagerButton}
+              aria-label={labels.previous}
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
             </button>
             <button
+              type="button"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-              aria-label="Next Page"
+              className={pagerButton}
+              aria-label={labels.next}
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
             </button>
           </div>
         </div>

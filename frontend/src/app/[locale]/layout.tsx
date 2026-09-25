@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import '@/styles/globals.css';
 import WalletProvider from '@/providers/WalletProvider';
 import { Navbar } from '@/components/layout';
@@ -10,18 +10,31 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
+import { REVEAL_GATE_SCRIPT } from '@/lib/revealGate';
 
-const inter = Inter({
-  subsets: ['latin', 'cyrillic'],
+// Self-hosted subsets (see src/fonts/README.md): the build never calls Google Fonts.
+const sans = localFont({
+  src: '../../fonts/Onest-Variable.woff2',
+  weight: '400 700',
   display: 'swap',
-  variable: '--font-inter',
+  variable: '--font-sans',
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
+const serif = localFont({
+  src: '../../fonts/AxelSerif-Variable.woff2',
+  weight: '400 600',
   display: 'swap',
-  variable: '--font-jetbrains-mono',
-  weight: ['400', '500'],
+  variable: '--font-serif',
+  fallback: ['Georgia', 'Times New Roman', 'serif'],
+  adjustFontFallback: 'Times New Roman',
+});
+
+const mono = localFont({
+  src: '../../fonts/JetBrainsMono-Variable.woff2',
+  weight: '400 600',
+  display: 'swap',
+  variable: '--font-mono',
+  preload: false,
 });
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
@@ -62,13 +75,16 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className="font-sans bg-white text-text-primary min-h-screen flex flex-col">
+    <html lang={locale} className={`${sans.variable} ${serif.variable} ${mono.variable}`}>
+      <body className="font-sans bg-background text-foreground min-h-screen flex flex-col">
+        <script dangerouslySetInnerHTML={{ __html: REVEAL_GATE_SCRIPT }} />
         <NextIntlClientProvider messages={messages}>
           <WalletProvider>
             <ToastProvider>
               <Navbar />
-              <main className="flex-1">{children}</main>
+              <main id="main" className="flex-1">
+                {children}
+              </main>
               <Footer />
             </ToastProvider>
           </WalletProvider>

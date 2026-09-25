@@ -1,17 +1,17 @@
-export const Logo = ({ className = "" }: { className?: string }) => {
-  return (
-    <div className={`flex items-center space-x-2.5 ${className}`}>
-      <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0 flex-none text-text-primary">
-        {/* Core Token Axis */}
-        <circle cx="16" cy="19" r="6" fill="#06B6D4" />
-        {/* A shape framing the axis */}
-        <path d="M16 2 L2 30 L9 30 L16 16 L23 30 L30 30 Z" fill="currentColor" />
-        {/* Classic flat crossbar completing the 'A' */}
-        <rect x="9" y="19" width="14" height="4" fill="currentColor" />
-      </svg>
-      <span className="text-xl font-bold tracking-[0.16em] uppercase text-text-primary mt-[2px]">
-        AXEL
-      </span>
-    </div>
-  );
-};
+/*
+ * AXEL mark: an "A" whose crossbar is a cyan token. The legs take the text color of the
+ * surface (ink on paper, paper on ink); the token is always the brand cyan.
+ */
+export const LogoMark = ({ className = '' }: { className?: string }): JSX.Element => (
+  <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false" className={className}>
+    <path d="M16 3 4 29h6l6-14 6 14h6Z" fill="currentColor" />
+    <circle cx="16" cy="22" r="3.2" className="fill-brand" />
+  </svg>
+);
+
+export const Logo = ({ className = '' }: { className?: string }): JSX.Element => (
+  <span className={`flex items-center gap-2 ${className}`}>
+    <LogoMark className="h-7 w-7 shrink-0" />
+    <span className="text-body font-semibold uppercase tracking-[0.14em]">AXEL</span>
+  </span>
+);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/routing';
 import { NavDesktopLinks } from './NavDesktopLinks';
 import { NavLanguageSwitcher } from './NavLanguageSwitcher';
@@ -9,13 +10,18 @@ import { NavMobileMenu } from './NavMobileMenu';
 import { Logo } from './Logo';
 import { ConnectionStatus } from '../shared/ConnectionStatus';
 
+const SCROLL_THRESHOLD = 16;
+
 export const Navbar = (): JSX.Element => {
+  const t = useTranslations('Navigation');
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const pathname = usePathname();
+  const isHome = pathname === '/';
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 0);
+    const onScroll = () => setScrolled(window.scrollY > SCROLL_THRESHOLD);
+    onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
@@ -24,35 +30,36 @@ export const Navbar = (): JSX.Element => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [mobileMenuOpen]);
+  // The home hero is a dark photo: until the page scrolls, the bar sits on it in the ink theme.
+  const overHero = isHome && !scrolled && !mobileMenuOpen;
 
   return (
     <>
-      <nav
-        id="navbar"
-        className={`fixed top-0 w-full h-[52px] z-sticky bg-white/80 backdrop-blur-xl shadow-[0_10px_40px_rgba(29,29,31,0.05)] border-b transition-colors duration-250 ${scrolled ? 'border-border-subtle' : 'border-transparent'}`}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-toast focus:inline-flex focus:h-11 focus:items-center focus:rounded-control focus:bg-background focus:px-4 focus:text-small focus:font-medium focus:text-foreground focus:shadow-md"
       >
-        <div className="flex justify-between items-center px-8 w-full max-w-[1200px] mx-auto h-full">
+        {t('skipToContent')}
+      </a>
+      <header
+        id="navbar"
+        className={`fixed inset-x-0 top-0 z-sticky border-b transition-colors duration-base ease-move motion-reduce:transition-none ${
+          overHero ? 'theme-ink border-transparent bg-transparent' : 'border-border bg-background'
+        }`}
+      >
+        <div className="page-container flex h-16 items-center gap-4 lg:gap-8">
           <Link
             href="/"
-            className="no-underline hover:opacity-80 transition-opacity duration-normal"
+            aria-label={t('home')}
+            className="-ml-1 flex min-h-11 items-center rounded-control px-1 text-foreground no-underline"
           >
             <Logo />
           </Link>
 
           <NavDesktopLinks />
 
-          <div className="flex items-center space-x-4">
-            <div className="hidden md:block">
+          <div className="ml-auto flex items-center gap-2">
+            <div className="hidden lg:block">
               <ConnectionStatus />
             </div>
             <NavLanguageSwitcher />
@@ -60,9 +67,9 @@ export const Navbar = (): JSX.Element => {
             <NavMobileMenu isOpen={mobileMenuOpen} setIsOpen={setMobileMenuOpen} />
           </div>
         </div>
-      </nav>
+      </header>
 
-      <div className="h-[52px]" />
+      {!isHome && <div aria-hidden="true" className="h-16" />}
     </>
   );
 };

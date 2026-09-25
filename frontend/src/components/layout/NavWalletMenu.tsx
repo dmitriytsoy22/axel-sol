@@ -1,125 +1,135 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWalletInfo } from '@/hooks/useWalletInfo';
-import { Link as LinkIcon } from 'lucide-react';
+import { Copy, LogOut, Wallet } from 'lucide-react';
+import { buttonClasses } from '@/components/ui/Button';
+import { formatNumber } from '@/lib/format';
+
+export function useCopyAddress(publicKey: string | null): {
+  copied: boolean;
+  copy: () => Promise<void>;
+} {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  const copy = useCallback(async () => {
+    if (!publicKey) return;
+    try {
+      await navigator.clipboard.writeText(publicKey);
+      setCopied(true);
+    } catch {
+      console.error('[AXEL] Failed to copy address');
+    }
+  }, [publicKey]);
+
+  return { copied, copy };
+}
 
 export const NavWalletMenu = (): JSX.Element => {
   const tCommon = useTranslations('Common');
+  const locale = useLocale();
   const { disconnect, connected } = useWallet();
+  const { setVisible } = useWalletModal();
   const { truncatedAddress, balance, publicKey } = useWalletInfo();
-  
-  const [chipDropdownOpen, setChipDropdownOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyAddress(publicKey);
+
+  const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  
-  const chipRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        chipRef.current &&
-        !chipRef.current.contains(e.target as Node) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setChipDropdownOpen(false);
-      }
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const { setVisible } = useWalletModal();
-
-  const handleConnect = useCallback(() => {
-    setVisible(true);
-  }, [setVisible]);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
 
   const handleDisconnect = useCallback(async () => {
     await disconnect();
-    setChipDropdownOpen(false);
+    setOpen(false);
   }, [disconnect]);
 
-  const handleCopyAddress = useCallback(async () => {
-    if (!publicKey) return;
-    try {
-      await navigator.clipboard.writeText(publicKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      console.error('[AXEL] Failed to copy address');
-    }
-  }, [publicKey]);
-
+  if (!mounted || !connected || !truncatedAddress) {
+    return (
+      <button
+        id="wallet-connect"
+        type="button"
+        onClick={() => setVisible(true)}
+        className={buttonClasses({
+          variant: 'outline',
+          size: 'sm',
+          className: 'hidden md:inline-flex',
+        })}
+      >
+        <Wallet aria-hidden="true" strokeWidth={1.75} />
+        {tCommon('connect')}
+      </button>
+    );
+  }
 
   return (
-    <div className="hidden sm:block">
-      {connected && truncatedAddress ? (
-        <div className="relative" ref={chipRef}>
+    <div ref={rootRef} className="relative hidden md:block">
+      <button
+        id="wallet-chip"
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex h-10 items-center gap-2 rounded-control border border-border px-3 text-small text-foreground transition-colors duration-fast ease-move hover:bg-secondary"
+      >
+        <span aria-hidden="true" className="h-2 w-2 rounded-full bg-success" />
+        <span className="font-mono">{truncatedAddress}</span>
+        {balance !== null && (
+          <span className="tabular-nums text-muted-foreground">
+            {formatNumber(balance, locale, 2)} SOL
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-dropdown mt-2 w-72 animate-slide-down rounded-card border border-border bg-popover p-2 text-popover-foreground shadow-md">
+          <p className="break-all px-2 pb-2 pt-1 font-mono text-small text-muted-foreground">
+            {publicKey}
+          </p>
           <button
-            id="wallet-chip"
-            onClick={() => setChipDropdownOpen(!chipDropdownOpen)}
-            className="bg-surface-secondary px-4 py-1.5 rounded-full flex items-center space-x-2 border border-border-subtle hover:bg-surface-hover transition-colors duration-200 cursor-pointer"
+            type="button"
+            onClick={copy}
+            className="flex h-10 w-full items-center gap-2 rounded-control px-2 text-small text-foreground transition-colors duration-fast ease-move hover:bg-secondary"
           >
-            <span className="font-mono text-[13px] font-medium text-text-primary">
-              {truncatedAddress} {balance !== null && `· ${balance.toFixed(2)} SOL`}
-            </span>
-            <div className="w-2 h-2 rounded-full bg-brand-primary"></div>
+            <Copy aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+            <span aria-live="polite">{copied ? tCommon('copied') : tCommon('copyAddress')}</span>
           </button>
-
-          {chipDropdownOpen && (
-            <div
-              ref={dropdownRef}
-              className="absolute right-0 top-full mt-2 w-[280px] bg-white rounded-card-sm shadow-md p-4 animate-slide-down z-dropdown"
-              style={{ border: '1px solid #E8E8ED' }}
-            >
-              <button
-                onClick={handleCopyAddress}
-                className="w-full text-left flex items-center justify-between gap-2 p-2 rounded-[8px] hover:bg-surface-secondary transition-colors duration-fast cursor-pointer border-none bg-transparent"
-              >
-                <span className="font-mono text-[13px] text-text-primary break-all leading-snug">
-                  {publicKey}
-                </span>
-                <span className="text-[12px] text-text-secondary whitespace-nowrap flex-shrink-0">
-                  {copied ? tCommon('copied') : tCommon('copy')}
-                </span>
-              </button>
-
-              <div className="h-px bg-border-subtle my-2" />
-
-              <button
-                id="wallet-disconnect"
-                onClick={handleDisconnect}
-                className="w-full text-left p-2 rounded-[8px] text-[14px] text-semantic-error hover:bg-semantic-error-muted transition-colors duration-fast cursor-pointer border-none bg-transparent"
-              >
-                {tCommon('disconnect')}
-              </button>
-            </div>
-          )}
+          <button
+            id="wallet-disconnect"
+            type="button"
+            onClick={handleDisconnect}
+            className="flex h-10 w-full items-center gap-2 rounded-control px-2 text-small text-destructive transition-colors duration-fast ease-move hover:bg-destructive-muted"
+          >
+            <LogOut aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+            {tCommon('disconnect')}
+          </button>
         </div>
-      ) : mounted ? (
-        <button
-          id="wallet-connect"
-          onClick={handleConnect}
-          className="flex items-center space-x-1.5 px-5 py-2 rounded-full bg-brand-primary-light text-brand-primary-active hover:bg-[#B5F5FC] transition-colors duration-200 font-medium text-[13px] border-none cursor-pointer"
-        >
-          <LinkIcon size={16} strokeWidth={2} />
-          <span>{tCommon('connect')}</span>
-        </button>
-      ) : (
-        <button className="flex items-center space-x-1.5 px-5 py-2 rounded-full bg-surface-secondary text-text-secondary font-medium text-[13px] border-none">
-          <LinkIcon size={16} strokeWidth={2} />
-          <span>{tCommon('connect')}</span>
-        </button>
       )}
     </div>
   );

@@ -7,7 +7,9 @@ interface CardProps {
 
 export function Card({ children, className = '' }: CardProps): JSX.Element {
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md ${className}`}>
+    <div
+      className={`overflow-hidden rounded-card border border-border bg-card text-card-foreground shadow-sm ${className}`}
+    >
       {children}
     </div>
   );

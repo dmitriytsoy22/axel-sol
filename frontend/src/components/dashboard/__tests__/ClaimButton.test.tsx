@@ -11,7 +11,9 @@ const mockMessages = {
   Dashboard: {
     claimNow: 'Claim Now',
     claimed: 'Claimed',
-    claiming: 'Claiming...'
+    claiming: 'Claiming...',
+    claimFailed: 'Claim failed',
+    txFailed: 'The transaction did not go through.'
   }
 };
 
