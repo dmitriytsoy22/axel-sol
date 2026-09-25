@@ -6,8 +6,10 @@ import { expectError, expectEvent, expectOk } from "./helpers/assert";
 import { big, bn, type TxResult } from "./helpers/env";
 import {
   ACTIVATION_WINDOW,
+  activate,
   buy,
   DAY,
+  DOC_HASH,
   marketEnv,
   newInvestor,
   openProject,
@@ -29,7 +31,7 @@ import {
   updateConfigIx,
   type ProjectRef,
 } from "./helpers/instructions";
-import { assertRaiseInvariants } from "./helpers/invariants";
+import { assertInvariants } from "./helpers/invariants";
 import { positionPda } from "./helpers/pda";
 import { plain } from "./helpers/plain";
 import {
@@ -42,7 +44,6 @@ import {
   tokenBalance,
 } from "./helpers/tokens";
 
-const DOC_HASH = Array.from({ length: 32 }, (_, i) => i + 1);
 const RAISE_FEE_BPS = 250n;
 const SIGNATURE_FEE = 5_000n;
 
@@ -56,15 +57,6 @@ function paymentAccount(market: Market, owner: PublicKey): PublicKey {
 
 function projectState(market: Market, project: ProjectRef) {
   return market.env.fetch("project", project.address);
-}
-
-async function activate(market: Market, project: ProjectRef, signer: Keypair = market.roles.admin): Promise<TxResult> {
-  const ix = await activateProjectIx(
-    project,
-    { admin: signer.publicKey, treasury: market.roles.treasury.publicKey, operator: market.operator.publicKey },
-    DOC_HASH,
-  );
-  return market.env.send([ix], [signer]);
 }
 
 async function finalize(market: Market, project: ProjectRef): Promise<TxResult> {
@@ -148,14 +140,14 @@ describe("full raise lifecycle", () => {
       );
       const mint = readMint(market.env, project.shareMint);
       assert.deepEqual(plain([mint.supply.toString(), mint.mintAuthority]), plain(["100", project.address]));
-      assertRaiseInvariants(market.env, project, buyers.map((buyer) => buyer.publicKey));
+      assertInvariants(market.env, project, buyers.map((buyer) => buyer.publicKey));
     });
 
     test(`failed in ${programName}: every buyer gets exactly what it paid back`, async () => {
       const market = await marketEnv(paymentProgram);
       const { project, buyers } = await failedRaise(market);
       const holders = buyers.map((buyer) => buyer.publicKey);
-      assertRaiseInvariants(market.env, project, holders);
+      assertInvariants(market.env, project, holders);
 
       for (const buyer of buyers) {
         const paidIn = big(market.env.fetch("position", positionPda(project.address, buyer.publicKey)).paidIn);
@@ -168,7 +160,7 @@ describe("full raise lifecycle", () => {
           plain(expectEvent(result, "refunded")),
           plain({ project: project.address, owner: buyer.publicKey, shares: bn(paidIn / PRICE), amount: bn(paidIn) }),
         );
-        assertRaiseInvariants(market.env, project, holders);
+        assertInvariants(market.env, project, holders);
       }
 
       assert.equal(tokenBalance(market.env, project.escrow), 0n);
@@ -446,7 +438,7 @@ describe("cancel_raise", () => {
       expectOk(await refund(market, project, buyer));
     }
     assert.equal(tokenBalance(market.env, project.escrow), 0n);
-    assertRaiseInvariants(market.env, project, buyers.map((buyer) => buyer.publicKey));
+    assertInvariants(market.env, project, buyers.map((buyer) => buyer.publicKey));
   });
 
   test("the operator cannot cancel a raise", async () => {
@@ -534,7 +526,7 @@ describe("refund", () => {
     expectError(await refund(market, project, buyers[0]), "InvestorFrozen");
 
     assert.equal(tokenBalance(market.env, project.escrow), 50n * PRICE);
-    assertRaiseInvariants(market.env, project, buyers.map((buyer) => buyer.publicKey));
+    assertInvariants(market.env, project, buyers.map((buyer) => buyer.publicKey));
   });
 
   test("an open or funded raise cannot be refunded", async () => {
@@ -545,8 +537,8 @@ describe("refund", () => {
     expectError(await refund(market, fundraising, early[0]), "InvalidState");
     expectError(await refund(market, funded, funders[0]), "InvalidState");
 
-    assertRaiseInvariants(market.env, fundraising, [early[0].publicKey]);
-    assertRaiseInvariants(market.env, funded, funders.map((funder) => funder.publicKey));
+    assertInvariants(market.env, fundraising, [early[0].publicKey]);
+    assertInvariants(market.env, funded, funders.map((funder) => funder.publicKey));
   });
 
   test("after activation there is no escrow left to refund from", async () => {

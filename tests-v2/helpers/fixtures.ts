@@ -2,9 +2,11 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { bn, TestEnv, type TxResult } from "./env";
 import { expectOk } from "./assert";
 import {
+  activateProjectIx,
   buySharesIx,
   createProjectIx,
   initializeConfigIx,
+  InvestorFlag,
   InvestorStatus,
   KycProvider,
   setInvestorIx,
@@ -190,9 +192,102 @@ export async function newInvestor(
   return wallet;
 }
 
+/** The KYC authority overwrites the wallet's record. */
+export async function setInvestorStatus(
+  market: Market,
+  wallet: PublicKey,
+  status: keyof typeof InvestorStatus,
+  expiresAt: bigint,
+  flags = 0,
+): Promise<void> {
+  expectOk(
+    market.env.send(
+      [
+        await setInvestorIx(market.roles.kyc.publicKey, wallet, {
+          status: InvestorStatus[status],
+          expiresAt: bn(expiresAt),
+          jurisdiction: KAZAKHSTAN,
+          flags,
+          provider: KycProvider.sumsub,
+        }),
+      ],
+      [market.roles.kyc],
+    ),
+  );
+}
+
+/**
+ * Ways a verified wallet loses the right to hold shares of a project that does not accept
+ * DEMO investors, with the reason `require_eligible` gives.
+ */
+export const INELIGIBLE_INVESTORS: Array<{
+  name: string;
+  reason: "InvestorNotActive" | "InvestorFrozen" | "InvestorExpired" | "DemoNotAllowed";
+  apply: (market: Market, wallet: PublicKey) => Promise<void>;
+}> = [
+  {
+    name: "revoked",
+    reason: "InvestorNotActive",
+    apply: (market, wallet) => setInvestorStatus(market, wallet, "revoked", 0n),
+  },
+  {
+    name: "sanctions-frozen",
+    reason: "InvestorFrozen",
+    apply: (market, wallet) => setInvestorStatus(market, wallet, "frozen", market.env.now() + 365n * DAY),
+  },
+  {
+    name: "KYC-expired",
+    reason: "InvestorExpired",
+    apply: async (market, wallet) => {
+      await setInvestorStatus(market, wallet, "active", market.env.now() + DAY);
+      market.env.warp(DAY);
+    },
+  },
+  {
+    name: "demo-only",
+    reason: "DemoNotAllowed",
+    apply: (market, wallet) =>
+      setInvestorStatus(market, wallet, "active", market.env.now() + 365n * DAY, InvestorFlag.demo),
+  },
+];
+
 /** The owner buys `shares` at the project's price, paying fees and rent itself. */
 export async function buy(market: Market, project: ProjectRef, owner: Keypair, shares: bigint): Promise<TxResult> {
   const price = BigInt(market.env.fetch("project", project.address).pricePerShare.toString());
   const ix = await buySharesIx(project, { payer: owner.publicKey, owner: owner.publicKey }, shares, shares * price);
   return market.env.send([ix], [owner]);
+}
+
+/** Hash of the car's purchase documents that the admin publishes on activation. */
+export const DOC_HASH = Array.from({ length: 32 }, (_, i) => i + 1);
+
+/** The admin (or `signer`) activates a funded project, paying the operator. */
+export async function activate(market: Market, project: ProjectRef, signer: Keypair = market.roles.admin): Promise<TxResult> {
+  const ix = await activateProjectIx(
+    project,
+    { admin: signer.publicKey, treasury: market.roles.treasury.publicKey, operator: market.operator.publicKey },
+    DOC_HASH,
+  );
+  return market.env.send([ix], [signer]);
+}
+
+/**
+ * An operating project whose holders bought `allocations` shares in the raise, in order.
+ * The allocations must add up to the total supply so the raise sells out.
+ */
+export async function operatingProject(
+  market: Market,
+  allocations: bigint[] = [50n, 30n, 20n],
+  overrides: Partial<CreateProjectParams> = {},
+): Promise<{ project: ProjectRef; holders: Keypair[] }> {
+  const total = bn(allocations.reduce((sum, shares) => sum + shares, 0n));
+  const project = await openProject(market, { totalShares: total, softCapShares: total, ...overrides });
+  const holders: Keypair[] = [];
+  for (const shares of allocations) {
+    const holder = await newInvestor(market);
+    expectOk(await buy(market, project, holder, shares));
+    holders.push(holder);
+  }
+  expectOk(await activate(market, project));
+  return { project, holders };
 }

@@ -24,6 +24,25 @@ pub struct Position {
 impl Position {
     pub const SPACE: usize = Position::DISCRIMINATOR.len() + Position::INIT_SPACE;
 
+    /// An empty position that earns only revenue deposited after `acc_checkpoint`.
+    pub fn new(project: Pubkey, owner: Pubkey, acc_checkpoint: u128, bump: u8) -> Self {
+        Self {
+            project,
+            owner,
+            shares: 0,
+            acc_checkpoint,
+            accrued: 0,
+            total_claimed: 0,
+            paid_in: 0,
+            bump,
+        }
+    }
+
+    /// True once the account holds a position, false right after `init_if_needed`.
+    pub fn is_open(&self) -> bool {
+        self.owner != Pubkey::default()
+    }
+
     /// Credits revenue earned since the checkpoint and moves the checkpoint to `acc`.
     pub fn settle(&mut self, acc: u128) -> Result<()> {
         self.accrued = math::settled_accrued(self.shares, self.acc_checkpoint, self.accrued, acc)?;

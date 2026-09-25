@@ -53,7 +53,9 @@ pub struct Project {
     pub bump: u8,
     pub escrow_bump: u8,
     pub revenue_bump: u8,
-    pub _reserved: [u8; 64],
+    /// Shares burned by `close_position` after the project closed.
+    pub shares_retired: u64,
+    pub _reserved: [u8; 56],
 }
 
 impl Project {
@@ -74,10 +76,11 @@ impl Project {
         ]
     }
 
-    /// Shares minted in the raise and not refunded: the share mint's supply.
+    /// Shares minted in the raise and neither refunded nor retired: the share mint's supply.
     pub fn outstanding_shares(&self) -> Result<u64> {
         self.shares_sold
             .checked_sub(self.shares_refunded)
+            .and_then(|shares| shares.checked_sub(self.shares_retired))
             .ok_or_else(|| AxelError::Overflow.into())
     }
 }

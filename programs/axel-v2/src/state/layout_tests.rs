@@ -100,13 +100,15 @@ fn project_layout() {
         bump: 24,
         escrow_bump: 25,
         revenue_bump: 26,
-        _reserved: [0; 64],
+        shares_retired: 27,
+        _reserved: [0; 56],
     };
     let data = serialize(&project);
     assert_eq!(Project::SPACE, 517);
     assert_eq!(data.len(), Project::SPACE);
     assert_eq!(&data[8..40], key(1).as_ref());
     assert_eq!(data[232], 5, "state");
+    assert_eq!(&data[453..461], &27u64.to_le_bytes(), "shares_retired");
 }
 
 #[test]

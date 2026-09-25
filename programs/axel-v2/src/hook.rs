@@ -5,13 +5,17 @@
 //! `["extra-account-metas", mint]`. Investors and positions are derived from the token
 //! accounts' owners (bytes 32..64 of a token account), not from the transfer authority,
 //! so a delegate can never move shares on behalf of an owner who lost KYC.
+//!
+//! The config and project addresses never change for a mint, so they are stored as fixed
+//! keys: Token-2022 derives every seeded address with `find_program_address` on each
+//! transfer, and each bump it tries costs 1 500 compute units.
 
 use anchor_lang::prelude::*;
 use spl_tlv_account_resolution::account::ExtraAccountMeta;
 use spl_tlv_account_resolution::seeds::Seed;
 use spl_tlv_account_resolution::state::ExtraAccountMetaList;
 
-use crate::constants::{CONFIG_SEED, INVESTOR_SEED, POSITION_SEED, PROJECT_SEED};
+use crate::constants::{INVESTOR_SEED, POSITION_SEED};
 
 pub const SOURCE_INDEX: u8 = 0;
 pub const MINT_INDEX: u8 = 1;
@@ -43,8 +47,11 @@ fn literal(bytes: &[u8]) -> Seed {
     }
 }
 
-/// Extra accounts of `execute`, in order, starting at index 5.
-pub fn extra_account_metas() -> Result<[ExtraAccountMeta; EXTRA_ACCOUNT_COUNT]> {
+/// Extra accounts of `execute` for the mint of `project`, in order, starting at index 5.
+pub fn extra_account_metas(
+    config: &Pubkey,
+    project: &Pubkey,
+) -> Result<[ExtraAccountMeta; EXTRA_ACCOUNT_COUNT]> {
     let position = |owner_of: u8| {
         ExtraAccountMeta::new_with_seeds(
             &[
@@ -59,15 +66,8 @@ pub fn extra_account_metas() -> Result<[ExtraAccountMeta; EXTRA_ACCOUNT_COUNT]> 
         )
     };
     Ok([
-        ExtraAccountMeta::new_with_seeds(&[literal(CONFIG_SEED)], false, false)?,
-        ExtraAccountMeta::new_with_seeds(
-            &[
-                literal(PROJECT_SEED),
-                Seed::AccountKey { index: MINT_INDEX },
-            ],
-            false,
-            false,
-        )?,
+        ExtraAccountMeta::new_with_pubkey(config, false, false)?,
+        ExtraAccountMeta::new_with_pubkey(project, false, false)?,
         ExtraAccountMeta::new_with_seeds(
             &[literal(INVESTOR_SEED), token_account_owner(SOURCE_INDEX)],
             false,
@@ -97,7 +97,9 @@ mod tests {
 
     #[test]
     fn extra_accounts_are_derived_in_the_documented_order() {
-        let metas = extra_account_metas().unwrap();
+        let config = Pubkey::new_unique();
+        let project = Pubkey::new_unique();
+        let metas = extra_account_metas(&config, &project).unwrap();
         assert_eq!(
             usize::from(DESTINATION_POSITION_INDEX - CONFIG_INDEX) + 1,
             metas.len()
@@ -105,6 +107,14 @@ mod tests {
         let writable: Vec<bool> = metas.iter().map(|meta| meta.is_writable.into()).collect();
         assert_eq!(writable, [false, false, false, false, true, true]);
         assert!(metas.iter().all(|meta| !bool::from(meta.is_signer)));
+        assert_eq!(metas[0].address_config, config.to_bytes());
+        assert_eq!(metas[1].address_config, project.to_bytes());
+        assert_eq!(metas[0].discriminator, 0, "config is a fixed key");
+        assert_eq!(metas[1].discriminator, 0, "project is a fixed key");
+        assert!(
+            metas[2..].iter().all(|meta| meta.discriminator == 1),
+            "the rest are seeded"
+        );
         assert_eq!(extra_account_metas_len().unwrap(), 226);
     }
 }

@@ -143,6 +143,8 @@ pub struct PositionOpened {
 pub struct PositionClosed {
     pub project: Pubkey,
     pub owner: Pubkey,
+    /// Shares burned because the project had closed; zero otherwise.
+    pub shares_burned: u64,
 }
 
 #[event]

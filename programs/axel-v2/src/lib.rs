@@ -2,6 +2,8 @@
 //! program, so the share ledger and revenue accounting settle on every transfer.
 
 use anchor_lang::prelude::*;
+use spl_discriminator::SplDiscriminate;
+use spl_transfer_hook_interface::instruction::ExecuteInstruction;
 
 pub mod constants;
 pub mod errors;
@@ -10,6 +12,7 @@ pub mod hook;
 pub mod instructions;
 pub mod math;
 pub mod payment_mint;
+pub mod share_account;
 pub mod state;
 
 pub use instructions::*;
@@ -88,5 +91,25 @@ pub mod axel_v2 {
     /// Burns the owner's shares of a failed raise and returns what they cost.
     pub fn refund(ctx: Context<Refund>) -> Result<()> {
         ctx.accounts.handle()
+    }
+
+    /// Opens the owner's position and thaws its share account so it can receive shares.
+    /// Anyone may pay; the owner needs an eligible KYC record but does not sign.
+    pub fn open_position(ctx: Context<OpenPosition>) -> Result<()> {
+        ctx.accounts.handle(ctx.bumps.position)
+    }
+
+    /// Closes an empty position and its share account, returning the rent to the owner.
+    /// Once the project is closed it also burns the shares left in the position.
+    pub fn close_position(ctx: Context<ClosePosition>) -> Result<()> {
+        ctx.accounts.handle()
+    }
+
+    /// Transfer hook of the share mints, invoked by Token-2022 on every share transfer.
+    /// Settles revenue for both owners, moves the shares in their positions and rejects
+    /// the transfer unless both owners are eligible and the project is operating.
+    #[instruction(discriminator = ExecuteInstruction::SPL_DISCRIMINATOR_SLICE)]
+    pub fn execute(ctx: Context<Execute>, amount: u64) -> Result<()> {
+        ctx.accounts.handle(amount)
     }
 }

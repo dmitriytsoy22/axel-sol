@@ -153,4 +153,24 @@ export class TestEnv {
     }
     return program.coder.accounts.decode<IdlAccounts<AxelV2>[N]>(name, Buffer.from(account.data));
   }
+
+  /**
+   * Rewrites fields of a program account in place, to put the program into a state that a
+   * test needs but that is expensive or not yet possible to reach through instructions.
+   */
+  async patch<N extends AccountName>(
+    name: N,
+    address: PublicKey,
+    changes: Partial<IdlAccounts<AxelV2>[N]>,
+  ): Promise<void> {
+    const account = this.svm.getAccount(address);
+    if (account === null) {
+      throw new Error(`${String(name)} account ${address.toBase58()} does not exist`);
+    }
+    const data = await program.coder.accounts.encode(name, { ...this.fetch(name, address), ...changes });
+    if (data.length !== account.data.length) {
+      throw new Error(`re-encoded ${String(name)} is ${data.length} bytes instead of ${account.data.length}`);
+    }
+    this.svm.setAccount(address, { ...account, data });
+  }
 }

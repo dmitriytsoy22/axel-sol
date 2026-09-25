@@ -50,7 +50,8 @@ import {
 
 const CREATE_PROJECT_CU_LIMIT = 400_000n;
 
-/** `ExtraAccountMeta` discriminator of an address derived from the hook program itself. */
+/** `ExtraAccountMeta` discriminators of a fixed address and of one derived from the hook program itself. */
+const FIXED_ADDRESS = 0;
 const HOOK_PROGRAM_PDA = 1;
 
 /** Seed configuration bytes of an `ExtraAccountMeta` derived from this program. */
@@ -113,7 +114,8 @@ describe("create_project", () => {
           bump,
           escrowBump,
           revenueBump,
-          reserved: new Array(64).fill(0),
+          sharesRetired: bn(0),
+          reserved: new Array(56).fill(0),
         }),
       );
       assert.deepEqual(
@@ -221,14 +223,13 @@ describe("create_project", () => {
     assert.deepEqual(plain(account.owner), plain(PROGRAM_ID));
     const metas = getExtraAccountMetas({ ...account, data: Buffer.from(account.data) });
     const source = 0;
-    const mint = 1;
     const destination = 2;
     const projectIndex = 6;
     assert.deepEqual(
       metas.map((meta) => [meta.discriminator, [...meta.addressConfig], meta.isSigner, meta.isWritable]),
       [
-        [HOOK_PROGRAM_PDA, seedConfig(literal("config")), false, false],
-        [HOOK_PROGRAM_PDA, seedConfig(literal("project"), accountKey(mint)), false, false],
+        [FIXED_ADDRESS, [...configPda().toBytes()], false, false],
+        [FIXED_ADDRESS, [...project.address.toBytes()], false, false],
         [HOOK_PROGRAM_PDA, seedConfig(literal("investor"), tokenOwnerOf(source)), false, false],
         [HOOK_PROGRAM_PDA, seedConfig(literal("investor"), tokenOwnerOf(destination)), false, false],
         [HOOK_PROGRAM_PDA, seedConfig(literal("position"), accountKey(projectIndex), tokenOwnerOf(source)), false, true],

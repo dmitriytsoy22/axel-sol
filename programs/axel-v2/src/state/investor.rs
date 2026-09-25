@@ -32,22 +32,32 @@ impl Investor {
         self.flags & Self::FLAG_DEMO != 0
     }
 
+    /// Why this wallet may not hold or move shares of a project that does or does not
+    /// accept DEMO investors; `None` when it may.
+    pub fn ineligibility(&self, now: i64, project_allows_demo: bool) -> Option<AxelError> {
+        match self.status {
+            InvestorStatus::Active => {}
+            InvestorStatus::Frozen => return Some(AxelError::InvestorFrozen),
+            InvestorStatus::None | InvestorStatus::Revoked => {
+                return Some(AxelError::InvestorNotActive)
+            }
+        }
+        if self.expires_at <= now {
+            return Some(AxelError::InvestorExpired);
+        }
+        if self.is_demo() && !project_allows_demo {
+            return Some(AxelError::DemoNotAllowed);
+        }
+        None
+    }
+
     /// Fails unless this wallet may acquire shares of a project that does or does not
     /// accept DEMO investors.
     pub fn require_eligible(&self, now: i64, project_allows_demo: bool) -> Result<()> {
-        match self.status {
-            InvestorStatus::Active => {}
-            InvestorStatus::Frozen => return err!(AxelError::InvestorFrozen),
-            InvestorStatus::None | InvestorStatus::Revoked => {
-                return err!(AxelError::InvestorNotActive)
-            }
+        match self.ineligibility(now, project_allows_demo) {
+            Some(reason) => Err(reason.into()),
+            None => Ok(()),
         }
-        require!(self.expires_at > now, AxelError::InvestorExpired);
-        require!(
-            project_allows_demo || !self.is_demo(),
-            AxelError::DemoNotAllowed
-        );
-        Ok(())
     }
 }
 

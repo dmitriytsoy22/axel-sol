@@ -2,13 +2,14 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_2022::Token2022;
 use anchor_spl::token_interface::{
-    self, Mint, MintTo, ThawAccount, TokenAccount, TokenInterface, TransferChecked,
+    self, Mint, MintTo, TokenAccount, TokenInterface, TransferChecked,
 };
 
 use crate::constants::{CONFIG_SEED, INVESTOR_SEED, POSITION_SEED, PROJECT_SEED};
 use crate::errors::AxelError;
 use crate::events::{PositionOpened, RaiseFinalized, SharesPurchased};
 use crate::math;
+use crate::share_account;
 use crate::state::{Config, Investor, Position, Project, ProjectState};
 
 /// Buys `shares` in an open raise. The owner pays from its own payment account into the
@@ -160,19 +161,15 @@ impl BuyShares<'_> {
 
     /// Fills in a position created by `init_if_needed`; an existing one is left as is.
     fn open_position(&mut self, bump: u8) -> Result<()> {
-        if self.position.owner != Pubkey::default() {
+        if self.position.is_open() {
             return Ok(());
         }
-        self.position.set_inner(Position {
-            project: self.project.key(),
-            owner: self.owner.key(),
-            shares: 0,
-            acc_checkpoint: self.project.acc_per_share,
-            accrued: 0,
-            total_claimed: 0,
-            paid_in: 0,
+        self.position.set_inner(Position::new(
+            self.project.key(),
+            self.owner.key(),
+            self.project.acc_per_share,
             bump,
-        });
+        ));
         emit!(PositionOpened {
             project: self.project.key(),
             owner: self.owner.key(),
@@ -182,29 +179,22 @@ impl BuyShares<'_> {
     }
 
     fn issue_shares(&self, shares: u64) -> Result<()> {
+        share_account::thaw_if_frozen(
+            &self.owner_share_account,
+            &self.share_mint,
+            &self.project,
+            &self.share_token_program,
+        )?;
         let seeds = self.project.signer_seeds();
-        let signer: &[&[&[u8]]] = &[&seeds];
-        let token_program = self.share_token_program.to_account_info();
-        if self.owner_share_account.is_frozen() {
-            token_interface::thaw_account(CpiContext::new_with_signer(
-                token_program.clone(),
-                ThawAccount {
-                    account: self.owner_share_account.to_account_info(),
-                    mint: self.share_mint.to_account_info(),
-                    authority: self.project.to_account_info(),
-                },
-                signer,
-            ))?;
-        }
         token_interface::mint_to(
             CpiContext::new_with_signer(
-                token_program,
+                self.share_token_program.to_account_info(),
                 MintTo {
                     mint: self.share_mint.to_account_info(),
                     to: self.owner_share_account.to_account_info(),
                     authority: self.project.to_account_info(),
                 },
-                signer,
+                &[&seeds],
             ),
             shares,
         )

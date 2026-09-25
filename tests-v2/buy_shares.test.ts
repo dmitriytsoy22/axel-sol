@@ -12,6 +12,7 @@ import {
   openProject,
   PRICE,
   RAISE_DURATION,
+  setInvestorStatus,
   TOTAL_SHARES,
   type Market,
 } from "./helpers/fixtures";
@@ -19,14 +20,11 @@ import {
   buySharesIx,
   cancelRaiseIx,
   InvestorFlag,
-  InvestorStatus,
-  KycProvider,
   ProjectState,
-  setInvestorIx,
   updateConfigIx,
   type ProjectRef,
 } from "./helpers/instructions";
-import { assertRaiseInvariants } from "./helpers/invariants";
+import { assertInvariants } from "./helpers/invariants";
 import { positionAddress, positionPda } from "./helpers/pda";
 import { plain } from "./helpers/plain";
 import {
@@ -48,23 +46,6 @@ function shareAccount(owner: PublicKey, project: ProjectRef): PublicKey {
 
 function paymentAccount(owner: PublicKey, market: Market): PublicKey {
   return ata(owner, market.paymentMint, market.paymentProgram);
-}
-
-async function setStatus(market: Market, wallet: PublicKey, status: keyof typeof InvestorStatus, expiresAt: bigint) {
-  expectOk(
-    market.env.send(
-      [
-        await setInvestorIx(market.roles.kyc.publicKey, wallet, {
-          status: InvestorStatus[status],
-          expiresAt: bn(expiresAt),
-          jurisdiction: 398,
-          flags: 0,
-          provider: KycProvider.sumsub,
-        }),
-      ],
-      [market.roles.kyc],
-    ),
-  );
 }
 
 describe("buy_shares", () => {
@@ -114,7 +95,7 @@ describe("buy_shares", () => {
         plain({ project: project.address, owner: investor.publicKey, payer: investor.publicKey }),
       );
       assert.ok(result.computeUnitsConsumed() < BUY_CU_LIMIT, `CU ${result.computeUnitsConsumed()}`);
-      assertRaiseInvariants(market.env, project, [investor.publicKey]);
+      assertInvariants(market.env, project, [investor.publicKey]);
     });
   }
 
@@ -145,7 +126,7 @@ describe("buy_shares", () => {
     const position = market.env.fetch("position", positionPda(project.address, investor.publicKey));
     assert.deepEqual(plain([position.shares, position.paidIn]), plain([bn(25), bn(25n * PRICE)]));
     assert.equal(eventsOf(result, "positionOpened").length, 0);
-    assertRaiseInvariants(market.env, project, [investor.publicKey]);
+    assertInvariants(market.env, project, [investor.publicKey]);
   });
 
   test("a sponsor pays fees and rent while the owner pays only for the shares", async () => {
@@ -183,7 +164,7 @@ describe("buy_shares", () => {
       plain(expectEvent(result, "raiseFinalized")),
       plain({ project: project.address, outcome: ProjectState.funded, sharesSold: bn(TOTAL_SHARES) }),
     );
-    assertRaiseInvariants(market.env, project, [first.publicKey, second.publicKey]);
+    assertInvariants(market.env, project, [first.publicKey, second.publicKey]);
   });
 
   test("a share account pre-created by an attacker is thawed instead of blocking the purchase", async () => {
@@ -283,7 +264,7 @@ describe("buy_shares", () => {
         name: "by a revoked investor",
         error: "InvestorNotActive",
         run: async (market, project, investor) => {
-          await setStatus(market, investor.publicKey, "revoked", 0n);
+          await setInvestorStatus(market, investor.publicKey, "revoked", 0n);
           return buy(market, project, investor, 1n);
         },
       },
@@ -291,7 +272,7 @@ describe("buy_shares", () => {
         name: "by a sanctions-frozen investor",
         error: "InvestorFrozen",
         run: async (market, project, investor) => {
-          await setStatus(market, investor.publicKey, "frozen", market.env.now() + 365n * DAY);
+          await setInvestorStatus(market, investor.publicKey, "frozen", market.env.now() + 365n * DAY);
           return buy(market, project, investor, 1n);
         },
       },
@@ -299,7 +280,7 @@ describe("buy_shares", () => {
         name: "by an investor whose KYC expired",
         error: "InvestorExpired",
         run: async (market, project, investor) => {
-          await setStatus(market, investor.publicKey, "active", market.env.now() + DAY);
+          await setInvestorStatus(market, investor.publicKey, "active", market.env.now() + DAY);
           market.env.warp(DAY);
           return buy(market, project, investor, 1n);
         },
@@ -340,7 +321,7 @@ describe("buy_shares", () => {
     expectError(await buy(market, project, late, 11n), "ExceedsSupply");
 
     assert.equal(market.env.fetch("project", project.address).sharesSold.toNumber(), 90);
-    assertRaiseInvariants(market.env, project, [early.publicKey]);
+    assertInvariants(market.env, project, [early.publicKey]);
   });
 
   test("a funded raise accepts no further purchases", async () => {

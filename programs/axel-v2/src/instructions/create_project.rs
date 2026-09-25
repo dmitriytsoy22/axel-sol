@@ -170,7 +170,8 @@ impl<'info> CreateProject<'info> {
             bump: bumps.project,
             escrow_bump: bumps.escrow_vault,
             revenue_bump: bumps.revenue_vault,
-            _reserved: [0; 64],
+            shares_retired: 0,
+            _reserved: [0; 56],
         });
 
         self.create_share_mint()?;
@@ -370,7 +371,8 @@ impl<'info> CreateProject<'info> {
 
     fn write_extra_account_metas(&self) -> Result<()> {
         let mut data = self.extra_account_metas.try_borrow_mut_data()?;
-        ExtraAccountMetaList::init::<ExecuteInstruction>(&mut data, &hook::extra_account_metas()?)?;
+        let metas = hook::extra_account_metas(&self.config.key(), &self.project.key())?;
+        ExtraAccountMetaList::init::<ExecuteInstruction>(&mut data, &metas)?;
         Ok(())
     }
 }
