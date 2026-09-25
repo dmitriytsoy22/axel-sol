@@ -72,7 +72,7 @@ Backend tests boot the real `AppModule` (`src/testing/test-app.ts`) and replace 
 1. `solana-test-validator` from an empty ledger, with `target/deploy/axel_v2.so` loaded as an upgradeable program.
 2. The demo seed at `--scale tiny` with a random `DEMO_SEED_SECRET`, while `npm run build` compiles the backend. The seed takes about two minutes, most of it waiting for the failed raise's deadline.
 3. The demo routes' keys from `frontend/scripts/demo-env.mjs`, and 5 SOL airdropped to the demo faucet.
-4. A file server for the seed's published files, the backend with the event indexer, and `next dev` with `NEXT_PUBLIC_E2E=1`. The setup waits until the indexer has caught up with the seeded chain and `next dev` has compiled every page the tests open.
+4. A file server for the seed's published files, the backend with the event indexer, and `next dev` bound to 127.0.0.1 with `NEXT_PUBLIC_E2E=1`. The setup waits until the indexer has caught up with the seeded chain and `next dev` has compiled every page the tests open.
 
 | Service | URL |
 | :--- | :--- |
@@ -96,6 +96,7 @@ The seed installs its own dependencies (`npm run seed:deps`). The tests:
 
 - `judge-path.spec.ts`, the judge path on `/demo`: connect a wallet, get demo access, buy a share in the open raise, receive the desk's shares of the Demo Fleet car, simulate a month and claim it, verify that car's published data in the browser, and open the proof of solvency. The claim is also checked outside the app: the wallet's tKZT balance on the validator grew by exactly the amount the page showed, and the backend's `GET /positions/:owner/claims` recorded that amount.
 - `kyc-required.spec.ts`: a wallet without a KYC record sees a disabled "Wallet not verified" button and no way to buy, and the invest Blink refuses to build a purchase for it.
+- `locale-routing.spec.ts`: English pages open without a prefix and `/en/…` redirects to them, `/ru/…` stays Russian, and the language menu switches between them, all on the address the browser opened. `next.config.mjs` sets `skipMiddlewareUrlNormalize` for this: Next 14 otherwise shows the locale middleware a request to 127.0.0.1 as `localhost`, and with `--hostname 127.0.0.1` every English page redirected to itself on `http://localhost`.
 
 **Wallet.** A build with `NEXT_PUBLIC_E2E=1` adds "E2E Burner" to the wallet picker, on any cluster but mainnet (`lib/solana/e2eBurnerWallet.ts`). `providers/WalletProvider.tsx` loads it with a dynamic import behind that flag, which `next.config.mjs` always defines, so any other build drops it; the frontend CI job checks that its production build has no trace of the burner. It signs transactions and messages with the secret key stored in `localStorage` under `axel:e2e-burner-secret-key`, or creates one there, so a reload stays the same wallet. Each test stores a new key before the app loads and picks the burner in the wallet dialog, so every test has a wallet of its own. Never set `NEXT_PUBLIC_E2E` on a deployment.
 

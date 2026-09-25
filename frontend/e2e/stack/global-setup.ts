@@ -8,6 +8,7 @@ import { Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { parseKeypair } from '../../src/lib/demo/server/env';
 import {
   FRONTEND_DIR,
+  HOST,
   LOG_DIR,
   PORTS,
   REPO_ROOT,
@@ -221,14 +222,14 @@ async function startBackend(): Promise<Service> {
 }
 
 async function startFrontend(demo: Record<string, string>, info: StackInfo): Promise<Service> {
-  // No --hostname: bound to 127.0.0.1, Next 14's dev server hands the locale middleware
-  // `localhost` URLs, and every page redirects to itself on http://localhost.
   const frontend = start(
     'frontend',
     'node',
     [
       join(FRONTEND_DIR, 'node_modules', 'next', 'dist', 'bin', 'next'),
       'dev',
+      '--hostname',
+      HOST,
       '--port',
       String(PORTS.frontend),
     ],

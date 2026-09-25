@@ -17,7 +17,8 @@ export const STACK_DIR = join(FRONTEND_DIR, 'e2e', '.stack');
 export const LOG_DIR = join(STACK_DIR, 'logs');
 export const STACK_FILE = join(STACK_DIR, 'stack.json');
 
-const HOST = '127.0.0.1';
+/** Every service listens on this address only, `next dev` included. */
+export const HOST = '127.0.0.1';
 
 export const PORTS = {
   /** The validator's JSON RPC; its websocket is on the next port. */
