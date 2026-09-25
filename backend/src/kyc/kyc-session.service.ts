@@ -6,11 +6,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { utils } from '@coral-xyz/anchor';
-import { PublicKey } from '@solana/web3.js';
 import { randomBytes, randomUUID } from 'crypto';
 
 import { CLOCK, type Clock } from '../common/clock';
 import { isRecord } from '../common/json';
+import { parsePublicKey } from '../common/public-key';
 import { APP_CONFIG, type AppConfig } from '../config/app-config';
 import { KycStore } from './kyc.store';
 import { formatSiwsMessage, verifyEd25519Signature } from './siws';
@@ -34,22 +34,6 @@ export interface SessionResponse {
   levelName: string;
   accessToken: string;
   accessTokenExpiresAt: string;
-}
-
-function parseWallet(value: unknown): PublicKey {
-  if (typeof value !== 'string' || value.length < 32 || value.length > 44) {
-    throw new BadRequestException('wallet must be a base58 public key');
-  }
-  let key: PublicKey;
-  try {
-    key = new PublicKey(value);
-  } catch {
-    throw new BadRequestException('wallet must be a base58 public key');
-  }
-  if (key.toBase58() !== value) {
-    throw new BadRequestException('wallet must be a base58 public key');
-  }
-  return key;
 }
 
 function parseSignature(value: unknown): Uint8Array {
@@ -83,7 +67,7 @@ export class KycSessionService {
   ) {}
 
   issueNonce(walletInput: unknown): NonceResponse {
-    const wallet = parseWallet(walletInput).toBase58();
+    const wallet = parsePublicKey(walletInput, 'wallet').toBase58();
     const now = this.clock.now();
     const nonce = randomBytes(16).toString('hex');
     const expiresAt = now + NONCE_TTL_MS;
@@ -106,7 +90,7 @@ export class KycSessionService {
       throw new BadRequestException('Expected a JSON body with wallet, nonce and signature');
     }
     const { wallet: walletInput, nonce, signature: signatureInput } = body;
-    const wallet = parseWallet(walletInput);
+    const wallet = parsePublicKey(walletInput, 'wallet');
     const signature = parseSignature(signatureInput);
     if (typeof nonce !== 'string' || nonce.length === 0 || nonce.length > 64) {
       throw new BadRequestException('nonce is required');

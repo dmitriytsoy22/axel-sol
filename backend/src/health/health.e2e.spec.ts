@@ -22,6 +22,7 @@ describe('GET /health', () => {
       rpc: 'connected',
       kyc: 'ready',
       oracle: 'ready',
+      indexer: 'disabled',
     });
   });
 
@@ -43,6 +44,7 @@ describe('GET /health', () => {
       rpc: 'connected',
       kyc: 'ready',
       oracle: 'not_configured',
+      indexer: 'disabled',
     });
   });
 
@@ -57,6 +59,7 @@ describe('GET /health', () => {
       rpc: 'disconnected',
       kyc: 'ready',
       oracle: 'ready',
+      indexer: 'disabled',
     });
   });
 });

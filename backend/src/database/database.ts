@@ -89,6 +89,39 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX report_attestations_mint ON report_attestations (mint);
   `,
+  `
+  CREATE TABLE indexer_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
+  CREATE TABLE indexed_transactions (
+    signature TEXT PRIMARY KEY,
+    slot INTEGER NOT NULL,
+    block_time INTEGER,
+    failed INTEGER NOT NULL,
+    event_count INTEGER NOT NULL,
+    logs_truncated INTEGER NOT NULL,
+    indexed_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE program_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    signature TEXT NOT NULL REFERENCES indexed_transactions (signature),
+    event_index INTEGER NOT NULL,
+    slot INTEGER NOT NULL,
+    block_time INTEGER,
+    type TEXT NOT NULL,
+    project TEXT,
+    owner TEXT,
+    data_json TEXT,
+    raw_data TEXT NOT NULL,
+    UNIQUE (signature, event_index)
+  );
+  CREATE INDEX program_events_type ON program_events (type, id);
+  CREATE INDEX program_events_project ON program_events (project, id);
+  CREATE INDEX program_events_owner ON program_events (owner, type, id);
+  `,
 ];
 
 export function openDatabase(path: string): SqliteDatabase {

@@ -10,10 +10,13 @@ import { configureApp } from '../app.setup';
 import { CLOCK, type Clock } from '../common/clock';
 import { APP_CONFIG, type AppConfig, loadAppConfig } from '../config/app-config';
 import { FLEET_HTTP_FETCH } from '../fleet/yandex-fleet.client';
+import { INDEXER_RPC } from '../indexer/indexer.service';
+import { INDEXER_LOGS } from '../indexer/log-stream';
 import { KYC_AUTHORITY } from '../kyc/investor-registry.service';
 import { HTTP_FETCH } from '../kyc/sumsub.client';
 import { SOLANA_CONNECTION } from '../solana/solana.service';
 import { ORACLE_KEYPAIR } from '../telemetry/telemetry-chain.service';
+import { FakeLedger } from './fake-ledger';
 import { FakeRpc } from './fake-rpc';
 import { FakeSumsub } from './fake-sumsub';
 import { FakeYandex } from './fake-yandex';
@@ -46,6 +49,8 @@ export interface TestApp {
   config: AppConfig;
   clock: TestClock;
   rpc: FakeRpc;
+  /** The program history and the log subscription the event indexer reads. */
+  ledger: FakeLedger;
   sumsub: FakeSumsub;
   yandex: FakeYandex;
   kycAuthority: Keypair;
@@ -67,11 +72,17 @@ export interface TestAppOptions {
   oracle?: Keypair | null | 'from-config';
   /** Reuses a chain, e.g. to restart the backend against the same projects. */
   rpc?: FakeRpc;
+  /**
+   * The history the event indexer reads. The indexer only runs with
+   * `env: { INDEXER_ENABLED: 'true' }`.
+   */
+  ledger?: FakeLedger;
 }
 
 /** Boots the real AppModule with the RPC, the Sumsub API and the clock replaced at their boundaries. */
 export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
-  const programId = options.rpc?.programId ?? Keypair.generate().publicKey;
+  const programId =
+    options.rpc?.programId ?? options.ledger?.programId ?? Keypair.generate().publicKey;
   const config = loadAppConfig({
     DATABASE_PATH: ':memory:',
     AXEL_PROGRAM_ID: programId.toBase58(),
@@ -86,12 +97,14 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     YANDEX_PARK_ID: TEST_YANDEX.parkId,
     YANDEX_CLIENT_ID: TEST_YANDEX.clientId,
     YANDEX_API_KEY: TEST_YANDEX.apiKey,
+    INDEXER_ENABLED: 'false',
     ...options.env,
   });
   const kycAuthority = Keypair.generate();
   const oracle = options.oracle === undefined ? Keypair.generate() : options.oracle;
   const clock = new TestClock(TEST_NOW);
   const rpc = options.rpc ?? new FakeRpc(programId, kycAuthority.publicKey);
+  const ledger = options.ledger ?? new FakeLedger(programId);
   const sumsub = new FakeSumsub(config.kyc.sumsub);
   const yandex = new FakeYandex(TEST_YANDEX);
 
@@ -100,6 +113,10 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     .useValue(config)
     .overrideProvider(SOLANA_CONNECTION)
     .useValue(rpc)
+    .overrideProvider(INDEXER_RPC)
+    .useValue(ledger)
+    .overrideProvider(INDEXER_LOGS)
+    .useValue(ledger)
     .overrideProvider(HTTP_FETCH)
     .useValue(sumsub.fetch)
     .overrideProvider(FLEET_HTTP_FETCH)
@@ -129,6 +146,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     config,
     clock,
     rpc,
+    ledger,
     sumsub,
     yandex,
     kycAuthority,

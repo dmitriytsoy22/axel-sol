@@ -37,6 +37,7 @@ Done:
   - `record_telemetry` batches that are reconciled after a crash;
   - revenue reports, and deposit co-signatures only for reports that match the published days;
   - simulated data flagged everywhere and refused on mainnet.
+- [x] Backend event indexer for v2 ([architecture.md](architecture.md#event-indexer-v2)): program history and a live log subscription stored idempotently in SQLite, `GET /events`, `/projects/:mint/history` and `/positions/:owner/claims`, tested against `solana-test-validator`
 - [x] Backend KYC on v2: wallet sign-in (`GET /kyc/nonce`, `POST /kyc/session`), Sumsub sessions bound to the wallet in SQLite, a webhook with a correct HMAC check that signs idempotent `set_investor` calls with a dedicated key, CORS, rate limits, production startup checks, ESLint and Jest ([api.md](api.md#backend-http-endpoints))
 
 Next steps. Each one addresses a limitation listed in [architecture.md](architecture.md#known-limitations):

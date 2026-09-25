@@ -12,9 +12,10 @@ AXEL has four parts:
 - A small NestJS backend. It does the jobs that need secrets or a server:
   - binding wallets to Sumsub applicants and writing their v2 KYC records;
   - the daily telemetry job, which publishes each car's day and appends its hash to the v2 chain as the project's oracle;
-  - co-signing revenue deposits whose report matches the published data.
+  - co-signing revenue deposits whose report matches the published data;
+  - indexing the history of v2 program events for project timelines and claim histories.
 
-  It keeps KYC state, the published days and the attested reports in one SQLite file.
+  It keeps KYC state, the published days, the attested reports and the indexed events in one SQLite file.
 
 ```
              Investor / admin browser (Phantom or Solflare, devnet)
@@ -25,17 +26,19 @@ AXEL has four parts:
 │ catalog · asset page · dashboard · payouts · admin panel         │
 │ reads accounts over JSON-RPC, builds transactions from the IDL   │
 └───────┬───────────────────────────────────────────┬──────────────┘
-        │ RPC reads + wallet-signed transactions    │ HTTP /telemetry/*, /reports/*
+        │ RPC reads + wallet-signed transactions    │ HTTP /telemetry/*, /reports/*, /events
         ▼                                           ▼
 ┌────────────────────────────────┐   ┌────────────────────────────────────┐
 │ Solana (devnet)                │   │ Backend — NestJS 11 (backend/)     │
 │                                │   │ SQLite: KYC, published days,       │
-│ axel program                   │   │   attested reports                 │
+│ axel program                   │   │   attested reports, event index    │
 │   12 instructions, 5 acct types│   │ telemetry job                      │──► Yandex Fleet API
 │ axel_v2 program (not deployed) │◄──┤   record_telemetry (oracle key)    │
 │ transfer_hook program          │ tx│ reports: co-sign deposit_revenue   │
 │ Token-2022 mint (one per car)  │   │ KYC sign-in + Sumsub webhook       │◄── Sumsub webhook
-└────────────────────────────────┘   │   set_investor (KYC authority key) │
+│                                │   │   set_investor (KYC authority key) │
+│                                ├──►│ event indexer                      │
+└────────────────────────────────┘ ws│   logsSubscribe + history (RPC)    │
                                      └────────────────────────────────────┘
 ```
 
@@ -44,7 +47,8 @@ AXEL has four parts:
 - The backend's SQLite file holds:
   - sign-in nonces, which wallet belongs to which Sumsub applicant, and a log of webhook events;
   - the published text of every telemetry day, with its place in the chain;
-  - the revenue reports the oracle attested.
+  - the revenue reports the oracle attested;
+  - an index of the v2 program's events. It is a copy of chain history for timelines, not state: balances and project states are still read from the accounts, and the index can be rebuilt from the chain.
 
   KYC status itself lives in the v2 `Investor` accounts. The telemetry chain head and each deposit's report hash live in `Project` and `RevenuePeriod`, so the stored texts can always be checked against the chain.
 
@@ -64,7 +68,7 @@ programs/
 tests/                          12 integration test files (node:test, local validator at 127.0.0.1:8899)
 scripts/                        init-project.ts (seed a project), generate-clients.ts (Codama)
 sdk/axel-v2/                    Codama TypeScript client of the v2 program (see v2.md)
-backend/src/                    health, kyc, fleet (Yandex Fleet client, simulator), telemetry, reports, solana modules
+backend/src/                    health, kyc, fleet (Yandex Fleet client, simulator), telemetry, reports, indexer, solana modules
 frontend/src/
   app/[locale]/                 routes (en default, ru, kk)
   hooks/                        chain reads and transaction hooks
@@ -256,6 +260,30 @@ Yandex Fleet API / simulator      Backend                                       
 **What this does and does not prove.**
 - It proves that the deposit pays out exactly the published report. The report's income comes only from days whose hashes are in the chain, and simulated data is marked as such, inside the hashed text.
 - It does not prove that the fleet system reported the truth, or that the operator's expense items are complete. The oracle is one backend key, and the Yandex rent attribution uses the drivers' current car assignment.
+
+## Event Indexer (v2)
+
+The backend indexes the events `axel_v2` emits, so the frontend can show a car's timeline and an investor's payouts without scanning the chain itself. Endpoints: [api.md](api.md#program-events-what-is-indexed).
+
+```
+logsSubscribe (confirmed, mentions axel_v2) ── notification ──┐   logs kept, sync starts now
+resubscribed after a drop ────────────────────────────────────┤
+poll every INDEXER_POLL_INTERVAL_MS ──────────────────────────┤
+                                                              ▼
+getSignaturesForAddress(axel_v2, until = cursor), paged to the cursor, then oldest first:
+   failed transaction   → stored without events
+   notified             → the notification's logs
+   otherwise            → getTransaction(confirmed)
+   logs → invoke stack → axel_v2's `Program data:` records, including those written as the
+          Token-2022 transfer hook → decoded with the vendored IDL (round trip checked)
+   SQLite, one transaction per chain transaction: transaction, events, cursor
+```
+
+- The history is the source of truth and the subscription only makes it fast. Nothing that the subscription alone reports is stored.
+- A failed sync is retried after 1 s, doubling up to 60 s. A notified transaction that the history does not list yet is retried the same way for up to two minutes.
+- The database remembers the genesis hash and program ID it was filled from, and halts on a mismatch.
+- The subscription is a small `ws` client, not web3.js's. web3.js hides its reconnects, so it could not trigger a catch-up, and it keeps a socket reconnecting after shutdown.
+- `npm run test:localnet` runs it against `solana-test-validator` with the built `axel_v2.so`. The test sends real transactions (config, KYC, create, buys, activation, telemetry, a deposit, claims and a hooked transfer), some before the backend starts and some while it runs, then restarts the backend. It checks each event against the chain: the claim against the balance change, and the telemetry head against `Project`.
 
 ## KYC Flow (v2)
 

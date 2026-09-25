@@ -2,14 +2,14 @@
 
 AXEL exposes two interfaces:
 
-1. **A small HTTP backend** in `backend/`: health, published telemetry, revenue reports and deposit attestation, and KYC.
+1. **A small HTTP backend** in `backend/`: health, published telemetry, revenue reports and deposit attestation, KYC, and the history of v2 program events.
 2. **The `axel` and `transfer_hook` Solana programs.** Clients call them directly.
 
 All business actions (buy, deposit, claim, whitelist, pause and so on) are Solana transactions. The backend signs three kinds of v2 transactions: `set_investor` after a Sumsub review (KYC key), `record_telemetry` batches (oracle key), and its co-signature on an operator's `deposit_revenue` (oracle key).
 
 ## Backend HTTP Endpoints
 
-- Stack: NestJS 11 (`backend/src`), SQLite through `better-sqlite3` for KYC state, published telemetry and attested reports.
+- Stack: NestJS 11 (`backend/src`), SQLite through `better-sqlite3` for KYC state, published telemetry, attested reports and indexed program events.
 - Default port: `3000` (`PORT`).
 - CORS: only the origins in `CORS_ORIGINS`, methods `GET` and `POST`.
 - Errors use the NestJS shape: `{ "statusCode": 400, "message": "...", "error": "Bad Request" }`.
@@ -21,18 +21,29 @@ All business actions (buy, deposit, claim, whitelist, pause and so on) are Solan
 GET /health
 ```
 
-Checks that the RPC answers (`getSlot`) and whether the KYC flow and the oracle are configured.
+Checks that the RPC answers (`getSlot`), whether the KYC flow and the oracle are configured, and how the event indexer is doing.
 
 **Response `200`:**
 ```json
-{ "status": "ok", "rpc": "connected", "kyc": "ready", "oracle": "ready" }
+{ "status": "ok", "rpc": "connected", "kyc": "ready", "oracle": "ready", "indexer": "live" }
 ```
 - `kyc` is `"not_configured"` unless `SUMSUB_WEBHOOK_SECRET`, `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY` and the KYC authority keypair are all set.
 - `oracle` is `"not_configured"` without `ORACLE_KEYPAIR_PATH`.
+- `indexer`:
+
+  | Value | Meaning |
+  |---|---|
+  | `starting` | no sync has finished since the start |
+  | `live` | the last sync finished |
+  | `retrying` | the last sync failed on the RPC; the next one waits for the backoff delay |
+  | `halted` | the database was filled from another cluster or program (see [Program Events](#program-events-what-is-indexed)); nothing is indexed |
+  | `disabled` | `INDEXER_ENABLED=false` |
+
+  The indexer never makes the health check fail; only the RPC does.
 
 **Response `503`** (RPC unreachable):
 ```json
-{ "status": "error", "rpc": "disconnected", "kyc": "ready", "oracle": "ready" }
+{ "status": "error", "rpc": "disconnected", "kyc": "ready", "oracle": "ready", "indexer": "retrying" }
 ```
 
 ### Telemetry: what is published
@@ -260,6 +271,106 @@ The first lists the reports the oracle attested for the car, oldest period first
 ```
 The second serves a report's canonical text byte for byte. Its SHA-256 is the `report_hash` of the deposit's `RevenuePeriod`.
 
+### Program Events: what is indexed
+
+The backend keeps the history of every event `axel_v2` emits (the 23 events in the IDL, such as `ProjectCreated`, `SharesPurchased`, `RevenueDeposited`, `Claimed`, `SharesTransferred` and `TelemetryRecorded`) in SQLite. The accounts stay the source of truth for balances and states. The history is an index built from the chain, and it can be rebuilt by deleting the tables.
+
+How it is kept complete:
+- **History first.** `getSignaturesForAddress(program)` pages back to the last stored signature, and every newer transaction is stored oldest first. A transaction and its events are written in one SQLite transaction together with the cursor. After a crash or an RPC error, the next sync resumes after the last stored transaction, so nothing is lost or stored twice.
+- **Live logs.** A `logsSubscribe` websocket (`mentions: [program]`, `confirmed`) starts a sync as soon as a transaction lands. Its logs are used directly, without a second `getTransaction`. If the history does not list a notified transaction yet, the sync is retried after 1 s, 2 s, 4 s and so on, for up to two minutes.
+- **Missed notifications.** A dropped websocket is reopened with backoff and pinged every 30 s. Each resubscription starts a sync, and a poll (`INDEXER_POLL_INTERVAL_MS`, default 30 s) catches anything else.
+- **RPC failures.** A failed sync is retried after 1 s, doubling up to 60 s. While it waits, new notifications do not call the RPC.
+- **Only confirmed, successful transactions count.** Failed transactions are recorded without events, even though their logs contain events the runtime reverted.
+- **Events from CPIs count.** `SharesTransferred` is emitted by the transfer hook while Token-2022 runs it. The log parser follows the invoke stack, so these events are kept, and records written by other programs are ignored.
+- **Idempotent.** Each event is stored once, keyed by transaction signature and its index among the program's events in that transaction.
+- **One chain per database.** On the first sync the database records the cluster's genesis hash and the program ID. If either differs later, the indexer halts instead of mixing two histories (`/health` shows `halted`). Use a new `DATABASE_PATH` after resetting a local validator.
+- **Unknown records.** A record that does not decode with the vendored IDL is stored with type `Unknown` and no `data`, and its raw bytes are kept.
+
+Every endpoint below lists events **newest first** and pages the same way: `limit` (1–200, default 50) and `before=<id>`. The response's `nextBefore` is the `before` for the next, older page, or `null` on the last page.
+
+An event looks like this:
+```json
+{
+  "id": 42,
+  "signature": "<transaction signature>",
+  "index": 0,
+  "slot": 3120551,
+  "blockTime": "2026-10-01T07:12:09.000Z",
+  "type": "RevenueDeposited",
+  "project": "<project account>",
+  "data": {
+    "project": "<project account>",
+    "index": 0,
+    "periodStart": 20260901,
+    "periodEnd": 20260930,
+    "gross": "1000000000",
+    "fee": "150000000",
+    "net": "850000000",
+    "supply": "10",
+    "accAfter": "1567973246265311887360000000",
+    "reportHash": "a0a1a2…bebf",
+    "attestor": "<oracle>",
+    "kind": "regular"
+  }
+}
+```
+- `id` grows in chain order. `index` is the event's position among the program's events in its transaction.
+- `project` is the project account (the PDA `["project", share mint]`). It is `null` for events without one: `ConfigUpdated`, `AdminProposed`, `AdminChanged`, `InvestorUpdated`, `Unknown`.
+- `blockTime` is `null` when the RPC does not know it.
+- `data` has the event's fields in camelCase: public keys in base58, byte arrays in hex, `u64`, `i64` and `u128` as decimal strings, smaller integers as numbers, and enums as the variant name (`"funded"`, `"final"`). Amounts are base units of the payment mint.
+
+### Events
+
+```
+GET /events?project=<project account>&type=<Type[,Type…]>&before=<id>&limit=<n>
+```
+
+Every indexed event. All parameters are optional:
+- `project` filters by project account;
+- `type` takes one event type or several separated by commas, as the program names them (`SharesPurchased,Claimed`), or `Unknown`.
+
+**Response `200`:** `{ "events": [ … ], "nextBefore": 17 }`
+
+**Response `400`:** `project` is not a base58 public key, an unknown `type`, or `before` / `limit` out of range.
+
+### Project History
+
+```
+GET /projects/:mint/history?type=<Type[,Type…]>&before=<id>&limit=<n>
+```
+
+The events of the project with this share mint, from `ProjectCreated` on.
+
+**Response `200`:**
+```json
+{ "mint": "<share mint>", "project": "<project account>", "events": [ … ], "nextBefore": null }
+```
+
+**Response `400`:** `mint` is not a base58 public key, or a query parameter is invalid. **`404`:** no `ProjectCreated` is indexed for this mint.
+
+### Claims of an Owner
+
+```
+GET /positions/:owner/claims?project=<project account>&before=<id>&limit=<n>
+```
+
+The owner's `Claimed` events across all projects, or in one project with `project`. `claimer` differs from the owner when someone else triggered the payout; the money always goes to the owner.
+
+**Response `200`:**
+```json
+{
+  "owner": "<wallet>",
+  "claims": [
+    { "id": 14, "signature": "<signature>", "slot": 3120560, "blockTime": "2026-10-01T07:12:30.000Z", "project": "<project account>", "claimer": "<wallet>", "amount": "510000000" }
+  ],
+  "nextBefore": null,
+  "totals": [{ "project": "<project account>", "amount": "510000000", "claims": 1 }]
+}
+```
+`totals` add up every claim of the owner (within `project`, if given), not only the page, and are exact for any `u64`. A wallet that never claimed gets empty `claims` and `totals`.
+
+**Response `400`:** `owner` or `project` is not a base58 public key, or `before` / `limit` is out of range.
+
 ### KYC Sign-In Nonce
 
 ```
@@ -367,10 +478,10 @@ Every verified event is stored in the `kyc_events` table with its outcome and tr
 | `PORT` | `main.ts` | `3000` |
 | `CORS_ORIGINS` | CORS | `http://localhost:3000` |
 | `TRUST_PROXY` | client IP for rate limits | `0` |
-| `SOLANA_RPC_URL` | `SolanaService` | `http://127.0.0.1:8899` |
+| `SOLANA_RPC_URL` | `SolanaService`; the indexer unless `INDEXER_RPC_URL` is set | `http://127.0.0.1:8899`; must start with `http://` or `https://` |
 | `SOLANA_CLUSTER` | sign-in message | `devnet` |
 | `AXEL_PROGRAM_ID` | v2 program client | `address` of `src/solana/idl/axel_v2.json` |
-| `DATABASE_PATH` | SQLite file (KYC state, published days, attested reports) | `data/axel-backend.sqlite` |
+| `DATABASE_PATH` | SQLite file (KYC state, published days, attested reports, indexed events) | `data/axel-backend.sqlite` |
 | `KYC_AUTHORITY_KEYPAIR_PATH` | `set_investor` signer | webhook answers `503`; an unreadable file stops the start |
 | `SIWS_URI` | sign-in message domain and URI | `http://localhost:3000` |
 | `SUMSUB_BASE_URL` | Sumsub API | `https://api.sumsub.com` |
@@ -383,6 +494,10 @@ Every verified event is stored in the `kyc_events` table with its outcome and tr
 | `YANDEX_PARK_ID`, `YANDEX_CLIENT_ID`, `YANDEX_API_KEY` | `YandexFleetClient` | required for `yandex_fleet` cars; set all three or none |
 | `YANDEX_RENT_CATEGORY_IDS` | which park transactions are rent | `partner_service_recurring_payment` |
 | `CRON_SCHEDULE` | telemetry job, registered after `.env` is loaded | `0 1 * * *` (daily 01:00, server time) |
+| `INDEXER_ENABLED` | event indexer | `true`; `false` leaves the RPC alone, and the event endpoints serve what is stored |
+| `INDEXER_RPC_URL` | history reads (`getSignaturesForAddress`, `getTransaction`) | `SOLANA_RPC_URL` |
+| `INDEXER_WS_URL` | `logsSubscribe` | the indexer RPC as `ws://` or `wss://`, on the next port if it has one (`http://127.0.0.1:8899` → `ws://127.0.0.1:8900/`); a query string such as an API key is kept |
+| `INDEXER_POLL_INTERVAL_MS` | how often the indexer checks for transactions the subscription missed | `30000` (1000–3600000) |
 
 The v2 program ID comes from `AXEL_PROGRAM_ID` or the vendored IDL; instructions are built with `@coral-xyz/anchor` from that IDL. `npm run export-idl` in the repository root refreshes the backend copy together with the frontend one.
 

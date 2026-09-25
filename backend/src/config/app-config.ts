@@ -50,6 +50,17 @@ export interface AppConfig {
   };
   /** `null` when no Yandex Fleet credentials are set. */
   yandex: YandexConfig | null;
+  indexer: IndexerConfig;
+}
+
+export interface IndexerConfig {
+  enabled: boolean;
+  /** RPC the event indexer reads program history from; default: `solana.rpcUrl`. */
+  rpcUrl: string;
+  /** Websocket for `logsSubscribe`; default: `rpcUrl` as ws(s), on the next port if it has one. */
+  wsUrl: string;
+  /** How often the indexer checks for transactions the log subscription missed. */
+  pollIntervalMs: number;
 }
 
 export interface YandexConfig {
@@ -119,6 +130,45 @@ function origin(key: string, value: string, requireHttps: boolean): URL {
     throw new ConfigError(`${key} must use https in production: ${value}`);
   }
   return url;
+}
+
+function booleanFlag(env: Env, key: string, fallback: boolean): boolean {
+  const value = optional(env, key);
+  if (value === null) {
+    return fallback;
+  }
+  if (value !== 'true' && value !== 'false') {
+    throw new ConfigError(`${key} must be true or false: ${value}`);
+  }
+  return value === 'true';
+}
+
+function endpoint(env: Env, key: string, protocols: string[]): string | null {
+  const value = optional(env, key);
+  if (value === null) {
+    return null;
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new ConfigError(`${key} is not a valid URL: ${value}`);
+  }
+  if (!protocols.some((protocol) => url.protocol === `${protocol}:`)) {
+    const allowed = protocols.map((protocol) => `${protocol}://`).join(' or ');
+    throw new ConfigError(`${key} must start with ${allowed}: ${value}`);
+  }
+  return value;
+}
+
+/** The websocket a Solana RPC node serves next to `rpcUrl`, as web3.js derives it. */
+function websocketUrl(rpcUrl: string): string {
+  const url = new URL(rpcUrl);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  if (url.port !== '') {
+    url.port = String(Number(url.port) + 1);
+  }
+  return url.toString();
 }
 
 const YANDEX_CREDENTIALS = ['YANDEX_PARK_ID', 'YANDEX_CLIENT_ID', 'YANDEX_API_KEY'];
@@ -215,13 +265,16 @@ export function loadAppConfig(env: Env): AppConfig {
     );
   }
 
+  const rpcUrl = endpoint(env, 'SOLANA_RPC_URL', ['http', 'https']) ?? 'http://127.0.0.1:8899';
+  const indexerRpcUrl = endpoint(env, 'INDEXER_RPC_URL', ['http', 'https']) ?? rpcUrl;
+
   return {
     isProduction,
     port: integer(env, 'PORT', 3000, 1, 65535),
     corsOrigins,
     trustProxy: integer(env, 'TRUST_PROXY', 0, 0, 10),
     solana: {
-      rpcUrl: optional(env, 'SOLANA_RPC_URL') ?? 'http://127.0.0.1:8899',
+      rpcUrl,
       cluster,
       programId: publicKey(env, 'AXEL_PROGRAM_ID') ?? new PublicKey(idl.address),
     },
@@ -242,5 +295,11 @@ export function loadAppConfig(env: Env): AppConfig {
     fleet: { cars, utcOffsetMinutes },
     oracle: { keypairPath: oracleKeypairPath },
     yandex,
+    indexer: {
+      enabled: booleanFlag(env, 'INDEXER_ENABLED', true),
+      rpcUrl: indexerRpcUrl,
+      wsUrl: endpoint(env, 'INDEXER_WS_URL', ['ws', 'wss']) ?? websocketUrl(indexerRpcUrl),
+      pollIntervalMs: integer(env, 'INDEXER_POLL_INTERVAL_MS', 30_000, 1_000, 3_600_000),
+    },
   };
 }

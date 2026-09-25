@@ -84,12 +84,13 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 - `npm run init-project` creates a project: a Token-2022 mint with six extensions and metadata, plus its `ProjectState`
 - `update_price` and `revoke_mint_authority` are available on-chain; they have no UI yet
 
-**Oracle, telemetry and KYC backend (NestJS, SQLite)**
+**Oracle, telemetry, KYC and event-index backend (NestJS, SQLite)**
 - Endpoints ([docs/api.md](docs/api.md#backend-http-endpoints)):
   - `GET /health`;
   - telemetry: `GET /telemetry/latest/:mint`, `/telemetry/:mint/:date.json`, `/telemetry/:mint/proof`, `/telemetry/:mint/chain`;
   - reports: `POST /reports/draft`, `POST /reports/attest`, `GET /reports/:mint`, `/reports/:mint/:hash.json`;
-  - KYC: `GET /kyc/nonce`, `POST /kyc/session`, `POST /kyc/webhook`.
+  - KYC: `GET /kyc/nonce`, `POST /kyc/session`, `POST /kyc/webhook`;
+  - program events: `GET /events`, `/projects/:mint/history`, `/positions/:owner/claims`.
 - Several cars from `FLEET_CONFIG` (share mint → plate, source, park fee). The daily job fills in every missed day, up to 31 back.
   - Real cars: trips and km come from Yandex Fleet orders, and the rent from the park's charges to the car's drivers.
   - Simulated cars: a deterministic generator. Every record says `data_origin: "simulated"`, there is no silent fallback, and mainnet refuses them.
@@ -100,7 +101,8 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 - Wallet binding: the wallet signs a Sign-In With Solana message with a single-use nonce, and only then gets a Sumsub WebSDK token for an applicant bound to it
 - Sumsub webhook: HMAC over the raw body with the algorithm Sumsub names, compared in constant time; approvals confirmed with the Sumsub API; v2 `set_investor` (Active for 12 months, or Revoked) built from the IDL and signed by a dedicated KYC key; nothing sent when the record would not change; a sanctions freeze is never touched
 - Refuses to start in production without the webhook secret, the Sumsub credentials, the KYC key, the program ID and the allowed origins; CORS limited to `CORS_ORIGINS`; rate limits on the sign-in endpoints
-- Jest tests with the Solana RPC, the Sumsub API and the Yandex Fleet API replaced at their boundaries; the fake RPC applies `set_investor` and `record_telemetry` the way the program does
+- Event indexer: the v2 program's history (`getSignaturesForAddress`, `getTransaction`) stored in SQLite oldest first with a cursor, a `logsSubscribe` websocket that brings new events in at once, retries with backoff, and events the transfer hook emits inside Token-2022 kept. It halts rather than mix two clusters in one database.
+- Jest tests with the Solana RPC, the Sumsub API and the Yandex Fleet API replaced at their boundaries; the fake RPC applies `set_investor` and `record_telemetry` the way the program does. `npm run test:localnet` runs the indexer against `solana-test-validator` with the built `axel_v2.so`.
 
 **Frontend**
 - Next.js 14 App Router; transactions are built from the vendored IDL (`frontend/src/lib/solana/idl/`)
@@ -250,22 +252,23 @@ Checks, as run in CI: `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm
 
 Buying shares requires a wallet with an approved `WhitelistEntry` on devnet. A public demo path for judges is planned (see below).
 
-**Backend** (optional: telemetry and KYC)
+**Backend** (optional: telemetry, KYC and event history)
 
 ```bash
 cd backend
 cp .env.example .env                # every variable is documented in the file
 npm ci
 npm run start:dev                   # watch mode; or: npm run build && npm run start:prod
-curl http://localhost:3001/health   # {"status":"ok","rpc":"connected","kyc":"not_configured","oracle":"not_configured"}
+curl http://localhost:3001/health   # {"status":"ok","rpc":"connected","kyc":"not_configured","oracle":"not_configured","indexer":"live"}
 ```
 
-Checks, as run in CI: `npm run lint`, `npm test`, `npm run build`.
+Checks, as run in CI: `npm run lint`, `npm test`, `npm run build`. With the Agave toolchain on PATH and `anchor build` done, `npm run test:localnet` also runs the event indexer against a local validator.
 
 - **Cars** come from `FLEET_CONFIG`. A `simulated` car needs no credentials and is published with `data_origin: "simulated"`. A `yandex_fleet` car needs the `YANDEX_*` credentials.
 - **Oracle key.** Without `ORACLE_KEYPAIR_PATH`, days are still published, but nothing is written on-chain and `/reports/attest` answers 503.
 - **KYC.** Without `KYC_AUTHORITY_KEYPAIR_PATH`, `SUMSUB_WEBHOOK_SECRET` and the Sumsub API credentials, the KYC endpoints answer 503.
 - **Production.** With `NODE_ENV=production` the backend does not start without the KYC settings, or without the oracle key when cars are configured.
+- **Event history.** The indexer reads `SOLANA_RPC_URL` (or `INDEXER_RPC_URL`) and its websocket. The SQLite file belongs to one cluster; after resetting a local validator, use a new `DATABASE_PATH`. `INDEXER_ENABLED=false` turns it off.
 
 **Programs**
 
@@ -304,7 +307,7 @@ axel-sol/
 ├── scripts/                        # init-project.ts, generate-clients.ts, last-project.json
 ├── sdk/axel-v2/                    # Codama TypeScript client of the v2 program (docs/v2.md)
 ├── migrations/deploy.ts            # Anchor scaffold, unused
-├── backend/src/                    # NestJS: health, kyc, fleet, telemetry, reports, solana modules
+├── backend/src/                    # NestJS: health, kyc, fleet, telemetry, reports, indexer, solana modules
 ├── frontend/
 │   ├── src/app/[locale]/           # /, /assets/[id], /dashboard, /payouts, /admin
 │   ├── src/components/             # admin, asset, catalog, dashboard, invest, layout, payouts, shared, ui, wallet
@@ -356,6 +359,7 @@ Done so far:
   - revenue reports, and a deposit co-signature given only when the operator's report matches the published days.
 
   Checked against the real `axel_v2.so` in LiteSVM: the chain head and the deposit's `report_hash` match. See [docs/architecture.md](docs/architecture.md#oracle--telemetry-flow).
+- Added a backend event indexer for v2: program history plus a live log subscription, stored idempotently in SQLite and served as `/events`, a project history by share mint, and an owner's claims with exact totals. It is tested against a real `solana-test-validator` running `axel_v2.so`, including the event the transfer hook emits inside Token-2022. See [docs/architecture.md](docs/architecture.md#event-indexer-v2).
 - Wrote the AXEL v2 program (`programs/axel-v2`, 24 instructions): escrowed fundraising with refunds, a KYC registry with restricted signers, a transfer hook inside the program, attested revenue deposits with claims that are safe against transfers and late buys, a telemetry hash chain and time-locked share recovery. It has 35 Rust tests and 530 LiteSVM tests, a generated client in `sdk/axel-v2`, and CI. Design: [docs/v2.md](docs/v2.md). It is not deployed yet.
 - Redesigned the frontend ([`frontend/design.md`](frontend/design.md)): new landing page, asset, portfolio, payouts and operator pages, self-hosted fonts, licensed photos, and pages checked for layout, contrast and accessibility at five widths in EN / RU / KK. The asset page no longer shows made-up specs or income projections.
 
@@ -386,6 +390,7 @@ In progress during the hackathon (**planned, not done yet**):
 - [ ] Revenue claims that ignore shares bought or transferred after a deposit
 - [ ] Create the hook's `ExtraAccountMetaList` during project setup
 - [x] Backend as the v2 oracle: telemetry batches, published records, attested revenue reports, simulated data flagged
+- [x] Backend event indexer for v2: project histories and claim histories
 - [ ] Connect KYC and the telemetry widget in the UI
 - [ ] Independent security audit, multisig authorities, mainnet
 

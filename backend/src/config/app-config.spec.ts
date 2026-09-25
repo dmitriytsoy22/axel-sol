@@ -226,6 +226,79 @@ describe('loadAppConfig', () => {
   });
 });
 
+describe('indexer settings', () => {
+  it('indexes the local validator by default, with its websocket on the next port', () => {
+    expect(loadAppConfig({}).indexer).toEqual({
+      enabled: true,
+      rpcUrl: 'http://127.0.0.1:8899',
+      wsUrl: 'ws://127.0.0.1:8900/',
+      pollIntervalMs: 30_000,
+    });
+  });
+
+  it('derives a secure websocket on the same host from an https RPC, keeping its query', () => {
+    const config = loadAppConfig({
+      SOLANA_RPC_URL: 'https://devnet.helius-rpc.com/?api-key=abc',
+    });
+
+    expect(config.indexer).toMatchObject({
+      rpcUrl: 'https://devnet.helius-rpc.com/?api-key=abc',
+      wsUrl: 'wss://devnet.helius-rpc.com/?api-key=abc',
+    });
+  });
+
+  it('reads a separate RPC and websocket for the indexer', () => {
+    const config = loadAppConfig({
+      SOLANA_RPC_URL: 'https://api.devnet.solana.com',
+      INDEXER_RPC_URL: 'https://indexer.example:8443/rpc',
+      INDEXER_WS_URL: 'wss://stream.indexer.example/ws',
+      INDEXER_ENABLED: 'false',
+      INDEXER_POLL_INTERVAL_MS: '5000',
+    });
+
+    expect(config.solana.rpcUrl).toBe('https://api.devnet.solana.com');
+    expect(config.indexer).toEqual({
+      enabled: false,
+      rpcUrl: 'https://indexer.example:8443/rpc',
+      wsUrl: 'wss://stream.indexer.example/ws',
+      pollIntervalMs: 5_000,
+    });
+  });
+
+  it('derives the websocket from INDEXER_RPC_URL when only that is set', () => {
+    expect(loadAppConfig({ INDEXER_RPC_URL: 'http://10.0.0.5:9000' }).indexer.wsUrl).toBe(
+      'ws://10.0.0.5:9001/',
+    );
+  });
+
+  it.each([
+    ['INDEXER_ENABLED', 'yes', 'INDEXER_ENABLED must be true or false: yes'],
+    [
+      'INDEXER_RPC_URL',
+      'ftp://node.example',
+      'INDEXER_RPC_URL must start with http:// or https://: ftp://node.example',
+    ],
+    [
+      'INDEXER_WS_URL',
+      'https://node.example',
+      'INDEXER_WS_URL must start with ws:// or wss://: https://node.example',
+    ],
+    [
+      'SOLANA_RPC_URL',
+      'localhost:8899',
+      'SOLANA_RPC_URL must start with http:// or https://: localhost:8899',
+    ],
+    ['SOLANA_RPC_URL', 'not a url', 'SOLANA_RPC_URL is not a valid URL: not a url'],
+    [
+      'INDEXER_POLL_INTERVAL_MS',
+      '500',
+      'INDEXER_POLL_INTERVAL_MS must be an integer between 1000 and 3600000: 500',
+    ],
+  ])('refuses %s=%s', (key, value, message) => {
+    expect(() => loadAppConfig({ [key]: value })).toThrow(new ConfigError(message));
+  });
+});
+
 describe('FLEET_CONFIG', () => {
   const car = { plate: '123ABC02', source: 'yandex_fleet', parkFeeBps: 1500 };
 
