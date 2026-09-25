@@ -33,6 +33,7 @@ Done:
 - [x] Replaced the stale v1 Codama output with a client generated for the v2 program in `sdk/axel-v2` ([v2.md](v2.md))
 - [x] Moved the frontend to the v2 program: client, hooks, amounts in the payment token, the six project states, KYC records, escrowed buys, refunds, claims, transfers and a role-based console ([architecture.md](architecture.md#frontend))
 - [x] Frontend v2 screens: soft-cap marker, live escrow, state timeline, refund dialog, in-browser verification of telemetry and reports, Proof of solvency, recovery flows (proposal, veto, execution), console split by role, demo data banner
+- [x] Judge demo path (`/demo` and the `/api/demo` routes: signed demo access, shares from the desk, simulated months, limits, optional Turnstile) and Solana Actions for investing and claiming ([api.md](api.md#judge-demo-api))
 
 Next steps. Each one addresses a limitation listed in [architecture.md](architecture.md#known-limitations):
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key (program upgrade)
@@ -44,7 +45,7 @@ Next steps. Each one addresses a limitation listed in [architecture.md](architec
 - [ ] Add a KYC flow to the UI (Sumsub with `externalUserId` = wallet)
 - [ ] Serve the indexer API the frontend reads payout history from ([api.md](api.md#indexer-api-read-by-the-frontend)), and prepare oracle-co-signed deposits in the backend
 - [ ] Publish real cars' telemetry, income reports and purchase papers from the backend in the layout the frontend verifies ([api.md](api.md#published-car-data-read-by-verify))
-- [ ] Public frontend deployment and a documented devnet demo path for judges (a whitelisted test wallet)
+- [ ] Public frontend deployment on devnet, with the demo keys and a funded faucet ([api.md](api.md#frontend-environment))
 - [ ] Recorded end-to-end devnet run with Explorer links: whitelist → buy → deposit → claim → transfer
 
 ## Before Mainnet

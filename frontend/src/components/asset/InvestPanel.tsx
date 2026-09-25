@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { Loader2 } from 'lucide-react';
+import { FlaskConical, Loader2 } from 'lucide-react';
 import type { PositionAccount } from '@/lib/solana/accounts';
 import type { Project } from '@/types/project';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonClasses } from '@/components/ui/Button';
 import { RefundButton } from '@/components/dashboard/RefundButton';
 import { useProjectAdmin } from '@/hooks/useAdminActions';
 import { Link } from '@/i18n/routing';
@@ -14,6 +14,7 @@ import { formatCount, formatDate, formatPercent, formatTokenAmount } from '@/lib
 import { finalizeOutcome, isRefundable } from '@/lib/solana/lifecycle';
 import { holdsEscrow } from '@/lib/solana/solvency';
 import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
+import { DEMO_ACCESS_SHOWN } from '@/lib/demo/config';
 import { CountdownTimer } from './CountdownTimer';
 import { EscrowBalance } from './EscrowBalance';
 import { InvestButton } from './InvestButton';
@@ -176,6 +177,18 @@ export function InvestPanel({
           {t(helper, { date: formatDate(project.activationDeadline, locale) })}
         </p>
       )}
+      {DEMO_ACCESS_SHOWN &&
+        project.allowsDemo &&
+        (saleState === 'open' || saleState === 'operating') &&
+        (!connected || approval === 'unverified' || approval === 'expired') && (
+          <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
+            <p className="text-small text-muted-foreground">{t('demoAccessHint')}</p>
+            <Link href="/demo" className={buttonClasses({ variant: 'outline', className: 'w-full' })}>
+              <FlaskConical aria-hidden="true" strokeWidth={1.75} />
+              {t('getDemoAccess')}
+            </Link>
+          </div>
+        )}
       <SettleRaise project={project} now={now} onSettled={onChanged} />
 
       {heldShares > 0n && (

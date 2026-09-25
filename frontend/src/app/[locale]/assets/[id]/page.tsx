@@ -13,6 +13,7 @@ import { carTitle } from '@/lib/solana/tokens';
 import type { Project } from '@/types/project';
 import { AssetHeader } from '@/components/asset/AssetHeader';
 import { AssetPhoto } from '@/components/asset/AssetPhoto';
+import { BlinkLinks } from '@/components/asset/BlinkLinks';
 import { InvestPanel } from '@/components/asset/InvestPanel';
 import { MobileInvestBar } from '@/components/asset/MobileInvestBar';
 import { ProjectTerms } from '@/components/asset/ProjectTerms';
@@ -110,6 +111,7 @@ function AssetDetails({ project, onChanged }: { project: Project; onChanged: () 
               {tAsset('solvencyLink')}
               <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
             </Link>
+            <BlinkLinks project={project} saleState={saleState} />
           </div>
           <CarPayouts project={project} />
           <VerifyData project={project} />

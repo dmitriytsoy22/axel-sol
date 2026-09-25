@@ -76,6 +76,8 @@ The frontend runs on the v2 program, `axel_v2`, which is not deployed yet (see [
 - Portfolio: a pending recovery of the wallet's shares with a veto, value, shares, and exactly what a claim pays now (the program's accumulator math on BigInt); claim per car or "Claim all" (four cars per transaction), refunds, and sending shares to another verified wallet (the recipient's KYC is checked while typing; the transfer lists the hook's accounts itself and onboards a first-time recipient)
 - Payout history: deposits of the wallet's cars from the chain, or its part of each deposit and its claims from an indexer
 - Every transaction outcome in a toast with an Explorer link; every program error explained in EN / RU / KK
+- Judge demo path (`/demo`, devnet only): sign a message to get a demo KYC record, 50,000 test tenge and 0.01 SOL; buy in an open raise; receive shares of an operating car from the desk; simulate a month of income (the operator's deposit, co-signed by the car's oracle); claim; verify the car's data; proof of solvency. Rate-limited per wallet, per IP address and in total (Upstash Redis), with optional Cloudflare Turnstile
+- Solana Actions (Blinks): invest in a car's open raise or claim its payout from a post on X or Telegram; `actions.json` makes a car page unfurl into its invest Blink
 
 **Admin** (frontend console, roles read from the chain)
 - One console split by the keys the wallet holds
@@ -95,7 +97,7 @@ The frontend runs on the v2 program, `axel_v2`, which is not deployed yet (see [
 - English (default), Russian and Kazakh via `next-intl`: `/`, `/ru/…`, `/kk/…`
 - Security headers: Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy, Permissions-Policy
 - Self-hosted fonts and a credited, licensed photo set; design rules in [`frontend/design.md`](frontend/design.md)
-- Vitest unit suite: 57 files, 408 tests, run in CI. The client is tested without mocks against the IDL, `@solana/spl-token`'s hook resolver, and accounts the real program wrote in LiteSVM
+- Vitest unit suite: 68 files, 510 tests, run in CI. The client is tested without mocks against the IDL, `@solana/spl-token`'s hook resolver, and accounts the real program wrote in LiteSVM
 
 ---
 
@@ -241,7 +243,11 @@ npm ci
 npm run dev                                    # http://localhost:3000
 ```
 
-That chain is for reading: its wallets have no saved keys, and it has no telemetry, so "Check the car's data yourself" has nothing to verify on it. The demo seed (`scripts/seed-devnet`, once merged) fills a local validator with every project state, telemetry and a pending recovery, and publishes the files the check reads; serve its `--data-dir` and set `NEXT_PUBLIC_PUBLISHED_DATA_URL` to it, and `NEXT_PUBLIC_PAYMENT_MINT_SYMBOLS=<tKZT mint>:tKZT`. Every variable is described in [docs/api.md](docs/api.md#frontend-environment). Checks, as run in CI: `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`.
+That chain is for reading: its wallets have no saved keys, and it has no telemetry, so "Check the car's data yourself" has nothing to verify on it. The demo seed (`scripts/seed-devnet`, once merged) fills a local validator with every project state, telemetry and a pending recovery, and publishes the files the check reads; serve its `--data-dir` and set `NEXT_PUBLIC_PUBLISHED_DATA_URL` to it, and `NEXT_PUBLIC_PAYMENT_MINT_SYMBOLS=<tKZT mint>:tKZT`. Every variable is described in [docs/api.md](docs/api.md#frontend-environment).
+
+To run the judge demo routes on that seeded chain, set `NEXT_PUBLIC_DEMO_ACCESS=1` and the demo keys the seed derived (`DEMO_SEED_SECRET=… node scripts/demo-env.mjs --cluster localnet --fleet <demo.demo_fleet>` in `frontend/` prints them), fund the faucet key it prints (`solana airdrop` on a local validator), and open `/demo`. The routes and Blinks are described in [docs/api.md](docs/api.md#judge-demo-api).
+
+Checks, as run in CI: `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`.
 
 **Backend** (optional: telemetry oracle and KYC webhook)
 
@@ -294,10 +300,13 @@ axel-sol/
 ├── migrations/deploy.ts            # Anchor scaffold, unused
 ├── backend/src/                    # NestJS: health, kyc, telemetry, yandex, solana modules
 ├── frontend/
-│   ├── src/app/[locale]/           # /, /assets/[id], /dashboard, /payouts, /solvency, /admin
-│   ├── src/components/             # admin, asset, catalog, dashboard, invest, layout, payouts, shared, solvency, ui, wallet
+│   ├── src/app/[locale]/           # /, /assets/[id], /dashboard, /payouts, /solvency, /demo, /admin
+│   ├── src/app/api/                # demo/ (judge demo routes, devnet only) and actions/ (Blinks); app/actions.json
+│   ├── src/components/             # admin, asset, catalog, dashboard, demo, invest, layout, payouts, shared, solvency, ui, wallet
 │   ├── src/hooks/                  # chain reads and transaction hooks
 │   ├── src/lib/solana/             # axel_v2 client: config, PDAs, readers, math, instructions, errors, idl-v2/ (vendored)
+│   ├── src/lib/demo/, lib/actions/ # demo keys, limits, tokens and transactions; Solana Actions handlers
+│   ├── scripts/demo-env.mjs        # prints the demo routes' keys for a cluster the seed filled
 │   ├── src/fonts/, public/images/  # self-hosted fonts; car and city photos with credits
 │   ├── messages/                   # en.json, ru.json, kk.json
 │   └── design.md                   # design direction, tokens and page rules
@@ -339,10 +348,11 @@ Done so far:
 - Wrote the AXEL v2 program (`programs/axel-v2`, 24 instructions): escrowed fundraising with refunds, a KYC registry with restricted signers, a transfer hook inside the program, attested revenue deposits with claims that are safe against transfers and late buys, a telemetry hash chain and time-locked share recovery. It has 35 Rust tests and 530 LiteSVM tests, a generated client in `sdk/axel-v2`, and CI. Design: [docs/v2.md](docs/v2.md). It is not deployed yet.
 - Redesigned the frontend ([`frontend/design.md`](frontend/design.md)): new landing page, asset, portfolio, payouts and operator pages, self-hosted fonts, licensed photos, and pages checked for layout, contrast and accessibility at five widths in EN / RU / KK. The asset page no longer shows made-up specs or income projections.
 - Moved the frontend to v2: a client for `axel_v2` (PDAs, readers, the revenue math on BigInt, instruction builders including hooked transfers, error messages for every program code), hooks for the raise, refunds, claims, transfers, positions, payout history and roles, amounts in the payment token, and the admin console on the program's roles. The v1 client was removed from the UI.
+- Built the judge demo path and Blinks: `/api/demo` routes (signed access with demo KYC, test tenge and SOL; shares from the desk through the transfer hook; simulated months deposited by the operator and attested by the oracle; limits in Upstash Redis; optional Turnstile), a `/demo` page that walks a judge through buy → shares → payout → claim → verify → solvency, and spec-compliant invest and claim Actions with `actions.json`. Checked end to end in a browser against a seeded local chain, with a wallet that really signs.
 - Built the v2 screens: raise progress with a soft-cap marker, live escrow balance and a state timeline; a refund dialog that settles a failed raise first; in-browser verification of each car's telemetry chain, income reports and purchase papers; a live Proof of solvency page; the recovery flows (proposal, the owner's veto, execution); and the console split into platform admin, operator and KYC. Checked in EN / RU / KK at phone and desktop widths against a seeded local chain.
 
 In progress during the hackathon (**planned, not done yet**):
-- [ ] Public frontend deployment with a judge demo path (a whitelisted devnet test wallet)
+- [ ] Public frontend deployment on devnet (the judge demo path and Blinks are built and checked on a local chain)
 - [ ] End-to-end devnet demo with Explorer links: whitelist → buy → deposit → claim → transfer
 - [ ] Deploy AXEL v2 under its new program ID (written and tested locally, see above)
 - [ ] Move the backend to v2, and publish the cars' telemetry in the layout the frontend verifies
@@ -364,7 +374,8 @@ In progress during the hackathon (**planned, not done yet**):
 - [x] Program build and v2 tests in CI (the v1 tests run locally only)
 - [x] Frontend on the v2 program: stablecoin amounts, the six project states, KYC records, escrowed buys, refunds, claims, transfers
 - [x] Frontend v2 screens: in-browser verification of telemetry and reports, Proof of solvency, recovery flows, console split by role
-- [ ] Public deployment and judge demo path
+- [x] Judge demo path and Solana Actions (Blinks), checked on a local chain
+- [ ] Public deployment on devnet
 - [ ] End-to-end devnet demo, including a holder-to-holder transfer
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key
 - [ ] Revenue claims that ignore shares bought or transferred after a deposit

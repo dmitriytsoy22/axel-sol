@@ -19,7 +19,12 @@ import {
 } from '@/hooks/useTelemetryVerification';
 import { PUBLISHED_DATA_URL } from '@/lib/api/published';
 import { formatDay, formatNumber } from '@/lib/format';
-import type { DepositCheck, DocumentStatus, JsonFetcher } from '@/lib/verify/published';
+import type {
+  DepositCheck,
+  DocumentStatus,
+  JsonFetcher,
+  ReportStatus,
+} from '@/lib/verify/published';
 import { NotPublishedError } from '@/lib/verify/published';
 import { WebCryptoUnavailableError, type Digest } from '@/lib/verify/sha256';
 import type { Project } from '@/types/project';
@@ -38,6 +43,8 @@ const DOCUMENT_TONE: Record<DocumentStatus, PillTone> = {
   mismatch: 'danger',
   unpublished: 'neutral',
 };
+
+const REPORT_TONE: Record<ReportStatus, PillTone> = { ...DOCUMENT_TONE, simulated: 'info' };
 
 function Verdict({ result }: { result: VerificationResult }): JSX.Element {
   const t = useTranslations('VerifyData');
@@ -125,7 +132,7 @@ function DepositRow({ deposit, behind }: { deposit: DepositCheck; behind: boolea
         {t('payout', { index: deposit.period.index })}
       </span>
       <span className="flex flex-wrap gap-2">
-        <Pill tone={DOCUMENT_TONE[deposit.report]}>{t(`report_${deposit.report}`)}</Pill>
+        <Pill tone={REPORT_TONE[deposit.report]}>{t(`report_${deposit.report}`)}</Pill>
         {snapshotPill}
       </span>
     </li>

@@ -5,6 +5,9 @@ export const NAV_LINKS = [
   { href: '/solvency', labelKey: 'solvency' },
 ] as const;
 
+/** The judges' demo path (`app/[locale]/demo`), shown only on a demo deployment. */
+export const DEMO_PATH = '/demo';
+
 export const LOCALE_OPTIONS = [
   { code: 'en', label: 'English' },
   { code: 'ru', label: 'Русский' },

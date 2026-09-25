@@ -55,9 +55,12 @@ sdk/axel-v2/                    Codama TypeScript client of the v2 program (see 
 backend/src/                    health, kyc, telemetry, yandex, solana modules
 frontend/src/
   app/[locale]/                 routes (en default, ru, kk)
+  app/api/demo/                 judge demo routes (devnet and localnet only)
+  app/api/actions/, app/actions.json   Solana Actions (Blinks): invest and claim
   hooks/                        chain reads and transaction hooks (axel_v2)
   lib/solana/                   axel_v2 client: cluster config, PDAs, readers, math, instruction builders, error messages, vendored IDL (idl-v2/)
   lib/api/                      telemetry and indexer HTTP clients
+  lib/demo/, lib/actions/       demo route logic (keys, limits, tokens, transactions) and the Actions handlers
 Anchor.toml                     program IDs for localnet and devnet; provider cluster = devnet
 ```
 
@@ -274,12 +277,15 @@ It uses:
 | `/dashboard` | Portfolio: a pending recovery of the wallet's shares with a veto, value, shares, what a claim pays now; per car claim, refund, or send shares; claim all | `RecoveryRequest`s by old owner, `Position`s by owner, `Project`s; `cancel_recovery`, `claim` (up to four per transaction), `refund`, `open_position` + hooked `transfer_checked` |
 | `/payouts` | Deposits of the wallet's cars and its claimed and claimable totals; with an indexer, its part of each deposit and its claims | `Position`s, `RevenuePeriod`s, or the [indexer API](api.md#indexer-api-read-by-the-frontend) |
 | `/solvency` | Proof of solvency: for every car, the income vault against deposited minus claimed and what holders are owed now, the escrow against (sold − refunded) × price, the share supply against the ledger and the positions, and the revenue checkpoints; checked again every 30 s | Every `Project` and `Position`, then one `getMultipleAccounts` for each car's income vault, escrow and share mint |
+| `/demo` | The judges' path, on a demo deployment (`NEXT_PUBLIC_DEMO_ACCESS=1`, devnet or localnet): demo access, buy in an open raise, shares from the desk, a simulated month, claim, verify, proof of solvency; each step's state read from the chain | The wallet's `Investor`, `Position`s and `Project`s; `claim`. Access, shares and simulated months go through the [demo routes](api.md#judge-demo-api), which send their own transactions |
+| `/api/demo/*`, `/api/actions/*`, `/actions.json` | [Judge demo routes](api.md#judge-demo-api) and [Solana Actions](api.md#solana-actions-blinks) | Server-side: `set_investor`, mint and SOL drip, `open_position` + hooked transfer, `deposit_revenue` co-signed by the oracle (demo); unsigned `buy_shares` and `claim` (Blinks) |
 | `/admin` | Console split by the keys the wallet holds. **Platform admin:** each car's state (settle, activate with the purchase documents' hash, cancel raise, pause, resume, close), its operator and oracle, share recovery (propose, run, withdraw), and the config account. **Operator:** its cars' deposits, keys, live income vault and payout history. **KYC:** looks a wallet's record up, then approves or revokes it; the demo key is stopped before it touches a record it may not change | `Config`, `Project`s, `RecoveryRequest`s, `Investor`; `finalize_raise`, `activate_project`, `cancel_raise`, `pause_project`, `resume_project`, `close_project`, `set_project_roles`, `propose_recovery`, `execute_recovery`, `cancel_recovery`, `set_investor` |
 
 Details:
 
 - Access comes from the roles on-chain (`hooks/useAdminRoles.ts`): `Config.admin`, `Config.kyc_authority`, `Config.demo_kyc_authority` and each project's `operator`. `/admin` is not in the navigation bar; a wallet with several roles switches between them with tabs.
-- On every test network a banner under the navigation bar says the data is the fictional demo seed of `scripts/seed-devnet`; on the home page the hero says it.
+- On every test network a banner under the navigation bar says the data is the fictional demo seed of `scripts/seed-devnet`; on the home page the hero says it. On a demo deployment the banner, the mobile menu and a car page's purchase panel (for a wallet without KYC) lead to `/demo`.
+- The demo routes hold five keys, each for one role (faucet, demo KYC, desk, the demo car's operator and oracle), never the admin's. The limits live in Upstash Redis when configured; a wallet's session from the access route is an HMAC token, so the shares and simulation routes need no storage to know who went through access. A simulated month's report holds only what the period account records, so "Check the car's data yourself" rebuilds it and labels the deposit as simulated.
 - The buy button reads the wallet's `Investor` record (`hooks/useInvestor.ts`) and judges it with the program's rule (`lib/solana/eligibility.ts`): active, not expired, and DEMO only where the project accepts it. Otherwise it names the reason. The purchase dialog says where the money goes (escrow, refund rule) and discloses a payment token whose issuer can freeze, seize or pause.
 - Portfolio figures use `pendingRevenue`, the program's settle on BigInt, so "Ready to claim" is exactly what a claim pays.
 - A transfer reads the recipient's KYC record and position while the address is typed, refuses a wallet the hook would refuse, and adds `open_position` when the recipient has no position yet.

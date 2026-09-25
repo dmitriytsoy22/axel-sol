@@ -5,6 +5,7 @@ AXEL exposes these interfaces:
 1. **A small HTTP backend** with three endpoints, in `backend/`.
 2. **The Solana programs.** Clients call them directly. The frontend uses `axel_v2` ([v2.md](v2.md)); the v1 `axel` and `transfer_hook` programs below are what runs on devnet today.
 3. **The indexer API** that the frontend reads payout history from when one is configured. The backend does not serve it yet; its contract is fixed [below](#indexer-api-read-by-the-frontend).
+4. **The judge demo routes and Solana Actions (Blinks)** of the frontend, in `frontend/src/app/api/`: [demo access, shares and simulated months](#judge-demo-api) on devnet, and [invest and claim Blinks](#solana-actions-blinks).
 
 All business actions (buy, deposit, claim, KYC, pause and so on) are Solana transactions. The backend is not in that path.
 
@@ -136,6 +137,25 @@ The `axel` program ID is hardcoded in `kyc.service.ts` and `telemetry-cron.servi
 | `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts`, `next.config.mjs` | Unset: the car page says trip data is not connected and makes no request. Set: the backend's base URL; the widget asks `/telemetry/latest/<share mint>` every minute. The backend does not enable CORS yet, so it must share the frontend's origin or add CORS. |
 | `NEXT_PUBLIC_INDEXER_URL` | `lib/api/indexer.ts`, `next.config.mjs` | Unset: payout history comes from the chain. Set: from the [indexer API](#indexer-api-read-by-the-frontend). |
 | `NEXT_PUBLIC_PUBLISHED_DATA_URL` | `lib/api/published.ts`, `next.config.mjs` | `/demo-data` on test networks (the seed's files in `frontend/public/demo-data`), unset on mainnet. The base of the [published car data](#published-car-data-read-by-verify) the asset page's "Check the car's data yourself" hashes. An absolute URL's origin is added to the CSP, and that server must allow CORS. |
+| `NEXT_PUBLIC_SITE_URL` | `lib/actions/http.ts` | Unset: the [Blinks](#solana-actions-blinks) take their absolute links and icon from the request's host (`X-Forwarded-Host` behind a proxy). |
+| `NEXT_PUBLIC_DEMO_ACCESS` | `lib/demo/config.ts` | Unset. `1` shows the [judge demo](#judge-demo-api) entry points (the demo banner, the mobile menu and the car page) and the `/demo` page, on devnet and localnet only. The routes themselves also need the server variables below. |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | `lib/demo/config.ts`, `next.config.mjs` | Unset. With `TURNSTILE_SECRET`, the access request shows a Cloudflare Turnstile check; the CSP then allows `challenges.cloudflare.com` scripts and frames. |
+
+Server-only variables of the judge demo (never `NEXT_PUBLIC_`, read per request by `lib/demo/server/env.ts`; missing ones make every demo route answer 503 with their names):
+
+| Variable | Holds |
+|---|---|
+| `DEMO_FAUCET_SECRET` | The faucet: fee payer and SOL pool of every demo transaction, and mint authority of the test tenge. It pays the rent the other roles need in the same transaction, so it is the only key to fund: about 0.018 SOL per judge and 0.0024 SOL per simulated month. |
+| `DEMO_KYC_SECRET` | `Config.demo_kyc_authority`. The program lets it write DEMO records for at most 30 days and nothing else. |
+| `DEMO_DESK_SECRET` | The desk wallet, which holds the demo fleet car's share inventory. |
+| `DEMO_OPERATOR_SECRET`, `DEMO_ORACLE_SECRET` | The demo fleet car's operator and oracle. |
+| `DEMO_FLEET_MINT` | Share mint of the demo fleet car (`demo.demo_fleet` in the seed's output). |
+| `DEMO_SESSION_SECRET` | Signs nonces and sessions (HMAC-SHA256); at least 32 characters. |
+| `DEMO_RPC_URL` | Optional server-side RPC for the demo routes and Blinks, e.g. a keyed Helius URL. |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Optional. The limits in Upstash Redis, shared by every serverless instance; without them each server process keeps its own. |
+| `TURNSTILE_SECRET` | Optional. The access request must carry a solved Turnstile token. |
+
+Keys are base58 secret keys or `solana-keygen` JSON arrays. `DEMO_SEED_SECRET=… node frontend/scripts/demo-env.mjs --cluster devnet --fleet <mint>` prints the five keys the seed derived for a cluster (HKDF, as `scripts/seed-devnet/lib/keys.ts`) and a fresh session secret; `--public` prints only the addresses, to compare with the seed's output. The admin, KYC authority, treasury and upgrade keys never reach the web server.
 
 ## Indexer API (read by the frontend)
 
@@ -210,10 +230,37 @@ The check, in order:
 2. Days must be real calendar days in strictly increasing order.
 3. The chain starts from 32 zero bytes and steps `head = SHA-256(head ‖ date as u32 little-endian ‖ data_hash)`, as `record_telemetry` does; a stated `head` must match.
 4. After `telemetry_count` days the rebuilt head and last date must equal the project's. More published days than on-chain is reported as ahead; fewer, as not finished.
-5. Each report file with a `period_index` is hashed the same way and compared with that period's `report_hash`; each period's `telemetry_head` is looked up among the rebuilt heads.
+5. Each report file with a `period_index` is hashed the same way and compared with that period's `report_hash`; each period's `telemetry_head` is looked up among the rebuilt heads. A period with no published report is checked against the report the demo's "Simulate a month" attests (`lib/demo/simulation.ts`), which holds only fields of the period account; a match is shown as a simulated demo month rather than a missing report.
 6. After activation, the acquisition file is compared with `acquisition_doc_hash`.
 
 File paths in the index must be relative `.json` paths inside the car's folder. A missing index (404) is reported as "nothing published".
+
+## Judge Demo API
+
+Next.js route handlers under `frontend/src/app/api/demo/` let a judge run the whole cycle on devnet with nothing but a wallet (`lib/demo/`). They exist on devnet and localnet only and answer 404 on any other cluster. Every answer is JSON with `Cache-Control: no-store`; a refusal is `{ code, message, retryAfter?, reason?, signature? }`, where `code` is one of `DEMO_ERROR_CODES` in `lib/demo/config.ts` (the app shows each in EN / RU / KK) and `reason` is the translated cause of a transaction Solana refused. A route that sent its transaction waits up to 30 s for confirmation and otherwise answers `confirmed: false`; the app then confirms it itself.
+
+| Route | Does | Limits |
+|---|---|---|
+| `GET /api/demo/nonce?wallet=` | A nonce (HMAC-signed, stateless, valid 5 minutes) and the exact message to sign with it | |
+| `POST /api/demo/access {wallet, nonce, signature, turnstileToken?}` | Checks the wallet's Ed25519 signature of the message (and Turnstile when configured). Then, in one faucet-paid transaction: `set_investor` (DEMO, 29 days, signed by the demo KYC key after the faucet sends it the record's rent), the wallet's tKZT account, 50,000 tKZT minted to it and 0.01 SOL. A wallet with a valid KYC record keeps it and only gets the drip; an expired DEMO record is renewed; a revoked, frozen or lapsed real record is refused (`kyc_locked`). Answers a session token (7 days) for the next two routes | Once per wallet (a returning wallet only gets a new session), 3 per IP address per UTC day, 80 in total. Refused below 0.05 SOL in the faucet |
+| `POST /api/demo/shares {wallet, session}` | The desk sends 5 shares of the demo fleet car: `open_position` (rent paid by the faucet) and the hooked `transfer_checked`, which checks both KYC records and settles both positions first | Once per wallet; the wallet must be eligible for the car |
+| `POST /api/demo/simulate-month {wallet, session}` | The faucet sends the operator the new period's rent and mints it the month's income; the operator deposits it with `deposit_revenue`, co-signed by the car's oracle. The month is the calendar month after the latest one the car's payouts cover, the amount the average of its latest three regular payouts in whole tokens, and the report hash that of a report which says it is simulated | One per minute across all wallets (`429` with `Retry-After`), 3 per wallet per UTC day, 150 payouts on the car |
+| `GET /api/demo/status[?wallet=]` | Whether access can be granted now, the faucet's balance, the limits, the fleet car (state, payouts, desk inventory, cooldown) and the wallet's one-time steps. `503` with the same body when the demo is unavailable, `code` saying why | |
+
+The server checks its configuration against the chain on each call: the demo KYC key must be `Config.demo_kyc_authority`, the faucet the payment mint's mint authority, and the operator and oracle keys the fleet car's; otherwise the route answers `misconfigured`.
+
+The `/demo` page walks through the path: access → buy in an open raise (the app's own purchase dialog) → receive shares → simulate a month → claim → verify the car's data → proof of solvency. Each step's state is read from the chain, so the path continues on another device.
+
+## Solana Actions (Blinks)
+
+`frontend/src/app/api/actions/` implements the [Solana Actions](https://solana.com/docs/advanced/actions) spec, so a car can be bought or its payout claimed from a post on X or Telegram. Every response carries the spec's CORS headers, `X-Action-Version: 2.4` and, on a public cluster, `X-Blockchain-Ids` (devnet: `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`); `OPTIONS` answers the preflight. The transactions are unsigned, with the reader's account as fee payer.
+
+| Route | GET | POST `{ account }` |
+|---|---|---|
+| `/api/actions/invest/[mint]` | The car's photo, price, raise progress, escrow and refund rule; buttons for 1, 3 and 5 shares (those that are left) and a number field. A car not raising is shown disabled | `?shares=N`: `buy_shares` capped at N × price. Refused with a message when the raise is closed, N is not a whole number of shares left, the wallet has no eligible KYC record (with the link to `/demo` on a demo deployment) or too little of the payment token |
+| `/api/actions/claim/[mint]` | The car's payouts so far and one "Claim payout" button; disabled before the car pays out | `claim` to the wallet's own account, when it holds a position with something to claim and is not frozen; the message names the amount |
+
+`GET /actions.json` maps `/assets/*` (and `/ru/assets/*`, `/kk/assets/*`) to the invest action. The car page links both Blinks on dial.to (`?action=solana-action:<url>&cluster=devnet`).
 
 ## Program Reference: `axel`
 

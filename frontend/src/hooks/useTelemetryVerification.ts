@@ -68,6 +68,7 @@ export function useTelemetryVerification(
         baseUrl,
         {
           shareMint: mint,
+          paymentMint: project.paymentMint.toBase58(),
           telemetry: onChain,
           acquisitionDocHash: project.acquisitionDocHash,
           periods,

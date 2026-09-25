@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { RevenuePeriodAccount } from '@/lib/solana/accounts';
+import { simulatedReportHash } from '@/lib/demo/simulation';
 import type { Digest } from './sha256';
 import {
   checkTelemetryChain,
@@ -79,10 +80,16 @@ export const fetchJson: JsonFetcher = async (url) => {
 
 export type DocumentStatus = 'match' | 'mismatch' | 'unpublished';
 
+/**
+ * A deposit's report: published and matching or not, a simulated month of the devnet demo
+ * (its report rebuilt from the period account hashes to `report_hash`), or not published.
+ */
+export type ReportStatus = DocumentStatus | 'simulated';
+
 export interface DepositCheck {
   period: RevenuePeriodAccount;
   /** The published income report against the period's attested `report_hash`. */
-  report: DocumentStatus;
+  report: ReportStatus;
   /**
    * The day through which the deposit's telemetry snapshot covers the rebuilt chain;
    * 'none' for a deposit made before any telemetry, null when the rebuilt chain never
@@ -102,6 +109,8 @@ export interface PublishedVerification {
 
 export interface VerificationTarget {
   shareMint: string;
+  /** The project's payment mint, which a simulated month's report names. */
+  paymentMint: string;
   telemetry: OnChainTelemetry;
   /** Hex; all zeros until the raise is released. */
   acquisitionDocHash: string;
@@ -158,20 +167,26 @@ export async function verifyPublishedData(
   onProgress?.({ phase: 'hashing', days: days.length });
   const telemetry = await checkTelemetryChain(days, target.telemetry, digest);
 
+  const reportStatus = async (period: RevenuePeriodAccount): Promise<ReportStatus> => {
+    const report = index.reports.find((entry) => entry.period_index === period.index);
+    if (report) {
+      return documentStatus(`${folder}/${report.file}`, period.reportHash, fetcher, digest);
+    }
+    const simulated = await simulatedReportHash(
+      { shareMint: target.shareMint, paymentMint: target.paymentMint, period },
+      digest,
+    );
+    return simulated === period.reportHash.toLowerCase() ? 'simulated' : 'unpublished';
+  };
+
   const deposits = await Promise.all(
-    target.periods.map(async (period): Promise<DepositCheck> => {
-      const report = index.reports.find((entry) => entry.period_index === period.index);
-      return {
+    target.periods.map(
+      async (period): Promise<DepositCheck> => ({
         period,
-        report: await documentStatus(
-          report ? `${folder}/${report.file}` : null,
-          period.reportHash,
-          fetcher,
-          digest,
-        ),
+        report: await reportStatus(period),
         snapshot: snapshotDay(telemetry.days, period.telemetryHead),
-      };
-    }),
+      }),
+    ),
   );
 
   const acquisition = !/^0{64}$/.test(target.acquisitionDocHash)

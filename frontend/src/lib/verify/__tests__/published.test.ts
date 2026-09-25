@@ -3,11 +3,14 @@ import { createHash } from 'node:crypto';
 import { PublicKey } from '@solana/web3.js';
 import { describe, expect, it } from 'vitest';
 import type { RevenuePeriodAccount } from '@/lib/solana/accounts';
+import { simulatedMonthReport } from '@/lib/demo/simulation';
+import { canonicalize } from '../jcs';
 import { NotPublishedError, verifyPublishedData, type JsonFetcher } from '../published';
 import { webCryptoSha256 } from '../sha256';
 import { EMPTY_HEAD } from '../telemetry';
 
 const MINT = 'FvJbFZYZdd4GwbYQS1zbWcbuPBqeHWnYdAt1ratzi1yv';
+const PAYMENT_MINT = '5qGVSmXa3ZJnPcwJ2JZPniSHVjhtDBiGAwaBqPqZdZ2z';
 const BASE = 'https://data.example/demo-data';
 const FOLDER = `${BASE}/${MINT}`;
 
@@ -106,6 +109,7 @@ describe('verifyPublishedData', () => {
       BASE,
       {
         shareMint: MINT,
+        paymentMint: PAYMENT_MINT,
         telemetry: { head: car.headOctober, count: 2, lastDate: 20261031 },
         acquisitionDocHash: car.acquisitionHash,
         periods: [
@@ -135,6 +139,7 @@ describe('verifyPublishedData', () => {
       BASE,
       {
         shareMint: MINT,
+        paymentMint: PAYMENT_MINT,
         telemetry: { head: car.headOctober, count: 2, lastDate: 20261031 },
         acquisitionDocHash: '0'.repeat(64),
         periods: [
@@ -156,6 +161,35 @@ describe('verifyPublishedData', () => {
     expect(result.acquisition).toBeNull();
   });
 
+  it('labels a deposit of the demo’s Simulate month as simulated, rebuilt from the chain alone', async () => {
+    const car = carFolder();
+    const simulated = { ...period(2, '', car.headOctober), periodStart: 20261101, periodEnd: 20261130, gross: 925_000_000n };
+    simulated.reportHash = sha256(
+      canonicalize(simulatedMonthReport({ shareMint: MINT, paymentMint: PAYMENT_MINT, period: simulated })),
+    );
+    // The same deposit with another amount than its report names is not a simulated month.
+    const altered = { ...simulated, index: 3, gross: 925_000_001n };
+
+    const result = await verifyPublishedData(
+      BASE,
+      {
+        shareMint: MINT,
+        paymentMint: PAYMENT_MINT,
+        telemetry: { head: car.headOctober, count: 2, lastDate: 20261031 },
+        acquisitionDocHash: '0'.repeat(64),
+        periods: [period(0, car.reportHashes[0], car.headSeptember), simulated, altered],
+      },
+      { digest: webCryptoSha256, fetcher: fetcherOf(car.files) },
+    );
+
+    expect(result.deposits.map((deposit) => deposit.report)).toEqual([
+      'match',
+      'simulated',
+      'unpublished',
+    ]);
+    expect(result.deposits[1].snapshot).toMatchObject({ date: 20261031 });
+  });
+
   it('reports the months it fetched and the days it hashes', async () => {
     const car = carFolder();
     const progress: unknown[] = [];
@@ -164,6 +198,7 @@ describe('verifyPublishedData', () => {
       BASE,
       {
         shareMint: MINT,
+        paymentMint: PAYMENT_MINT,
         telemetry: { head: car.headOctober, count: 2, lastDate: 20261031 },
         acquisitionDocHash: '0'.repeat(64),
         periods: [],
@@ -193,6 +228,7 @@ describe('verifyPublishedData', () => {
         BASE,
         {
           shareMint: other,
+          paymentMint: PAYMENT_MINT,
           telemetry: { head: EMPTY_HEAD, count: 0, lastDate: 0 },
           acquisitionDocHash: '0'.repeat(64),
           periods: [],
@@ -212,6 +248,7 @@ describe('verifyPublishedData', () => {
         BASE,
         {
           shareMint: MINT,
+          paymentMint: PAYMENT_MINT,
           telemetry: { head: EMPTY_HEAD, count: 0, lastDate: 0 },
           acquisitionDocHash: '0'.repeat(64),
           periods: [],
@@ -227,6 +264,7 @@ describe('verifyPublishedData', () => {
         BASE,
         {
           shareMint: MINT,
+          paymentMint: PAYMENT_MINT,
           telemetry: { head: EMPTY_HEAD, count: 0, lastDate: 0 },
           acquisitionDocHash: '0'.repeat(64),
           periods: [],

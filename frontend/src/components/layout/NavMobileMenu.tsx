@@ -6,13 +6,14 @@ import { usePathname, Link } from '@/i18n/routing';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWalletInfo } from '@/hooks/useWalletInfo';
-import { Copy, LogOut, Menu, Wallet, X } from 'lucide-react';
+import { Copy, FlaskConical, LogOut, Menu, Wallet, X } from 'lucide-react';
 import { buttonClasses } from '@/components/ui/Button';
 import { ConnectionStatus } from '@/components/shared/ConnectionStatus';
 import { formatNumber } from '@/lib/format';
-import { LOCALE_OPTIONS, NAV_LINKS, isActiveLink } from './constants';
+import { DEMO_PATH, LOCALE_OPTIONS, NAV_LINKS, isActiveLink } from './constants';
 import { useSwitchLocale } from './NavLanguageSwitcher';
 import { useCopyAddress } from './NavWalletMenu';
+import { DEMO_ACCESS_SHOWN } from '@/lib/demo/config';
 
 interface NavMobileMenuProps {
   isOpen: boolean;
@@ -143,6 +144,20 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
               </Link>
             ))}
           </nav>
+
+          {DEMO_ACCESS_SHOWN && (
+            <div className="page-container mt-6">
+              <Link
+                href={DEMO_PATH}
+                onClick={() => setIsOpen(false)}
+                aria-current={pathname === DEMO_PATH ? 'page' : undefined}
+                className={buttonClasses({ variant: 'outline', size: 'lg', className: 'w-full' })}
+              >
+                <FlaskConical aria-hidden="true" strokeWidth={1.75} />
+                {tNav('demoAccess')}
+              </Link>
+            </div>
+          )}
 
           <div className="page-container mt-8">
             <p className="text-overline uppercase text-subtle-foreground">{tNav('language')}</p>
