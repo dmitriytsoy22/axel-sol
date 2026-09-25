@@ -183,7 +183,7 @@ Open issues are listed under [Security](#security) and in [docs/architecture.md]
 | Backend | NestJS 11 · `@nestjs/schedule` 5 · `@nestjs/throttler` 6 · `better-sqlite3` 12 · `@solana/web3.js` 1.98 · `@coral-xyz/anchor` 0.32.1 · `ws` 8 · Jest 29 + Supertest · ESLint 10 + typescript-eslint |
 | Demo seed | TypeScript · `@coral-xyz/anchor` · HKDF key derivation · RFC 8785 canonical JSON |
 | External services | Yandex Fleet API (telemetry) · Sumsub (KYC) · Upstash Redis and Cloudflare Turnstile (judge demo, optional) · dial.to (Blinks) |
-| CI | GitHub Actions: frontend; backend; demo seed; programs (build, fmt, clippy, Rust and LiteSVM tests, IDL and SDK freshness, v1 typecheck); the backend's event indexer and operator deposits on a local validator; end-to-end |
+| CI | GitHub Actions: frontend; backend; demo seed; programs (build, fmt, clippy, Rust tests, IDL and SDK freshness, v1 typecheck); LiteSVM program tests on an arm64 runner; the backend's event indexer and operator deposits on a local validator; end-to-end |
 | AI tools | Claude Code (coding assistant) · Google Stitch (UI drafts) |
 
 ---

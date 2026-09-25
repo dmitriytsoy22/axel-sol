@@ -162,6 +162,16 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      - name: Keep the axel_v2 IDL and types for the LiteSVM tests
+        uses: actions/upload-artifact@v7
+        with:
+          name: axel-v2-idl
+          path: |
+            target/idl/axel_v2.json
+            target/types/axel_v2.ts
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Check formatting of axel-v2
         run: cargo fmt -p axel-v2 --check
 
@@ -179,27 +189,6 @@ jobs:
             package-lock.json
             tests-v2/package-lock.json
             sdk/axel-v2/package-lock.json
-
-      - name: v2 program tests on LiteSVM
-        run: |
-          set -o pipefail
-          npm run test:v2:ci 2>&1 | tee tests-v2/test-output.log
-
-      - name: Report failed v2 tests as annotations
-        if: failure()
-        run: node scripts/ci/junit-annotations.mjs tests-v2/junit.xml tests-v2/test-output.log
-
-      - name: Diagnose a crash of the v2 test run
-        if: failure()
-        working-directory: tests-v2
-        run: |
-          echo "::notice title=axel_v2.so::$(stat -c %s ../target/deploy/axel_v2.so) bytes, sha256 $(sha256sum ../target/deploy/axel_v2.so | cut -c1-64)"
-          echo "::notice title=Memory::$(free -m | tr -s ' ' | tr '\n' ';')"
-          echo "::notice title=Limits::overcommit=$(cat /proc/sys/vm/overcommit_memory) max_map_count=$(cat /proc/sys/vm/max_map_count) ulimit_v=$(ulimit -v) nproc=$(nproc)"
-          new_svm=$(node -e "const { LiteSVM } = require('litesvm'); new LiteSVM(); console.log('ok')" 2>&1 | tail -3 | tr '\n' ' ')
-          echo "::notice title=new LiteSVM()::${new_svm}"
-          add_program=$(node -e "const { LiteSVM } = require('litesvm'); const { Keypair } = require('@solana/web3.js'); const svm = new LiteSVM(); svm.addProgram(Keypair.generate().publicKey, require('fs').readFileSync('../target/deploy/axel_v2.so')); console.log('ok')" 2>&1 | tail -3 | tr '\n' ' ')
-          echo "::notice title=addProgram(axel_v2.so)::${add_program}"
 
       - name: Check the IDL vendored in the frontend and the backend, and the SDK, match the build
         run: |
@@ -233,6 +222,44 @@ jobs:
             echo "- ELF size: ${size} bytes"
             echo "- Deploy rent, upper estimate (size + 128) x 6960 lamports: ${rent} lamports ($(awk "BEGIN { printf \"%.3f\", ${rent} / 1e9 }") SOL)"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  program-tests:
+    name: v2 program tests on LiteSVM (arm64)
+    needs: programs
+    # litesvm 0.8, the last release with the @solana/web3.js API these tests use, aborts with
+    # std::bad_alloc in every test file on the x86_64 runners. The same suite passes on arm64
+    # (and on macOS and under x86_64 emulation), so it runs here on the program the programs job built.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use the axel_v2 program the programs job built
+        uses: actions/download-artifact@v8
+        with:
+          name: axel-v2-program
+          path: target/deploy
+
+      - name: Use the IDL and types the programs job built
+        uses: actions/download-artifact@v8
+        with:
+          name: axel-v2-idl
+          path: target
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests-v2/package-lock.json
+
+      - name: v2 program tests on LiteSVM
+        run: |
+          set -o pipefail
+          npm run test:v2:ci 2>&1 | tee tests-v2/test-output.log
+
+      - name: Report failed v2 tests as annotations
+        if: failure()
+        run: node scripts/ci/junit-annotations.mjs tests-v2/junit.xml tests-v2/test-output.log
 
   e2e:
     name: End-to-end (Playwright, app and backend on a seeded local validator)
