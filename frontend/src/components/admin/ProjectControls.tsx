@@ -1,39 +1,48 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
-import { Loader2, PauseCircle, PlayCircle, AlertOctagon } from 'lucide-react';
+import { Loader2, Pause, Play } from 'lucide-react';
 
 import { ProjectState } from '@/types/project';
 import {
   buildPauseProjectInstruction,
   buildResumeProjectInstruction,
-  buildCloseProjectInstruction
+  buildCloseProjectInstruction,
 } from '@/lib/solana/instructions';
 import { useTransactionConfirmation } from '@/hooks/useTransactionConfirmation';
+import { Button } from '@/components/ui/Button';
 
 interface ProjectControlsProps {
   project: ProjectState;
 }
 
+type Action = 'pause' | 'resume' | 'close';
+
 export function ProjectControls({ project }: ProjectControlsProps) {
   const t = useTranslations('Admin');
+  const titleId = useId();
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const { confirmTransaction } = useTransactionConfirmation();
 
-  const [activeAction, setActiveAction] = useState<'pause' | 'resume' | 'close' | null>(null);
+  const [activeAction, setActiveAction] = useState<Action | null>(null);
+  const [confirmingClose, setConfirmingClose] = useState(false);
 
-  const handleAction = async (action: 'pause' | 'resume' | 'close') => {
+  const handleAction = async (action: Action) => {
     if (!publicKey) return;
 
     setActiveAction(action);
     try {
       const mint = new PublicKey(project.mint);
       const params = {
-        wallet: { publicKey, signTransaction: async (tx: any) => tx, signAllTransactions: async (txs: any[]) => txs },
+        wallet: {
+          publicKey,
+          signTransaction: async (tx: any) => tx,
+          signAllTransactions: async (txs: any[]) => txs,
+        },
         connection,
         mint,
       };
@@ -51,84 +60,106 @@ export function ProjectControls({ project }: ProjectControlsProps) {
 
       const signature = await sendTransaction(transaction, connection);
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-      await confirmTransaction(
-        signature,
-        blockhash,
-        lastValidBlockHeight,
-        t(`${action}Project`)
-      );
-
+      await confirmTransaction(signature, blockhash, lastValidBlockHeight, t(`${action}Done`));
     } catch (err) {
       console.error(`Failed to execute ${action}:`, err);
     } finally {
       setActiveAction(null);
+      setConfirmingClose(false);
     }
   };
 
+  const isClosed = project.status === 'closed';
+  const busy = activeAction !== null;
+  const spinner = (action: Action) =>
+    activeAction === action && (
+      <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
+    );
+  const carName = `${project.carMake} ${project.carModel}`;
+
   return (
-    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-xl">
-      <h2 className="mb-6 font-display text-xl font-medium tracking-tight text-white">
+    <section
+      aria-labelledby={titleId}
+      className="rounded-card border border-border bg-card p-6 shadow-sm md:p-8"
+    >
+      <h2 id={titleId} className="text-title font-semibold text-foreground">
         {t('projectControls')}
       </h2>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Pause Action */}
-        <div className="flex flex-col rounded-xl border border-white/5 bg-white/[0.03] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center space-x-2 text-yellow-400">
-              <PauseCircle className="h-5 w-5" />
-              <span className="font-medium">{t('pauseProject')}</span>
-            </div>
-          </div>
-          <p className="mb-6 text-sm text-white/50">{t('pauseWarning')}</p>
-          <button
-            onClick={() => handleAction('pause')}
-            disabled={activeAction !== null || project.status === 'paused'}
-            className="mt-auto flex items-center justify-center space-x-2 rounded-lg bg-yellow-400/10 px-4 py-2 text-sm font-medium text-yellow-400 transition-colors hover:bg-yellow-400/20 disabled:opacity-50 disabled:hover:bg-yellow-400/10"
-          >
-            {activeAction === 'pause' && <Loader2 className="h-4 w-4 animate-spin" />}
-            <span>{t('pauseProject')}</span>
-          </button>
-        </div>
+      {isClosed ? (
+        <p className="mt-2 text-body text-muted-foreground">{t('closedNote')}</p>
+      ) : (
+        <>
+          <div className="mt-6 flex flex-col divide-y divide-border">
+            {project.status === 'active' ? (
+              <div className="flex flex-col gap-3 pb-6">
+                <div>
+                  <h3 className="text-body font-semibold text-foreground">{t('pauseTitle')}</h3>
+                  <p className="mt-1 text-small text-muted-foreground">{t('pauseWarning')}</p>
+                </div>
+                <Button variant="outline" onClick={() => handleAction('pause')} disabled={busy}>
+                  {spinner('pause') || <Pause aria-hidden="true" strokeWidth={1.75} />}
+                  {t('pauseProject')}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 pb-6">
+                <div>
+                  <h3 className="text-body font-semibold text-foreground">{t('resumeTitle')}</h3>
+                  <p className="mt-1 text-small text-muted-foreground">{t('resumeDesc')}</p>
+                </div>
+                <Button onClick={() => handleAction('resume')} disabled={busy}>
+                  {spinner('resume') || <Play aria-hidden="true" strokeWidth={1.75} />}
+                  {t('resumeProject')}
+                </Button>
+              </div>
+            )}
 
-        {/* Resume Action */}
-        <div className="flex flex-col rounded-xl border border-white/5 bg-white/[0.03] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center space-x-2 text-cyan-400">
-              <PlayCircle className="h-5 w-5" />
-              <span className="font-medium">{t('resumeProject')}</span>
+            <div className="flex flex-col gap-3 pt-6">
+              <div>
+                <h3 className="text-body font-semibold text-destructive">{t('closeTitle')}</h3>
+                <p className="mt-1 text-small text-muted-foreground">{t('closeWarning')}</p>
+              </div>
+              {confirmingClose ? (
+                <div
+                  role="alertdialog"
+                  aria-labelledby={`${titleId}-confirm`}
+                  className="rounded-control border border-destructive/40 bg-destructive-muted p-4"
+                >
+                  <p id={`${titleId}-confirm`} className="text-small font-medium text-foreground">
+                    {t('closeConfirmPrompt', { car: carName })}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleAction('close')}
+                      disabled={busy}
+                    >
+                      {spinner('close')}
+                      {t('closeConfirm')}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setConfirmingClose(false)}
+                      disabled={busy}
+                    >
+                      {t('cancel')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="destructiveOutline"
+                  onClick={() => setConfirmingClose(true)}
+                  disabled={busy}
+                >
+                  {t('closeProject')}
+                </Button>
+              )}
             </div>
           </div>
-          <p className="mb-6 text-sm text-white/50">Resume operations and logic flows.</p>
-          <button
-            onClick={() => handleAction('resume')}
-            disabled={activeAction !== null || project.status !== 'paused'}
-            className="mt-auto flex items-center justify-center space-x-2 rounded-lg bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-400 transition-colors hover:bg-cyan-400/20 disabled:opacity-50 disabled:hover:bg-cyan-400/10"
-          >
-            {activeAction === 'resume' && <Loader2 className="h-4 w-4 animate-spin" />}
-            <span>{t('resumeProject')}</span>
-          </button>
-        </div>
-
-        {/* Close Action */}
-        <div className="flex flex-col rounded-xl border border-red-500/20 bg-red-500/5 p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center space-x-2 text-red-500">
-              <AlertOctagon className="h-5 w-5" />
-              <span className="font-medium">{t('closeProject')}</span>
-            </div>
-          </div>
-          <p className="mb-6 text-sm text-red-400/70">{t('closeWarning')}</p>
-          <button
-            onClick={() => handleAction('close')}
-            disabled={activeAction !== null || project.status === 'closed'}
-            className="mt-auto flex items-center justify-center space-x-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50 disabled:hover:bg-red-500"
-          >
-            {activeAction === 'close' && <Loader2 className="h-4 w-4 animate-spin" />}
-            <span>{t('closeProject')}</span>
-          </button>
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </section>
   );
 }

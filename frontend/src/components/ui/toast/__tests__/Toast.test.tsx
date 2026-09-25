@@ -6,7 +6,8 @@ import { ToastProvider, useToast } from '../ToastProvider';
 
 const mockMessages = {
   Toast: {
-    viewExplorer: 'view explorer test'
+    viewExplorer: 'view explorer test',
+    close: 'Close'
   }
 };
 

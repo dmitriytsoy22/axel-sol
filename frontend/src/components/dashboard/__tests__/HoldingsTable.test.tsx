@@ -1,72 +1,74 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { HoldingsTable } from '../HoldingsTable';
 import { NextIntlClientProvider } from 'next-intl';
 import messagesEn from '../../../../messages/en.json';
 import { describe, it, expect, vi } from 'vitest';
+import { makeProject } from '@/components/catalog/__tests__/fixtures';
 
-vi.mock('next/image', () => ({
-  __esModule: true,
-  default: (props: any) => <img {...props} />
-}));
+// Thumbnails are decoration here; the image optimizer is not under test.
+vi.mock('next/image', () => ({ __esModule: true, default: () => null }));
 vi.mock('@/i18n/routing', () => ({
-  Link: ({ children, href }: any) => <a href={href}>{children}</a>
+  Link: ({ children, href, className }: any) => (
+    <a href={href} className={className}>
+      {children}
+    </a>
+  ),
 }));
 
-const renderWithTranslations = (component: React.ReactNode) => {
-  return render(
+const renderWithTranslations = (component: React.ReactNode) =>
+  render(
     <NextIntlClientProvider locale="en" messages={messagesEn}>
       {component}
-    </NextIntlClientProvider>
+    </NextIntlClientProvider>,
   );
-};
 
 describe('HoldingsTable', () => {
-  it('renders empty state correctly', () => {
+  it('points an empty wallet to the cars', () => {
     renderWithTranslations(<HoldingsTable holdings={[]} />);
+
     expect(screen.getByTestId('empty-holdings')).toBeInTheDocument();
-    expect(screen.getByText('No Investments Yet')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'This wallet holds no shares yet' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Browse the cars' })).toHaveAttribute(
+      'href',
+      '/#vehicles',
+    );
   });
 
-  it('renders filled state correctly', () => {
-    const mockHoldings = [
-      {
-        project: {
-          mint: 'mint1',
-          carMake: 'Toyota',
-          carModel: 'Camry',
-          carYear: 2024,
-          imageUrl: '/img.png',
-          status: 'active' as const,
-          pricePerToken: 1_000_000_000,
-        } as any,
-        tokenBalance: 100,
-        ownershipPercentage: 1,
-      },
-      {
-        project: {
-          mint: 'mint2',
-          carMake: 'Tesla',
-          carModel: 'Model 3',
-          carYear: 2023,
-          imageUrl: '/img2.png',
-          status: 'closed' as const,
-          pricePerToken: 2_000_000_000,
-        } as any,
-        tokenBalance: 50,
-        ownershipPercentage: 0.5,
-      }
-    ];
+  it('lists each car with its shares, part of the car, value and status', () => {
+    const camry = makeProject({
+      mint: 'mint1',
+      pricePerToken: 1_000_000_000,
+      totalTokenSupply: 200,
+    });
+    const k5 = makeProject({
+      mint: 'mint2',
+      carMake: 'Kia',
+      carModel: 'K5',
+      status: 'closed',
+      pricePerToken: 2_000_000_000,
+    });
 
-    renderWithTranslations(<HoldingsTable holdings={mockHoldings} />);
-    // Desktop View text
-    expect(screen.getAllByText('Toyota Camry')[0]).toBeInTheDocument();
-    
-    // In our mock, status is 'active' -> uppercase 'Active'
-    expect(screen.getAllByText(/active/i)[0]).toBeInTheDocument();
+    renderWithTranslations(
+      <HoldingsTable
+        holdings={[
+          { project: camry, tokenBalance: 100, ownershipPercentage: 50 },
+          { project: k5, tokenBalance: 5, ownershipPercentage: 5 },
+        ]}
+      />,
+    );
 
-    // Check mint2
-    expect(screen.getAllByText('Tesla Model 3')[0]).toBeInTheDocument();
-    expect(screen.getAllByText(/closed/i)[0]).toBeInTheDocument();
+    const [, camryRow, k5Row] = within(screen.getByRole('table')).getAllByRole('row');
+    expect(within(camryRow).getByRole('link')).toHaveAttribute('href', '/assets/mint1');
+    expect(within(camryRow).getByText('Toyota Camry')).toBeInTheDocument();
+    expect(within(camryRow).getByText('50% of the car')).toBeInTheDocument();
+    expect(within(camryRow).getByText('100 SOL')).toBeInTheDocument();
+    expect(within(camryRow).getByText('Active')).toBeInTheDocument();
+
+    expect(within(k5Row).getByText('Kia K5')).toBeInTheDocument();
+    expect(within(k5Row).getByText('10 SOL')).toBeInTheDocument();
+    expect(within(k5Row).getByText('Closed')).toBeInTheDocument();
   });
 });

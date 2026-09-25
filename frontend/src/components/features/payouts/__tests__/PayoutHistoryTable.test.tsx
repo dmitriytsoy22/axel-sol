@@ -1,26 +1,10 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+import { describe, it, expect } from 'vitest';
+import messagesEn from '../../../../../messages/en.json';
 import { PayoutHistoryTable } from '../PayoutHistoryTable';
 import { PayoutRecord } from '@/hooks/usePayoutHistory';
-
-// Mock next-intl hooks
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => {
-    const translations: Record<string, string> = {
-      tablePeriod: 'Period',
-      tableDeposited: 'Deposited',
-      tableShare: 'Share',
-      tableClaim: 'Claim Amount',
-      tableStatus: 'Status',
-      tableTxLink: 'TX Link',
-      noPayouts: 'No Payouts',
-      statusClaimed: 'Claimed',
-      statusAvailable: 'Available',
-    };
-    return translations[key] || key;
-  },
-}));
 
 // Shaped like usePayoutHistory output: amounts are SOL (converted from lamports on-chain).
 const mockData: PayoutRecord[] = [
@@ -32,7 +16,7 @@ const mockData: PayoutRecord[] = [
     claimAmount: 0.15,
     status: 'claimed',
     txLink: 'http://test-tx',
-    timestamp: 1234567890
+    timestamp: 1_775_563_200_000, // 12:00 UTC: Apr 7 in every zone from UTC-11 to UTC+11
   },
   {
     id: 'p2',
@@ -42,45 +26,44 @@ const mockData: PayoutRecord[] = [
     claimAmount: 0.2,
     status: 'available',
     txLink: '',
-    timestamp: 1234567891
-  }
+    timestamp: 1_778_122_000_000,
+  },
 ];
 
+const renderTable = (data: PayoutRecord[], isLoading = false) =>
+  render(
+    <NextIntlClientProvider locale="en" messages={messagesEn}>
+      <PayoutHistoryTable data={data} isLoading={isLoading} />
+    </NextIntlClientProvider>,
+  );
+
 describe('PayoutHistoryTable', () => {
-  it('renders loading state successfully', () => {
-    render(<PayoutHistoryTable data={[]} isLoading={true} />);
-    expect(screen.getByText('Loading payout history...')).toBeInTheDocument();
+  it('announces the loading state', () => {
+    renderTable([], true);
+    expect(screen.getByText('Loading payout history…')).toBeInTheDocument();
   });
 
   it('renders SOL-denominated payout records in their columns', () => {
-    render(<PayoutHistoryTable data={mockData} isLoading={false} />);
+    renderTable(mockData);
 
-    expect(screen.getAllByText('Toyota Camry #0')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Toyota Camry #1')[0]).toBeInTheDocument();
+    const [, first, second] = within(screen.getByRole('table')).getAllByRole('row');
 
-    // Deposited amount in SOL with lamport-level precision
-    expect(screen.getAllByText('1.5000 SOL')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('2.0000 SOL')[0]).toBeInTheDocument();
+    expect(within(first).getByText('Toyota Camry #0')).toBeInTheDocument();
+    expect(within(first).getByText('Apr 7, 2026')).toBeInTheDocument();
+    expect(within(first).getByText('1.5 SOL')).toBeInTheDocument();
+    expect(within(first).getByText('10%')).toBeInTheDocument();
+    expect(within(first).getByText('+0.15 SOL')).toBeInTheDocument();
+    expect(within(first).getByText('Claimed')).toBeInTheDocument();
+    expect(within(first).getByRole('link')).toHaveAttribute('href', 'http://test-tx');
 
-    // Share fraction rendered as percent
-    expect(screen.getAllByText('10.00%')[0]).toBeInTheDocument();
-
-    // Claim amount in SOL, prefixed with +
-    expect(screen.getAllByText('+0.1500 SOL')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('+0.2000 SOL')[0]).toBeInTheDocument();
-
-    // Status text
-    expect(screen.getAllByText('Claimed')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Available')[0]).toBeInTheDocument();
-
-    // TX link check
-    const txLink = screen.getAllByRole('link');
-    expect(txLink.length).toBeGreaterThan(0);
-    expect(txLink[0]).toHaveAttribute('href', 'http://test-tx');
+    expect(within(second).getByText('2 SOL')).toBeInTheDocument();
+    expect(within(second).getByText('+0.2 SOL')).toBeInTheDocument();
+    expect(within(second).getByText('Not claimed')).toBeInTheDocument();
+    expect(within(second).queryByRole('link')).not.toBeInTheDocument();
   });
 
-  it('renders empty message when no data is provided', () => {
-    render(<PayoutHistoryTable data={[]} isLoading={false} />);
-    expect(screen.getAllByText('No Payouts')[0]).toBeInTheDocument();
+  it('explains an empty history', () => {
+    renderTable([]);
+    expect(screen.getAllByText(/No payouts for this wallet yet/)[0]).toBeInTheDocument();
   });
 });

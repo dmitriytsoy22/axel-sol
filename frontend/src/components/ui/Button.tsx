@@ -1,6 +1,12 @@
 import React from 'react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
+type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'destructive'
+  | 'destructiveOutline';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonStyle {
@@ -14,6 +20,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/70',
   outline: 'border border-border bg-transparent text-foreground hover:bg-secondary',
   ghost: 'bg-transparent text-foreground hover:bg-secondary',
+  destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+  destructiveOutline: 'border border-destructive/40 bg-transparent text-destructive hover:bg-destructive-muted',
 };
 
 /* sm is 40px only from the sm breakpoint; touch widths keep a 44px target. */

@@ -1,54 +1,84 @@
 'use client';
 
 import React from 'react';
-import { useWalletInfo } from '@/hooks/useWalletInfo';
+import { useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
-import { useTranslations } from 'next-intl';
+import { Loader2, Wallet } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import type { Approval, SaleState } from './saleState';
 
 interface InvestButtonProps {
-  isKycCompleted?: boolean;
-  onInvestClick?: () => void;
+  saleState: SaleState;
+  approval: Approval;
+  onInvestClick: () => void;
   className?: string;
 }
 
-export function InvestButton({ 
-  isKycCompleted = true, // Defaulting to true until Task 7 is implemented
+const CLOSED_LABEL: Record<Exclude<SaleState, 'open'>, string> = {
+  paused: 'salesPaused',
+  closed: 'projectClosed',
+  soldOut: 'soldOut',
+};
+
+const APPROVAL_LABEL: Record<Exclude<Approval, 'approved'>, string> = {
+  checking: 'checking',
+  notApproved: 'notApproved',
+  unknown: 'approvalUnknown',
+};
+
+/*
+ * The one purchase action of the car page. It is only ever primary when pressing it does
+ * something; every other state is a disabled button that names the reason in two words.
+ */
+export function InvestButton({
+  saleState,
+  approval,
   onInvestClick,
-  className = ''
-}: InvestButtonProps): React.JSX.Element {
-  const { connected } = useWalletInfo();
+  className = '',
+}: InvestButtonProps): JSX.Element {
+  const { connected } = useWallet();
   const { setVisible } = useWalletModal();
   const t = useTranslations('Asset');
+  const base = `w-full ${className}`;
 
-  if (!connected) {
+  if (saleState !== 'open') {
     return (
-      <button 
-        onClick={() => setVisible(true)}
-        className={`w-full py-4 rounded-full font-semibold text-lg bg-gray-900 text-white hover:bg-gray-800 transition-colors ${className}`}
-      >
-        {t('connectWallet')}
-      </button>
+      <Button size="lg" variant="secondary" disabled className={base}>
+        {t(CLOSED_LABEL[saleState])}
+      </Button>
     );
   }
 
-  if (!isKycCompleted) {
+  if (!connected) {
     return (
-      <a 
-        href="/kyc" // Dummy KYC route
-        className={`flex w-full justify-center py-4 rounded-full font-semibold text-lg bg-orange-500 text-white hover:bg-orange-600 transition-colors ${className}`}
+      <Button size="lg" onClick={() => setVisible(true)} className={base}>
+        <Wallet aria-hidden="true" strokeWidth={1.75} />
+        {t('connectWallet')}
+      </Button>
+    );
+  }
+
+  if (approval !== 'approved') {
+    return (
+      <Button
+        size="lg"
+        variant="secondary"
+        disabled
+        aria-busy={approval === 'checking'}
+        className={base}
       >
-        {t('completeKyc')}
-      </a>
+        {approval === 'checking' && (
+          <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
+        )}
+        {t(APPROVAL_LABEL[approval])}
+      </Button>
     );
   }
 
   return (
-    <button 
-      onClick={onInvestClick}
-      className={`w-full py-4 rounded-full font-semibold text-lg bg-brand-primary text-white shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all ${className}`}
-    >
+    <Button size="lg" onClick={onInvestClick} data-testid="invest-open" className={base}>
       {t('investNow')}
-    </button>
+    </Button>
   );
 }

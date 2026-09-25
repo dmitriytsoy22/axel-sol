@@ -78,12 +78,7 @@ const config: Config = {
         ]),
 
         border: token('border'),
-        brand: {
-          DEFAULT: token('brand'),
-          /* Legacy alias: the pre-redesign name for `primary`. Remove it when the asset,
-             dashboard and admin screens stop using `brand-primary`. */
-          primary: token('primary'),
-        },
+        brand: token('brand'),
       },
 
       /* Plain `border` and `ring` classes use the theme, not Tailwind's gray-200 / blue-500. */

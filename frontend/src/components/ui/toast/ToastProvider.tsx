@@ -41,15 +41,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }): JSX.
   return (
     <ToastContext.Provider value={{ addToast, removeToast }}>
       {children}
+      {/* Above modals, so a transaction result is visible while its dialog is still open. */}
       <div
-        aria-live="assertive"
-        className="pointer-events-none fixed inset-0 z-50 flex items-start px-4 py-6 sm:p-6"
-      >
-        <div className="flex w-full flex-col items-center space-y-4">
-          {toasts.map((toast) => (
-            <Toast key={toast.id} {...toast} onClose={removeToast} />
-          ))}
-        </div>
+        aria-live="polite"
+        className="pointer-events-none fixed inset-x-0 top-0 z-toast flex flex-col items-center gap-3 p-4 sm:items-end sm:p-6">
+        {toasts.map((toast) => (
+          <Toast key={toast.id} {...toast} onClose={removeToast} />
+        ))}
       </div>
     </ToastContext.Provider>
   );

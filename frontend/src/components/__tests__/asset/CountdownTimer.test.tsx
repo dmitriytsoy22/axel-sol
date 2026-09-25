@@ -26,10 +26,10 @@ describe('CountdownTimer', () => {
     const element = screen.getByTestId('timer-active');
     expect(element).toBeInTheDocument();
     expect(element.textContent).toBe('01:12:00:00');
-    expect(element.className).toContain('text-gray-900'); // not urgent
+    expect(element).toHaveAttribute('data-urgent', 'false');
   });
 
-  it('renders correctly in red when less than 24 hours remain', () => {
+  it('marks the timer urgent when less than 24 hours remain', () => {
     const mockDate = new Date('2024-01-01T00:00:00Z');
     vi.setSystemTime(mockDate);
     
@@ -40,7 +40,7 @@ describe('CountdownTimer', () => {
 
     const element = screen.getByTestId('timer-active');
     expect(element.textContent).toBe('00:02:05:00');
-    expect(element.className).toContain('text-[#FF3B30]'); // urgent
+    expect(element).toHaveAttribute('data-urgent', 'true');
   });
 
   it('updates every second', () => {

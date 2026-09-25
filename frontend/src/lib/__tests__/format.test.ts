@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatNumber, formatPercent, formatSol, shortAddress } from '../format';
+import {
+  formatDate,
+  formatNumber,
+  formatPercent,
+  formatSol,
+  formatSolAmount,
+  formatTenge,
+  shortAddress,
+} from '../format';
 
 const NBSP = ' ';
 
@@ -15,6 +23,38 @@ describe('formatSol', () => {
   it('keeps up to four decimals so small prices stay exact', () => {
     expect(formatSol(100_000_000, 'en')).toBe('0.1 SOL');
     expect(formatSol(123_400_000, 'en')).toBe('0.1234 SOL');
+  });
+});
+
+describe('formatSolAmount', () => {
+  it('writes an amount already in SOL the same way as lamports', () => {
+    expect(formatSolAmount(0.35, 'en')).toBe('0.35 SOL');
+    expect(formatSolAmount(0.35, 'ru')).toBe('0,35 SOL');
+  });
+});
+
+describe('formatTenge', () => {
+  it.each([
+    ['en', '₸1,250'],
+    ['ru', `1${NBSP}250${NBSP}₸`],
+  ])('puts the tenge sign where %s readers expect it', (locale, expected) => {
+    expect(formatTenge(1250, locale)).toBe(expected);
+  });
+
+  it('keeps tiyn only when there are any', () => {
+    expect(formatTenge(153.25, 'en')).toBe('₸153.25');
+  });
+});
+
+describe('formatDate', () => {
+  // 12:00 UTC: the same calendar day from UTC-11 to UTC+11.
+  const april7 = Date.UTC(2026, 3, 7, 12) / 1000;
+
+  it.each([
+    ['en', 'Apr 7, 2026'],
+    ['ru', '7 апр. 2026 г.'],
+  ])('writes a chain timestamp as a %s calendar date', (locale, expected) => {
+    expect(formatDate(april7, locale)).toBe(expected);
   });
 });
 

@@ -2,138 +2,92 @@
 
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
+import { RotateCw } from 'lucide-react';
+import { Link } from '@/i18n/routing';
 import { useProjectState } from '@/hooks/useProjectState';
+import type { ProjectState } from '@/types/project';
 import { AssetHeader } from '@/components/asset/AssetHeader';
-import { FundingProgress } from '@/components/asset/FundingProgress';
-import { InvestmentDetails } from '@/components/asset/InvestmentDetails';
-import { RevenueProjection } from '@/components/asset/RevenueProjection';
-import { InvestButton } from '@/components/asset/InvestButton';
+import { AssetPhoto } from '@/components/asset/AssetPhoto';
+import { InvestPanel } from '@/components/asset/InvestPanel';
+import { MobileInvestBar } from '@/components/asset/MobileInvestBar';
+import { ProjectTerms } from '@/components/asset/ProjectTerms';
+import { CarPayouts } from '@/components/asset/CarPayouts';
+import { PayoutCalculator } from '@/components/asset/PayoutCalculator';
+import { TelemetryWidget } from '@/components/asset/TelemetryWidget';
+import { approvalOf } from '@/components/asset/saleState';
+import { useWalletApproval } from '@/components/asset/useWalletApproval';
 import { InvestModal } from '@/components/invest/InvestModal';
+import { Button, buttonClasses } from '@/components/ui/Button';
+import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { ArrowLeft } from 'lucide-react';
-import { RpcErrorBoundary } from '@/components/shared/RpcErrorBoundary';
+import { NETWORK_NAME } from '@/lib/network';
 
-function AssetDetailsContent(): React.JSX.Element {
-  const { id } = useParams();
-  const router = useRouter();
-  const t = useTranslations('Asset');
-  
-  const { projects, isLoading, error, refetch } = useProjectState();
-  const [isInvestModalOpen, setIsInvestModalOpen] = useState(false);
-
-  if (error) {
-    throw error;
-  }
-  
-  // Find project by array index or mint address (to support both ways in UI mock)
-  const project = projects.find(p => 
-    p.mint === id || 
-    projects.indexOf(p).toString() === id
+function AssetSkeleton(): JSX.Element {
+  return (
+    <div aria-busy="true" className="pt-8">
+      <Skeleton className="h-7 w-24 rounded-pill" />
+      <Skeleton className="mt-4 h-12 w-2/3 max-w-md" />
+      <Skeleton className="mt-3 h-5 w-64" />
+      <div className="mt-10 grid gap-8 lg:grid-cols-12 lg:gap-12">
+        <Skeleton className="aspect-[4/3] w-full rounded-card lg:col-span-7" />
+        <Skeleton className="h-80 w-full rounded-card lg:col-span-5" />
+      </div>
+    </div>
   );
+}
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center w-full pb-20 pt-10 px-5">
-        <div className="max-w-[1200px] w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-          <div className="lg:col-span-7 flex flex-col gap-6">
-            <Skeleton className="w-full aspect-[4/3] rounded-2xl" />
-            <Skeleton className="w-3/4 h-10 mt-2" />
-            <div className="flex gap-4">
-              <Skeleton className="w-32 h-12" />
-              <Skeleton className="w-32 h-12" />
-            </div>
-          </div>
-          <div className="lg:col-span-5 flex flex-col gap-6">
-            <Skeleton className="w-full h-48 rounded-2xl" />
-            <Skeleton className="w-full h-64 rounded-2xl" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!project) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
-        <h2 className="text-2xl font-semibold mb-2">{t('notFound')}</h2>
-        <button 
-          onClick={() => router.push('/')}
-          className="text-brand-primary font-medium hover:underline"
-        >
-          {t('backToCatalog')}
-        </button>
-      </div>
-    );
-  }
+function AssetDetails({ project, onChanged }: { project: ProjectState; onChanged: () => void }) {
+  const tNav = useTranslations('Navigation');
+  const tAsset = useTranslations('Asset');
+  const [isInvestModalOpen, setIsInvestModalOpen] = useState(false);
+  const approval = approvalOf(useWalletApproval());
+  const carName = `${project.carMake} ${project.carModel} ${project.carYear}`;
+  const openInvest = () => setIsInvestModalOpen(true);
 
   return (
-    <div className="flex flex-col items-center w-full pb-28 lg:pb-20 pt-8 px-5">
-      <div className="max-w-[1200px] w-full mb-6">
-        <button 
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft size={16} />
-          {t('backToCatalog')}
-        </button>
+    <>
+      <nav aria-label={tAsset('breadcrumb')}>
+        <ol className="flex flex-wrap items-center gap-x-2 text-small text-muted-foreground">
+          <li>
+            <Link
+              href="/#vehicles"
+              className="-mx-2 inline-flex min-h-11 items-center px-2 underline-offset-4 transition-colors duration-fast ease-move hover:text-foreground hover:underline"
+            >
+              {tNav('catalog')}
+            </Link>
+          </li>
+          <li aria-hidden="true">/</li>
+          <li aria-current="page" className="text-foreground">
+            {carName}
+          </li>
+        </ol>
+      </nav>
+
+      <div className="mt-4">
+        <AssetHeader project={project} />
       </div>
 
-      <div className="max-w-[1200px] w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 relative items-start">
-        {/* Left Column: Image & Basic Info */}
-        <div className="lg:col-span-7 flex flex-col gap-10">
-          <AssetHeader project={project} />
-          
-          <div className="border-t border-gray-100 pt-8">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">{t('carSpecs')}</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="flex flex-col bg-[#F5F5F7] p-5 rounded-2xl">
-                <span className="text-xs text-gray-500 mb-1 tracking-wide uppercase">Year</span>
-                <span className="font-semibold text-gray-900">{project.carYear}</span>
-              </div>
-              <div className="flex flex-col bg-[#F5F5F7] p-5 rounded-2xl">
-                <span className="text-xs text-gray-500 mb-1 tracking-wide uppercase">Class</span>
-                <span className="font-semibold text-gray-900">Comfort+</span>
-              </div>
-              <div className="flex flex-col bg-[#F5F5F7] p-5 rounded-2xl">
-                <span className="text-xs text-gray-500 mb-1 tracking-wide uppercase">Engine</span>
-                <span className="font-semibold text-gray-900">2.0L Hybrid</span>
-              </div>
-              <div className="flex flex-col bg-[#F5F5F7] p-5 rounded-2xl">
-                <span className="text-xs text-gray-500 mb-1 tracking-wide uppercase">Color</span>
-                <span className="font-semibold text-gray-900">White</span>
-              </div>
-            </div>
-          </div>
-          
-          <RevenueProjection />
+      {/* DOM order is the mobile order: photo, then the invest panel, then the details. */}
+      <div className="mt-8 grid gap-10 md:mt-10 md:grid-cols-12 md:gap-x-6 md:gap-y-16 lg:gap-x-12">
+        <div className="md:col-span-7">
+          <AssetPhoto project={project} />
         </div>
-
-        {/* Right Column: Key Details & Investment (Sticky Desktop) */}
-        <div className="lg:col-span-5 flex flex-col lg:sticky lg:top-24 gap-6">
-          <FundingProgress project={project} />
-          <InvestmentDetails project={project} />
-          
-          {/* Desktop Invest Button */}
-          <div className="hidden md:block mt-2">
-            <InvestButton
-              isKycCompleted={true}
-              onInvestClick={() => setIsInvestModalOpen(true)}
-            />
+        <div className="md:col-span-5 md:col-start-8 md:row-start-1 lg:row-span-2">
+          <div className="lg:sticky lg:top-24">
+            <InvestPanel project={project} approval={approval} onBuy={openInvest} />
           </div>
+        </div>
+        <div className="flex flex-col gap-16 md:col-span-12 lg:col-span-7">
+          <ProjectTerms project={project} />
+          <CarPayouts project={project} />
+          <PayoutCalculator project={project} />
+          <TelemetryWidget projectId={project.mint} />
         </div>
       </div>
 
-      {/* Mobile Sticky Invest Area */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 pb-safe bg-white/80 backdrop-blur-xl border-t border-gray-100 md:hidden z-40">
-        <InvestButton
-          isKycCompleted={true}
-          onInvestClick={() => setIsInvestModalOpen(true)}
-        />
-      </div>
+      <MobileInvestBar project={project} approval={approval} onBuy={openInvest} />
 
-      {/* Invest Modal */}
       <InvestModal
         isOpen={isInvestModalOpen}
         onClose={() => setIsInvestModalOpen(false)}
@@ -141,18 +95,55 @@ function AssetDetailsContent(): React.JSX.Element {
         adminPubkey={project.admin}
         pricePerToken={project.pricePerToken}
         tokensRemaining={project.tokensRemaining}
+        carName={carName}
+        onPurchased={onChanged}
       />
-    </div>
+    </>
   );
 }
 
+export default function AssetDetailsPage(): JSX.Element {
+  const { id } = useParams<{ id: string }>();
+  const t = useTranslations('Asset');
+  const { projects, isLoading, error, refetch } = useProjectState();
 
-export default function AssetDetailsPage(): React.JSX.Element {
-  const { refetch } = useProjectState();
-  return (
-    <RpcErrorBoundary onReset={refetch}>
-      <AssetDetailsContent />
-    </RpcErrorBoundary>
-  );
+  // A car is addressed by its share-token mint; the catalog index is kept for old links.
+  const project = projects.find((p, index) => p.mint === id || String(index) === id);
+
+  let content: React.ReactNode;
+  if (project) {
+    // A refetch after a purchase keeps the page on screen instead of flashing the skeleton.
+    content = <AssetDetails project={project} onChanged={refetch} />;
+  } else if (error) {
+    content = (
+      <Notice
+        as="h1"
+        title={t('errorTitle')}
+        body={t('errorBody')}
+        action={
+          <Button variant="secondary" onClick={refetch}>
+            <RotateCw aria-hidden="true" strokeWidth={1.75} />
+            {t('retry')}
+          </Button>
+        }
+      />
+    );
+  } else if (isLoading) {
+    content = <AssetSkeleton />;
+  } else {
+    content = (
+      <Notice
+        as="h1"
+        title={t('notFound')}
+        body={t('notFoundBody', { network: NETWORK_NAME })}
+        action={
+          <Link href="/#vehicles" className={buttonClasses()}>
+            {t('backToCatalog')}
+          </Link>
+        }
+      />
+    );
+  }
+
+  return <div className="page-container pb-32 pt-6 md:pb-24 md:pt-8">{content}</div>;
 }
-

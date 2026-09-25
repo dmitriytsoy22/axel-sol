@@ -251,11 +251,48 @@ product rule, never a placeholder.
   a "before you invest" panel: the devnet disclosure, four plain risks, and the page's closing
   CTA → footer. Every section has its own loading, empty and error state; one chain read feeds
   them all.
-- **Asset page:** photo with the illustrative note, title, status → sticky invest panel on the
-  right (bottom bar on mobile) → funding progress and terms → payout history → telemetry.
-- **Dashboard:** portfolio summary tiles (equal tiles are fine on dashboards) → holdings → claim.
-- **Payouts:** ledger table with explorer links.
-- **Admin:** operator console on paper with an ink header, the same tokens as the app.
+- **Asset page (built, stage 3):** breadcrumb (Cars / car name) → status badge, serif H1 with
+  the year muted, VIN in mono → a 12-column grid: the model photo with its "Illustrative photo"
+  caption (7 columns) and, beside it from `md`, the invest panel (5 columns; from `lg` it spans
+  both rows and is sticky):
+  price per share, "x of y shares sold" with a bar, shares left, the purchase button and one
+  sentence saying why the button is what it is (connect, not approved, paused, closed, sold out,
+  approved), then the devnet note. Below the photo: terms on Solana (a two-column ledger:
+  numbers on the left, the share token, income vault, operator wallet and trip-data oracle as
+  Explorer links on the right) → payout history (every period account of the car: number, date,
+  paid in, shares counted, per share, record link; empty, loading, partial and error states) →
+  payout calculator (the reader's shares and their own monthly assumption; results stay "—"
+  until they type) → trip data (the telemetry widget, whose honest empty state says the tracker
+  is not connected yet). Below `md` the purchase button moves to a fixed bottom bar with the
+  price and a 48 px button; DOM order is the mobile order (photo, panel, details). The page
+  keeps showing the car while it re-reads after a purchase.
+- **Dashboard (built, stage 3):** page header (overline, serif H1, a lead that names the
+  connected wallet) → a ruled summary card with three equal figures (value at current price,
+  shares held "in N cars", not claimed yet) → holdings table (car with thumbnail, shares and
+  "x% of the car", value, status; stacked rows below `sm`) → payouts list, newest first, each
+  naming its car, number and date, with a status pill, the amount and a Claim button, plus
+  "Claim all" (the page's one primary action) only when something is claimable. Disconnected:
+  a two-part panel (why a wallet is needed + "Connect wallet", and what the page shows once
+  connected). Empty: "This wallet holds no shares yet" with "Browse the cars". Loading keeps the
+  summary labels with placeholder values. Error: retry.
+- **Payouts (built, stage 3):** page header → the same ruled summary (claimed so far, not
+  claimed yet, payouts) → a sortable ledger (payout, date, paid in, your share, your amount,
+  status, record link; stacked label/value rows below `sm`). Disconnected, loading, empty and
+  error states as on the dashboard; the old endless "Loading payout history…" with no wallet
+  is gone.
+- **Admin (built, stage 3):** an ink header naming the managed car (overline "Operator
+  console", serif H1, share token link) with four figures (status, shares sold, payouts made,
+  income vault) → paper cards in an 8 + 4 grid: deposit income (three amounts in SOL, the
+  on-chain amount "paid out to holders", disabled with the reason when the program would refuse)
+  and approved wallets on the left, car status on the right (pause or resume, and a close action
+  that asks for confirmation inline before sending). Disconnected and wrong-wallet visitors stay
+  on the page with an explanation instead of being redirected home.
+- **Shared states:** `ui/Notice` (empty, error, not found), `wallet/ConnectWalletPanel`
+  (disconnected), `ui/SummaryStats` (ruled figures with placeholders), `ui/Pill` (status dot +
+  word; `Badge` maps project status onto it), `layout/PageHeader`. Modal is a paper dialog and a
+  bottom sheet below `sm`; toasts sit top-right above modals; transaction progress reads
+  "Approve it in your wallet → Sending to Solana → Waiting for confirmation → Confirmed on
+  Solana".
 
 ## Decisions
 
@@ -310,6 +347,28 @@ product rule, never a placeholder.
 13. **Numbers follow the reader's locale.** `src/lib/format.ts` formats with `en-US`, `ru-KZ`
     and `kk-KZ`: "1,250.5 SOL" in English, "1 250,5 SOL" in Russian and Kazakh.
 
+14. **A calculator, not a projection.** The asset page used to show a "Revenue projection" with
+    made-up income ($800 a month) and made-up specs (Comfort+, 2.0L Hybrid, White). Both are
+    gone: the page shows only token metadata and project accounts. The projection became a
+    labelled calculator on the reader's own monthly figure, applying the program's split rule
+    (each payout divided by the shares sold at that moment; the calculator assumes a fully sold
+    car). Results read "—" until the reader types. ← anti-slop "fake and pressure", decision 10.
+15. **The purchase button always tells the truth.** It is primary only when pressing it does
+    something (connect, or buy with an approved wallet). Paused, closed, sold out, checking, not
+    approved and "couldn't check" are disabled buttons that name the reason in two words, with
+    one explaining sentence beneath. The old dummy "Complete KYC" link to `/kyc` (a 404) is
+    removed. ← components "one dominant CTA", checklist "states of interactive elements".
+16. **Every wallet page has four designed states.** Disconnected (why a wallet is needed and
+    what it unlocks), loading (labels stay, values are placeholders), empty (the next step) and
+    error (a retry). ← review rubric "stress states", components "loading → empty → error →
+    happy".
+17. **Irreversible means confirmed.** Closing a project stops sales and claims for good in v1,
+    so the button first opens an inline confirmation naming the car. Red stays reserved for
+    this and for errors; a near deadline is amber. ← color "red for errors only".
+18. **Tenge for off-chain money, SOL for on-chain money.** Telemetry income (reported in tenge
+    by the backend) is formatted with `formatTenge`; it used to show a dollar sign. Chain
+    amounts stay in SOL until v2 moves them to tKZT.
+
 ## Constraints
 
 - Presentation only. `src/hooks/` and `src/lib/solana/` belong to the v2 integration and are
@@ -317,13 +376,13 @@ product rule, never a placeholder.
 - Brand: the name AXEL, near-black and the cyan `#06B6D4` stay.
 - Live data: the catalog reads two v1 devnet projects, both with test metadata (Toyota Camry
   2023, no image). The UI never shows made-up figures as real.
-- One legacy alias is left in `tailwind.config.ts`: `brand-primary`, the pre-redesign name for
-  `primary`, still used by the asset, dashboard and admin screens. Remove it when they migrate.
-- Legacy components on the asset, dashboard, payouts and admin screens still use Tailwind's
-  default palettes (`gray-*`, `red-*`, `green-*`, `white`) and pill buttons. They move to
-  semantic tokens during the page stages. The shared primitives (`Card`, `Badge`,
-  `ProgressBar`, `Skeleton`, `ConnectionStatus`) are already on tokens, so those screens changed
-  look slightly with stage 2.
+- No legacy aliases or default Tailwind palettes are left: every screen uses semantic tokens.
+  `brand-primary` was removed in stage 3.
+- The asset page reads a car's payout periods through `components/asset/useCarPayouts.ts`,
+  which calls `fetchAllRevenuePeriods` from `lib/solana/readers`. The v2 integration must keep
+  that reader or update this hook.
+- The operator console manages `projects[0]` because `useAdminAccess` picks it; v2 replaces the
+  hook with roles, and the console header already names the car it manages.
 - `src/app/opengraph-image.tsx` draws the social card with static TTF instances of the site
   fonts (`src/fonts/og/`), since Satori cannot read WOFF2. `src/middleware.ts` excludes
   `/opengraph-image` so the i18n rewrite does not turn it into a 404.
@@ -339,3 +398,8 @@ product rule, never a placeholder.
   catalog page became the landing (hero with chain stats, fleet, how it works, verify, before
   you invest). Grid changed to two columns beside a sticky heading; decisions 10–13 added;
   unused legacy aliases removed.
+- 2026-09-25: Stage 3, inner pages. Asset page rebuilt around on-chain data only (fake specs and
+  projection removed, calculator added, car payout history, terms ledger, sticky invest panel
+  and mobile purchase bar); dashboard, payouts and operator console moved to tokens with
+  designed disconnected, loading, empty and error states; modal, toast, table, transaction
+  status and error boundary restyled; decisions 14–18 added; last legacy alias removed.

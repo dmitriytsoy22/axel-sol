@@ -1,42 +1,72 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React from 'react';
 import { useTranslations } from 'next-intl';
-import { useAdminAccess } from '@/hooks/useAdminAccess';
-import { useToast } from '@/components/ui/toast/ToastProvider';
-import { Loader2 } from 'lucide-react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
+import { Notice } from '@/components/ui/Notice';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { buttonClasses } from '@/components/ui/Button';
+import { Link } from '@/i18n/routing';
+import { shortAddress } from '@/lib/format';
 
 interface AdminGuardProps {
+  /** From useAdminAccess, read once by the page. */
+  isAdmin: boolean;
+  isLoading: boolean;
   children: React.ReactNode;
 }
 
-export function AdminGuard({ children }: AdminGuardProps) {
-  const { isAdmin, isLoading } = useAdminAccess();
-  const router = useRouter();
+/*
+ * The console opens only for the car's operator. Anyone else stays on the page and is told
+ * why, so they can switch wallets here instead of being bounced to the home page.
+ */
+export function AdminGuard({ isAdmin, isLoading, children }: AdminGuardProps) {
+  const { connected, connecting, publicKey } = useWallet();
   const t = useTranslations('Admin');
-  const { addToast } = useToast();
+  const tCommon = useTranslations('Common');
 
-  useEffect(() => {
-    if (!isLoading && !isAdmin) {
-      addToast({
-        title: t('accessDenied'),
-        variant: 'error',
-      });
-      router.replace('/');
-    }
-  }, [isAdmin, isLoading, router, addToast, t]);
-
-  if (isLoading) {
+  if (isLoading || connecting) {
     return (
-      <div className="flex w-full min-h-[50vh] flex-col items-center justify-center space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+      <div aria-busy="true" data-testid="admin-loading" className="page-container section-y">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="mt-4 h-12 w-2/3 max-w-lg" />
+        <Skeleton className="mt-10 h-64 w-full rounded-card" />
+      </div>
+    );
+  }
+
+  if (!connected) {
+    return (
+      <div className="page-container section-y">
+        <h1 className="sr-only">{t('overline')}</h1>
+        <ConnectWalletPanel
+          title={t('connectTitle')}
+          body={t('connectBody')}
+          pointsTitle={t('connectPointsTitle')}
+          points={[t('connectPoint1'), t('connectPoint2'), t('connectPoint3')]}
+        />
       </div>
     );
   }
 
   if (!isAdmin) {
-    return null; // Will prevent rendering flash before redirect
+    return (
+      <div className="page-container section-y">
+        <Notice
+          as="h1"
+          title={t('accessDenied')}
+          body={t('accessDeniedBody', {
+            address: publicKey ? shortAddress(publicKey.toBase58()) : '',
+          })}
+          action={
+            <Link href="/#vehicles" className={buttonClasses({ variant: 'secondary' })}>
+              {tCommon('browseCars')}
+            </Link>
+          }
+        />
+      </div>
+    );
   }
 
   return <>{children}</>;

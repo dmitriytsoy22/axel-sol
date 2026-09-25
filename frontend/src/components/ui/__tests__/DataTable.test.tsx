@@ -38,7 +38,7 @@ describe('DataTable', () => {
   it('sorts data ascending and descending', () => {
     render(<DataTable data={mockData} columns={mockColumns} />);
     
-    const amountHeader = screen.getAllByText('Amount')[0].closest('th');
+    const amountHeader = screen.getByRole('button', { name: 'Amount' });
     
     // Initial order is unsorted (renders in array order)
     let cells = screen.getAllByRole('cell');

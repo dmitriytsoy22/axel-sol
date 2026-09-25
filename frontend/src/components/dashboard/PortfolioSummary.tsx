@@ -1,39 +1,36 @@
 import React from 'react';
-import { Card } from '@/components/ui/Card';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { SummaryStats } from '@/components/ui/SummaryStats';
+import { formatNumber, formatSol } from '@/lib/format';
 
 interface PortfolioSummaryProps {
-  totalValue: number;
+  totalValue: number; // lamports
   tokensHeld: number;
-  unclaimedRevenue: number;
+  carCount: number;
+  unclaimedRevenue: number; // lamports
 }
 
 export function PortfolioSummary({
   totalValue,
   tokensHeld,
+  carCount,
   unclaimedRevenue,
 }: PortfolioSummaryProps): JSX.Element {
   const t = useTranslations('Dashboard');
-
-  const formattedTotalValue = (totalValue / 1_000_000_000).toLocaleString(undefined, { maximumFractionDigits: 2 });
-  const formattedUnclaimed = (unclaimedRevenue / 1_000_000_000).toLocaleString(undefined, { maximumFractionDigits: 4 });
+  const locale = useLocale();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <Card className="p-6 flex flex-col justify-center bg-gray-50 border-gray-100">
-        <span className="text-sm text-gray-500 uppercase tracking-wider mb-2">{t('totalValue')}</span>
-        <span className="text-3xl font-semibold text-gray-900">{formattedTotalValue} SOL</span>
-      </Card>
-      
-      <Card className="p-6 flex flex-col justify-center bg-gray-50 border-gray-100">
-        <span className="text-sm text-gray-500 uppercase tracking-wider mb-2">{t('tokensHeld')}</span>
-        <span className="text-3xl font-semibold text-gray-900">{tokensHeld.toLocaleString()}</span>
-      </Card>
-
-      <Card className="p-6 flex flex-col justify-center bg-brand-primary/5 border-brand-primary/20">
-        <span className="text-sm text-brand-primary/80 uppercase tracking-wider mb-2">{t('unclaimedRevenue')}</span>
-        <span className="text-3xl font-semibold text-brand-primary">{formattedUnclaimed} SOL</span>
-      </Card>
-    </div>
+    <SummaryStats
+      label={t('summaryLabel')}
+      items={[
+        { label: t('totalValue'), value: formatSol(totalValue, locale), hint: t('totalValueHint') },
+        {
+          label: t('tokensHeld'),
+          value: formatNumber(tokensHeld, locale),
+          hint: t('carsCount', { count: carCount }),
+        },
+        { label: t('unclaimedRevenue'), value: formatSol(unclaimedRevenue, locale) },
+      ]}
+    />
   );
 }

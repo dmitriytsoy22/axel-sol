@@ -9,6 +9,7 @@ import { buildDepositRevenueInstruction } from '@/lib/solana/instructions';
 // Mocks
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => `mock_t_${key}`,
+  useLocale: () => 'en',
 }));
 
 const adminWallet = Keypair.generate().publicKey;
@@ -107,12 +108,12 @@ describe('DepositRevenueForm', () => {
     });
 
     // Verify calculated profit indicator text updates
-    expect(screen.getByText('10.000 SOL')).toBeInTheDocument();
+    expect(screen.getByText('10 SOL')).toBeInTheDocument();
 
     // Set Expenses: 2
     fireEvent.change(inputs[1], { target: { value: '2' } });
     await waitFor(() => {
-      expect(screen.getByText('8.000 SOL')).toBeInTheDocument();
+      expect(screen.getByText('8 SOL')).toBeInTheDocument();
     });
   });
 
@@ -124,7 +125,7 @@ describe('DepositRevenueForm', () => {
     fireEvent.submit(screen.getByRole('button', { name: /mock_t_depositBtn/i }));
     
     await waitFor(() => {
-      expect(screen.getByText('Must be positive')).toBeInTheDocument();
+      expect(screen.getByText('mock_t_mustBePositive')).toBeInTheDocument();
     });
   });
   
@@ -167,7 +168,7 @@ describe('DepositRevenueForm', () => {
         'tx_signature',
         'mock_hash',
         1234,
-        'mock_t_depositRevenue'
+        'mock_t_depositDone'
       );
     });
   });

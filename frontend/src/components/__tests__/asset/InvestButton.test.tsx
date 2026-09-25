@@ -1,63 +1,74 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { NextIntlClientProvider } from 'next-intl';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { InvestButton } from '../../asset/InvestButton';
-import { useWalletInfo } from '@/hooks/useWalletInfo';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import messagesEn from '../../../../messages/en.json';
+import { InvestButton } from '../../asset/InvestButton';
+import type { Approval, SaleState } from '../../asset/saleState';
 
-// Mock Wallet Info hook
-vi.mock('@/hooks/useWalletInfo', () => ({
-  useWalletInfo: vi.fn(),
-}));
+vi.mock('@solana/wallet-adapter-react', () => ({ useWallet: vi.fn() }));
+vi.mock('@solana/wallet-adapter-react-ui', () => ({ useWalletModal: vi.fn() }));
 
-// Mock Wallet Modal hook
-vi.mock('@solana/wallet-adapter-react-ui', () => ({
-  useWalletModal: vi.fn(),
-}));
-
-// Mock Translations
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => `translated_${key}`,
-}));
+function renderButton(
+  { saleState = 'open', approval = 'approved' }: { saleState?: SaleState; approval?: Approval },
+  { connected }: { connected: boolean },
+) {
+  vi.mocked(useWallet).mockReturnValue({ connected } as ReturnType<typeof useWallet>);
+  const onInvestClick = vi.fn();
+  render(
+    <NextIntlClientProvider locale="en" messages={messagesEn}>
+      <InvestButton saleState={saleState} approval={approval} onInvestClick={onInvestClick} />
+    </NextIntlClientProvider>,
+  );
+  return { onInvestClick };
+}
 
 describe('InvestButton', () => {
-  let mockSetVisible: ReturnType<typeof vi.fn>;
+  const setVisible = vi.fn();
 
   beforeEach(() => {
-    mockSetVisible = vi.fn();
-    (useWalletModal as any).mockReturnValue({ setVisible: mockSetVisible });
+    vi.clearAllMocks();
+    vi.mocked(useWalletModal).mockReturnValue({ setVisible, visible: false });
   });
 
-  it('renders Connect Wallet when disconnected', () => {
-    (useWalletInfo as any).mockReturnValue({ connected: false });
+  it('opens the wallet picker when no wallet is connected', async () => {
+    renderButton({ approval: 'notApproved' }, { connected: false });
 
-    render(<InvestButton />);
-    const btn = screen.getByText('translated_connectWallet');
-    expect(btn).toBeInTheDocument();
-    
-    fireEvent.click(btn);
-    expect(mockSetVisible).toHaveBeenCalledWith(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Connect wallet to buy' }));
+
+    expect(setVisible).toHaveBeenCalledWith(true);
   });
 
-  it('renders Complete KYC when connected but no kyc', () => {
-    (useWalletInfo as any).mockReturnValue({ connected: true });
+  it('opens the purchase for an approved wallet', async () => {
+    const { onInvestClick } = renderButton({ approval: 'approved' }, { connected: true });
 
-    render(<InvestButton isKycCompleted={false} />);
-    const link = screen.getByText('translated_completeKyc');
-    expect(link).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Buy shares' }));
+
+    expect(onInvestClick).toHaveBeenCalledTimes(1);
   });
 
-  it('renders Invest Now when connected and kyc completed', () => {
-    (useWalletInfo as any).mockReturnValue({ connected: true });
+  it.each([
+    ['notApproved', 'Wallet not approved'],
+    ['checking', 'Checking wallet…'],
+    ['unknown', "Couldn't check wallet"],
+  ] as const)('names a %s wallet instead of offering the purchase', (approval, label) => {
+    renderButton({ approval }, { connected: true });
 
-    const onInvestProps = vi.fn();
-    render(<InvestButton isKycCompleted={true} onInvestClick={onInvestProps} />);
-    
-    const btn = screen.getByText('translated_investNow');
-    expect(btn).toBeInTheDocument();
-    
-    fireEvent.click(btn);
-    expect(onInvestProps).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: label })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Buy shares' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['paused', 'Sales paused'],
+    ['closed', 'Project closed'],
+    ['soldOut', 'Sold out'],
+  ] as const)('says why a %s car cannot be bought, even before connecting', (saleState, label) => {
+    renderButton({ saleState }, { connected: false });
+
+    expect(screen.getByRole('button', { name: label })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Connect wallet to buy' })).not.toBeInTheDocument();
   });
 });
-

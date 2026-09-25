@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import { ProjectStatus } from '@/types/project';
+import { Pill, type PillTone } from './Pill';
 
 interface BadgeProps {
   status: ProjectStatus;
@@ -7,20 +8,17 @@ interface BadgeProps {
   className?: string;
 }
 
-const DOT: Record<ProjectStatus, string> = {
-  active: 'bg-success',
-  paused: 'bg-warning',
-  closed: 'bg-subtle-foreground',
+const TONE: Record<ProjectStatus, PillTone> = {
+  active: 'success',
+  paused: 'warning',
+  closed: 'neutral',
 };
 
-/* Status is never color alone: the dot always comes with its text label. */
+/** A car project's status. */
 export function Badge({ status, children, className = '' }: BadgeProps): JSX.Element {
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-pill border border-border bg-card px-2.5 py-0.5 text-small font-medium text-card-foreground ${className}`}
-    >
-      <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${DOT[status]}`} />
+    <Pill tone={TONE[status]} className={className}>
       {children}
-    </span>
+    </Pill>
   );
 }

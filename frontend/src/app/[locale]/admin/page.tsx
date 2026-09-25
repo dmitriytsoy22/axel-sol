@@ -1,6 +1,5 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
 import { AdminGuard } from '@/components/admin/AdminGuard';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { AdminMetrics } from '@/components/admin/AdminMetrics';
@@ -8,33 +7,26 @@ import { DepositRevenueForm } from '@/components/admin/DepositRevenueForm';
 import { ProjectControls } from '@/components/admin/ProjectControls';
 import { WhitelistManager } from '@/components/admin/WhitelistManager';
 
+/* Operator console: an ink header naming the car, then the working forms on paper. */
 export default function AdminPage() {
-  const t = useTranslations('Admin');
-  const { project, isLoading, isAdmin } = useAdminAccess();
+  const { project, isAdmin, isLoading } = useAdminAccess();
 
   return (
-    <AdminGuard>
-      <main className="min-h-screen pt-24 pb-16 bg-slate-950">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-8 relative">
-            <div className="absolute -top-12 -left-12 h-64 w-64 rounded-full bg-cyan-500/10 blur-[100px]" />
-            <h1 className="relative font-display text-3xl font-medium tracking-tight text-white sm:text-4xl">
-              {t('title')}
-            </h1>
+    <AdminGuard isAdmin={isAdmin} isLoading={isLoading}>
+      {project && (
+        <>
+          <AdminMetrics project={project} />
+          <div className="page-container grid gap-8 pb-24 pt-10 md:pt-12 lg:grid-cols-12">
+            <div className="flex flex-col gap-8 lg:col-span-8">
+              <DepositRevenueForm project={project} />
+              <WhitelistManager />
+            </div>
+            <div className="lg:col-span-4">
+              <ProjectControls project={project} />
+            </div>
           </div>
-
-          <div className="relative space-y-6">
-            {project && isAdmin && (
-              <>
-                <AdminMetrics project={project} />
-                <WhitelistManager />
-                <DepositRevenueForm project={project} />
-                <ProjectControls project={project} />
-              </>
-            )}
-          </div>
-        </div>
-      </main>
+        </>
+      )}
     </AdminGuard>
   );
 }

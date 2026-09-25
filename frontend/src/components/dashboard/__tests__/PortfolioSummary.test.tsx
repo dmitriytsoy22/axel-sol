@@ -5,37 +5,24 @@ import { NextIntlClientProvider } from 'next-intl';
 import messagesEn from '../../../../messages/en.json';
 import { describe, it, expect } from 'vitest';
 
-const renderWithTranslations = (component: React.ReactNode) => {
-  return render(
-    <NextIntlClientProvider locale="en" messages={messagesEn}>
-      {component}
-    </NextIntlClientProvider>
-  );
-};
+const figure = (label: string) => screen.getByText(label).closest('div');
 
 describe('PortfolioSummary', () => {
-  it('renders correctly', () => {
-    // totalValue: 450 SOL (in lamports) => 450 * 10^9
-    const totalValue = 450 * 1_000_000_000;
-    const tokensHeld = 250;
-    // unclaimedRevenue: 44 SOL (in lamports) => 44 * 10^9
-    const unclaimedRevenue = 44 * 1_000_000_000;
-
-    renderWithTranslations(
-      <PortfolioSummary
-        totalValue={totalValue}
-        tokensHeld={tokensHeld}
-        unclaimedRevenue={unclaimedRevenue}
-      />
+  it('shows value, shares and unclaimed payouts in SOL from lamports', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messagesEn}>
+        <PortfolioSummary
+          totalValue={450 * 1_000_000_000}
+          tokensHeld={250}
+          carCount={2}
+          unclaimedRevenue={44 * 1_000_000_000}
+        />
+      </NextIntlClientProvider>,
     );
 
-    expect(screen.getByText('Total Value')).toBeInTheDocument();
-    expect(screen.getByText('450 SOL')).toBeInTheDocument();
-
-    expect(screen.getByText('Tokens Held')).toBeInTheDocument();
-    expect(screen.getByText('250')).toBeInTheDocument();
-
-    expect(screen.getByText('Unclaimed Revenue')).toBeInTheDocument();
-    expect(screen.getByText('44 SOL')).toBeInTheDocument();
+    expect(figure('Value at current price')).toHaveTextContent('450 SOL');
+    expect(figure('Shares held')).toHaveTextContent('250');
+    expect(figure('Shares held')).toHaveTextContent('in 2 cars');
+    expect(figure('Not claimed yet')).toHaveTextContent('44 SOL');
   });
 });

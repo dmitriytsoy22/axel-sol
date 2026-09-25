@@ -191,6 +191,18 @@
     padding-block: var(--section-py-mobile);
   }
 
+  /* Amount fields keep type="number" for the numeric keyboard, without the tiny steppers. */
+  .no-spinner {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .no-spinner::-webkit-inner-spin-button,
+  .no-spinner::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
   /* Readability zone over the hero photo: a band under the nav, a floor under the stats and,
      from md, a fade from the text column toward the open right side of the frame. */
   .hero-scrim {
