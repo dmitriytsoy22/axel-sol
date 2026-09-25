@@ -268,23 +268,19 @@ The frontend uses:
 
 | Route | What it does | Chain access |
 |---|---|---|
-| `/` | Catalog of all projects, with a status filter | `program.account.projectState.all()` plus Token-2022 metadata for each mint |
-| `/assets/[id]` | Asset page: car metadata, sale progress, price, mint and vault Explorer links, invest modal. `id` is the mint address or the list index. | `buy_tokens` |
-| `/dashboard` | Holdings, revenue periods with claim status, claim / claim-all, telemetry widget | ATA balances, `RevenuePeriod`, `ClaimRecord`; `claim_revenue` (claim-all packs several claims into one transaction) |
+| `/` | Landing page: figures from the chain, the catalog of all projects (with a status filter once cars differ in status), how it works, Explorer links to verify the program, risks | `program.account.projectState.all()` plus Token-2022 metadata for each mint, read once and shared by every section |
+| `/assets/[id]` | Asset page: car metadata, sale progress, price, terms with Explorer links (mint, vault, operator, oracle), buy panel and invest modal, the car's payout history, a payout calculator on the reader's own inputs, telemetry widget. `id` is the mint address or the list index. | The wallet's `WhitelistEntry`, the project's `RevenuePeriod`s; `buy_tokens` |
+| `/dashboard` | Portfolio: holdings, revenue periods with claim status, claim / claim-all | ATA balances, `RevenuePeriod`, `ClaimRecord`; `claim_revenue` (claim-all packs several claims into one transaction) |
 | `/payouts` | Payout history across the wallet's holdings | `RevenuePeriod`, `ClaimRecord` |
 | `/admin` | Metrics, whitelist manager, revenue deposit form, pause / resume / close | `add_to_whitelist`, `remove_from_whitelist`, `deposit_revenue`, `pause_project`, `resume_project`, `close_project` |
 
 Details:
 
-- `/admin` is not in the navigation bar. `useAdminAccess` shows the panel only when the connected wallet is the admin of the **first** project returned by the catalog query. The panel manages only that project.
+- `/admin` is not in the navigation bar. `useAdminAccess` shows the panel only when the connected wallet is the admin of the **first** project returned by the catalog query; other visitors see why the panel is unavailable. The panel manages only that project.
+- The buy button either connects a wallet or, during an open sale, buys with a wallet whose `WhitelistEntry` is approved. In every other case it is disabled and states the reason. The asset page reads the entry with `components/asset/useWalletApproval.ts`, not with the broken `useWhitelistStatus` (limitation 8).
 - `lib/solana/instructions.ts` also has a builder for `update_price`, but no component uses it.
 - `initialize_project` and `revoke_mint_authority` have no UI. Projects are created with `npm run init-project`.
-- **Illustrative values** that are not read from the chain:
-  - the "Class / Engine / Color" specs on the asset page (`Comfort+`, `2.0L Hybrid`, `White`)
-  - the `RevenueProjection` defaults ($1,200 gross, $300 expenses, $100 reserve per month)
-  - `isKycCompleted={true}` passed to `InvestButton`
-
-  The program still enforces the whitelist on `buy_tokens`.
+- Car photos are stock photos picked by make and model (`components/catalog/vehiclePhoto.ts`) and marked "Illustrative photo". Credits are in `public/images/CREDITS.md`. Design rules: [`frontend/design.md`](../frontend/design.md).
 - Security headers are set in `next.config.mjs`: a CSP whose `connect-src` allows Solana devnet and mainnet RPC, Helius and `http://localhost:*`; `X-Frame-Options: DENY`; `nosniff`; a Referrer-Policy; and a Permissions-Policy.
 
 ## Security Properties (as implemented)
@@ -323,7 +319,7 @@ These come from reading the code on 2026-09-24. None of them is fixed yet.
    - `useTelemetry` fetches `${NEXT_PUBLIC_API_URL}/telemetry/latest/:mint`. That variable is not in `.env.local.example`, and when it is empty the request goes to the Next.js origin, which has no such route.
    - The separate client `lib/api/telemetry.ts` uses `NEXT_PUBLIC_TELEMETRY_API_URL`, but no component calls it.
    - The backend does not enable CORS.
-8. **The whitelist status hook always returns false.** `useWhitelistStatus` derives the whitelist PDA and then passes it to `fetchWhitelistEntry`, which derives a PDA again from that address. Its only caller, `WhitelistGate`, is not mounted by any page.
+8. **The whitelist status hook always returns false.** `useWhitelistStatus` derives the whitelist PDA and then passes it to `fetchWhitelistEntry`, which derives a PDA again from that address. Nothing calls it any more: the asset page uses its own correct reader, `components/asset/useWalletApproval.ts`.
 9. **The revenue vault is subject to rent rules.** The vault is a 0-byte system account, so Solana's rent-state rules apply. A deposit that would leave an empty vault below the rent-exempt minimum (890,880 lamports) is rejected. So is a claim that would leave a non-zero balance below that minimum. Rounding dust can therefore block the last claim of a period, unless the vault holds extra SOL.
 10. **Transfer-fee rounding.** Token-2022 rounds the fee up, and shares have 0 decimals, so every transfer pays at least one whole share. A 1-share transfer delivers nothing to the recipient.
 11. **The admin holds strong powers.** The admin receives all sale proceeds immediately and sweeps the vault on close. The admin is also the permanent delegate: it can move or burn any holder's shares with Token-2022 directly. On devnet these are single keys. The code comment mentions a Squads multisig for production, but none is configured.

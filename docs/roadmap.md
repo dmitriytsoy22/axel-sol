@@ -38,8 +38,8 @@ Next steps. Each one addresses a limitation listed in [architecture.md](architec
 - [ ] Thaw token accounts without relying on `buy_tokens` creating the ATA (program upgrade)
 - [ ] Create the hook's `ExtraAccountMetaList` during project setup, and add an end-to-end test of a holder-to-holder transfer on a full six-extension mint
 - [ ] Fix the account list in the backend's `record_telemetry` transaction, and mark simulated telemetry as simulated in the API
-- [ ] Connect the dashboard telemetry widget to the backend: one env variable, CORS enabled
-- [ ] Connect KYC in the UI (Sumsub with `externalUserId` = wallet) in place of the unmounted Blockpass prompt, and fix `useWhitelistStatus`
+- [ ] Connect the asset page's telemetry widget to the backend: one env variable, CORS enabled
+- [ ] Add a KYC flow to the UI (Sumsub with `externalUserId` = wallet), and fix or remove the unused `useWhitelistStatus`
 - [ ] Public frontend deployment and a documented devnet demo path for judges (a whitelisted test wallet)
 - [ ] Recorded end-to-end devnet run with Explorer links: whitelist → buy → deposit → claim → transfer
 

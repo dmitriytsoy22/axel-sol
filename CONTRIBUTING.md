@@ -38,6 +38,8 @@ npx tsc --noEmit                    # type check
 npm run build                       # production build
 ```
 
+UI changes follow [`frontend/design.md`](frontend/design.md): tokens, type, photos and their credits, motion, and the layout and accessibility rules.
+
 The program IDLs are vendored in `frontend/src/lib/solana/idl/` (v1: `axel.json`, `axel.ts`) and `frontend/src/lib/solana/idl-v2/` (v2: `axel_v2.json`, `axel_v2.ts`), so the frontend builds without an Anchor toolchain. If you change the v1 interface, run `anchor build` and copy `target/idl/axel.json` and `target/types/axel.ts` there. For v2, run `anchor build` and `npm run export-idl`; CI checks that the committed copy matches the build.
 
 ## Backend

@@ -129,12 +129,12 @@ The `axel` program ID is hardcoded in `kyc.service.ts` and `telemetry-cron.servi
 | Variable | Read in | Notes |
 |---|---|---|
 | `NEXT_PUBLIC_SOLANA_RPC_URL` | `lib/solana/connection.ts`, `providers/WalletProvider.tsx` | Defaults to devnet |
-| `NEXT_PUBLIC_SOLANA_NETWORK` | `lib/solana/connection.ts` | Used for Explorer links; default `devnet` |
+| `NEXT_PUBLIC_SOLANA_NETWORK` | `lib/solana/connection.ts`, `app/opengraph-image.tsx` | Used for Explorer links and the social card; default `devnet` |
 | `NEXT_PUBLIC_PROGRAM_ID` | `lib/solana/connection.ts` | Defaults to `DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M` |
 | `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts` | That client is not used by any component |
 | `NEXT_PUBLIC_KYC_URL` | — | Not read anywhere |
 
-The dashboard telemetry widget (`hooks/useTelemetry.ts`) reads `NEXT_PUBLIC_API_URL`, which is not in the example file.
+The asset page's telemetry widget (`hooks/useTelemetry.ts`) reads `NEXT_PUBLIC_API_URL`, which is not in the example file.
 
 ## Program Reference: `axel`
 

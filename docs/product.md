@@ -86,5 +86,5 @@ What the code does **not** contain:
   - Prices and payouts are in SOL; telemetry revenue is in KZT.
   - No fiat on- or off-ramp.
   - Shares are whole units, and the 1% fee rounds up to at least one share per transfer.
-- **KYC loop not wired in the UI.** The backend webhook exists. The frontend's KYC prompt is not mounted and points to a Blockpass URL, not Sumsub.
+- **KYC loop not wired in the UI.** The backend webhook exists, but the frontend has no KYC flow. The asset page only reads whether the connected wallet is approved and explains why buying is unavailable.
 - **Single keys.** Admin and oracle are single keys. On devnet they are the same key. No multisig is configured.

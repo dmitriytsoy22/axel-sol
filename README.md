@@ -66,8 +66,9 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 ## Summary of Features
 
 **Investor**
-- Catalog of every project read from the `axel` program, with Token-2022 metadata and an Active / Paused / Closed filter
-- Asset page: VIN, sale progress, price, remaining shares, Solana Explorer links for the mint and the revenue vault, and a buy flow (`buy_tokens`)
+- Landing page and catalog of every project read from the `axel` program: live figures from the chain (cars listed, shares sold, payout periods), Token-2022 metadata, and a status filter once cars differ in status
+- Asset page: VIN, sale progress, price, remaining shares, Solana Explorer links for the mint, the revenue vault, the operator and the oracle, and a buy flow (`buy_tokens`). The buy button reads the wallet's `WhitelistEntry` first and says why it is disabled.
+- Per-car payout history, a payout calculator that works only on the reader's own numbers, and the trip-data (telemetry) widget
 - Dashboard: holdings, revenue periods with claimed / claimable status, per-period claim and "Claim all" (several `claim_revenue` instructions in one transaction)
 - Payout history across all holdings
 
@@ -85,7 +86,8 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 - Next.js 14 App Router; transactions are built from the vendored IDL (`frontend/src/lib/solana/idl/`)
 - English (default), Russian and Kazakh via `next-intl`: `/`, `/ru/…`, `/kk/…`
 - Security headers: Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy, Permissions-Policy
-- Vitest unit suite: 31 files, 105 tests, run in CI
+- Self-hosted fonts and a credited, licensed photo set; design rules in [`frontend/design.md`](frontend/design.md)
+- Vitest unit suite: 45 files, 206 tests, run in CI
 
 ---
 
@@ -184,8 +186,8 @@ AXEL is an MVP on **devnet only**. The programs are **not audited**, and there i
 - `claim_revenue` pays on the **current** balance, so shares bought or transferred after a deposit can claim that period again.
 - Neither devnet mint has the hook's `ExtraAccountMetaList`, so holder-to-holder transfers fail today. Primary sales are mints, not transfers, so they are unaffected.
 - The backend's `record_telemetry` transaction passes one account too many and fails. Without Yandex Fleet credentials the backend serves simulated telemetry, and does not mark it as simulated.
-- The dashboard telemetry widget and the KYC prompt are not connected to the backend or to Sumsub yet.
-- Some asset-page values are illustrative, not on-chain: the car specs (class, engine, colour) and the Revenue Projection defaults.
+- The telemetry widget on the asset page is not connected to the backend. The UI has no KYC flow; wallets are approved by the backend's Sumsub webhook or from the admin panel.
+- Car photos are stock photos of the model, marked "Illustrative photo" on the page.
 
 Security reports: [SECURITY.md](SECURITY.md).
 
@@ -245,10 +247,12 @@ Without Yandex Fleet credentials the telemetry job uses simulated data. Without 
 ```bash
 npm ci
 npm run build                               # anchor build → target/deploy, target/idl, target/types
-anchor test --provider.cluster localnet     # starts a local validator with both programs, runs the test script
+anchor test --provider.cluster localnet     # v1: starts a local validator with the programs, runs the test script
+cargo test -p axel-v2                       # v2: math, dates, telemetry chain, account layouts
+npm run test:v2                             # v2: the program on LiteSVM, no validator needed
 ```
 
-`npm test` runs `node --import tsx/esm --test tests/**/*.ts` against a validator at `http://127.0.0.1:8899`. `Anchor.toml` sets the provider cluster to devnet, so always pass `--provider.cluster localnet`. To create a project on a cluster: `npm run init-project -- --cluster devnet` (admin = `~/.config/solana/id.json`). Program builds and tests are not in CI yet. With the toolchain above, `anchor build` and `anchor test --provider.cluster localnet` pass locally (49 tests).
+`npm test` runs `node --import tsx/esm --test tests/**/*.ts` against a validator at `http://127.0.0.1:8899`. `Anchor.toml` sets the provider cluster to devnet, so always pass `--provider.cluster localnet`. To create a v1 project on a cluster: `npm run init-project -- --cluster devnet` (admin = `~/.config/solana/id.json`). CI builds all programs and runs the v2 Rust and LiteSVM tests (530); the v1 tests (49) need a local validator and run locally only.
 
 More detail: [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -278,10 +282,12 @@ axel-sol/
 ├── backend/src/                    # NestJS: health, kyc, telemetry, yandex, solana modules
 ├── frontend/
 │   ├── src/app/[locale]/           # /, /assets/[id], /dashboard, /payouts, /admin
-│   ├── src/components/             # admin, asset, catalog, dashboard, invest, kyc, layout, payouts, ui, wallet
+│   ├── src/components/             # admin, asset, catalog, dashboard, invest, layout, payouts, shared, ui, wallet
 │   ├── src/hooks/                  # chain reads and transaction hooks
 │   ├── src/lib/solana/             # connection, PDAs, readers, instruction builders, idl/ and idl-v2/ (vendored)
-│   └── messages/                   # en.json, ru.json, kk.json
+│   ├── src/fonts/, public/images/  # self-hosted fonts; car and city photos with credits
+│   ├── messages/                   # en.json, ru.json, kk.json
+│   └── design.md                   # design direction, tokens and page rules
 ├── docs/                           # product, architecture, api, v2, roadmap; planning/ and ru/ (historical)
 ├── assets/                         # logo, hero, screenshots
 ├── .github/workflows/ci.yml        # frontend, backend and programs CI
@@ -317,11 +323,14 @@ Done so far:
 - Pinned the SBF platform-tools in `Cargo.toml` so `anchor build` works with the current lockfile, and re-ran the program test suite on a local validator (49 tests pass).
 - Added missing asset-page translations (EN / RU / KK).
 - Rewrote this README to match the code.
+- Wrote the AXEL v2 program (`programs/axel-v2`, 24 instructions): escrowed fundraising with refunds, a KYC registry with restricted signers, a transfer hook inside the program, attested revenue deposits with claims that are safe against transfers and late buys, a telemetry hash chain and time-locked share recovery. It has 35 Rust tests and 530 LiteSVM tests, a generated client in `sdk/axel-v2`, and CI. Design: [docs/v2.md](docs/v2.md). It is not deployed yet.
+- Redesigned the frontend ([`frontend/design.md`](frontend/design.md)): new landing page, asset, portfolio, payouts and operator pages, self-hosted fonts, licensed photos, and pages checked for layout, contrast and accessibility at five widths in EN / RU / KK. The asset page no longer shows made-up specs or income projections.
 
 In progress during the hackathon (**planned, not done yet**):
 - [ ] Public frontend deployment with a judge demo path (a whitelisted devnet test wallet)
 - [ ] End-to-end devnet demo with Explorer links: whitelist → buy → deposit → claim → transfer
-- [ ] AXEL v2 programs under new program IDs: whitelist restricted to a KYC authority, claim accounting that is safe against transfers and late buys, escrowed fundraising with refunds, stablecoin payments
+- [ ] Deploy AXEL v2 under its new program ID (written and tested locally, see above)
+- [ ] Move the frontend and backend to v2: stablecoin prices, the new project states, KYC records and recovery alerts
 
 ---
 
@@ -335,6 +344,9 @@ In progress during the hackathon (**planned, not done yet**):
 - [x] NestJS backend: health, telemetry endpoint, KYC webhook, Yandex Fleet cron
 - [x] Next.js frontend: catalog, asset page and buy, dashboard with claim, payouts, admin panel, EN / RU / KK
 - [x] Vendored IDL, green frontend unit suite, CI, English docs
+- [x] AXEL v2 program with its tests and TypeScript client (not deployed)
+- [x] Frontend redesign
+- [x] Program build and v2 tests in CI (the v1 tests run locally only)
 - [ ] Public deployment and judge demo path
 - [ ] End-to-end devnet demo, including a holder-to-holder transfer
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key
@@ -342,7 +354,6 @@ In progress during the hackathon (**planned, not done yet**):
 - [ ] Create the hook's `ExtraAccountMetaList` during project setup
 - [ ] Fix the backend's `record_telemetry` transaction and flag simulated telemetry
 - [ ] Connect KYC and the telemetry widget in the UI
-- [ ] Program build and tests in CI
 - [ ] Independent security audit, multisig authorities, mainnet
 
 Full roadmap: [docs/roadmap.md](docs/roadmap.md)
