@@ -3,6 +3,7 @@
 .agent/
 _agents/
 _agent/
+.claude/settings.local.json
 
 # Dependencies
 node_modules/
@@ -18,6 +19,7 @@ build/
 .env.local
 .env.staging
 .env.production
+*keypair*.json
 
 # IDE
 .vscode/
