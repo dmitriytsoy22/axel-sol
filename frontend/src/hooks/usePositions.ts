@@ -67,8 +67,11 @@ export function summarize(holdings: Holding[]): PortfolioSummary {
   };
 }
 
-/** The connected wallet's shares and revenue in every car, from its positions. */
-export function usePositions(): {
+/**
+ * The connected wallet's shares and revenue in every car, from its positions. A page that
+ * takes them from elsewhere passes `enabled: false` and reads nothing.
+ */
+export function usePositions({ enabled = true }: { enabled?: boolean } = {}): {
   holdings: Holding[];
   summary: PortfolioSummary;
   isLoading: boolean;
@@ -77,7 +80,7 @@ export function usePositions(): {
 } {
   const { publicKey } = useWallet();
   const { data, isLoading, error, refetch } = useChainQuery(
-    publicKey ? `positions:${publicKey.toBase58()}` : null,
+    publicKey && enabled ? `positions:${publicKey.toBase58()}` : null,
     async (connection) => {
       if (!publicKey) return [];
       const [projects, positions] = await Promise.all([

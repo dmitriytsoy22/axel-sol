@@ -69,6 +69,9 @@ describe('Admin console', () => {
     expect(await screen.findByRole('heading', { name: 'Income deposits' })).toBeInTheDocument();
     expect(screen.getByText('Operator')).toBeInTheDocument();
     expect(screen.getByText('Deposits open')).toBeInTheDocument();
+    // No oracle backend is configured in the tests, so the monthly deposit says why it is off.
+    expect(screen.getByRole('heading', { name: "Deposit a month's income" })).toBeInTheDocument();
+    expect(screen.getByText(/This deployment has no oracle backend/)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Car status' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });

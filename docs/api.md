@@ -2,13 +2,13 @@
 
 AXEL exposes these interfaces:
 
-1. **A small HTTP backend** in `backend/`: health, published telemetry, revenue reports and deposit attestation, KYC, and the history of v2 program events.
+1. **A small HTTP backend** in `backend/`: health, published telemetry, revenue reports and the operator's deposit flow, each car's data in the layout "Verify" reads, KYC, the history of v2 program events and each wallet's payouts.
 2. **The Solana program `axel_v2`** ([reference](#program-reference-axel_v2), design in [v2.md](v2.md)). Clients call it directly. It is not deployed yet. The v1 `axel` and `transfer_hook` programs, which run on devnet since before the hackathon, are documented at the end as [legacy](#legacy-program-reference-axel-v1).
 3. **The TypeScript clients:** the frontend's Anchor-based client and the generated Codama SDK ([below](#typescript-client-frontend-axel_v2)).
-4. **The indexer API** that the frontend reads payout history from when one is configured. The backend indexes every v2 event ([below](#program-events-what-is-indexed)) but does not serve this wallet-payout endpoint yet; its contract is fixed [below](#indexer-api-read-by-the-frontend).
+4. **The indexer API** that the frontend reads payout history from when one is configured ([below](#indexer-api-read-by-the-frontend)). The backend serves it from its index of every v2 event ([below](#program-events-what-is-indexed)).
 5. **The judge demo routes and Solana Actions (Blinks)** of the frontend, in `frontend/src/app/api/`: [demo access, shares and simulated months](#judge-demo-api) on devnet, and [invest and claim Blinks](#solana-actions-blinks).
 
-All business actions (buy, deposit, claim, KYC, pause and so on) are Solana transactions. The backend signs three kinds of v2 transactions: `set_investor` after a Sumsub review (KYC key), `record_telemetry` batches (oracle key), and its co-signature on an operator's `deposit_revenue` (oracle key).
+All business actions (buy, deposit, claim, KYC, pause and so on) are Solana transactions. The backend signs three kinds of v2 transactions: `set_investor` after a Sumsub review (KYC key), `record_telemetry` batches (oracle key), and its co-signature on an operator's `deposit_revenue` (oracle key), either on a deposit the operator signed first or on one it builds for the operator to sign.
 
 ## Backend HTTP Endpoints
 
@@ -17,6 +17,7 @@ All business actions (buy, deposit, claim, KYC, pause and so on) are Solana tran
 - CORS: only the origins in `CORS_ORIGINS`, methods `GET` and `POST`.
 - Errors use the NestJS shape: `{ "statusCode": 400, "message": "...", "error": "Bad Request" }`.
 - Run a single instance: the per-wallet ordering of webhook events and the rate limits live in the process.
+- **Data origin.** Every telemetry and report response says where its figures come from: `dataOrigin` in the JSON responses, `data_origin` inside the published records, reports and car files. It is `yandex_fleet`, `simulated`, `mixed` when a set holds both, or `null` when a response lists nothing.
 
 ### Health Check
 
@@ -67,7 +68,7 @@ Every car in `FLEET_CONFIG` gets one record per calendar day of the fleet's zone
 | `rent_charged` | Whole KZT the park charged for the car that day, net of corrections; this is the owners' gross income |
 | `data_origin` | `yandex_fleet` or `simulated`. It is inside the hashed text, so it is committed on-chain too |
 
-- **Hash.** `data_hash` = SHA-256 of the record's [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) (JCS) canonical form. That text is what `GET /telemetry/:mint/:date.json` serves, byte for byte, and it never changes after it is collected.
+- **Hash.** `data_hash` = SHA-256 of the record's [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) (JCS) canonical form. That text is the `raw` of the [day's proof](#day-proof), and it never changes after it is collected. Confirmed days are also in the car's [published data](#published-car-data-read-by-verify), where re-canonicalizing each record gives the same text.
 - **On-chain entry.** `record_telemetry` gets `{ date: YYYYMMDD, data_hash, trips, km, rent_paid: rent_charged, status }` with these status codes:
 
   | Code | Status |
@@ -114,14 +115,6 @@ interface LatestTelemetryResponse {
 }
 ```
 
-### Published Day
-
-```
-GET /telemetry/:mint/:date.json        e.g. /telemetry/<mint>/2026-09-24.json
-```
-
-The day's canonical text, exactly as hashed. `Content-Type: application/json; charset=utf-8`, `Cache-Control: public, max-age=31536000, immutable`. `404` if the car is not in the fleet or the day was not collected; `400` if `date` is not a real day.
-
 ### Day Proof
 
 ```
@@ -137,7 +130,6 @@ GET /telemetry/:mint/proof?date=YYYY-MM-DD
   "dataOrigin": "simulated",
   "raw": "<the canonical text>",
   "record": { "...": "the same, parsed" },
-  "rawUrl": "/telemetry/<mint>/2026-09-24.json",
   "dataHash": "<hex>",
   "chain": {
     "position": 25,
@@ -151,6 +143,7 @@ GET /telemetry/:mint/proof?date=YYYY-MM-DD
 ```
 - `position` equals `Project.telemetry_count` right after this day was appended.
 - `chain` is `null` until the day's batch is confirmed, and stays `null` for a day the chain can no longer take (see below).
+- `404` if the car is not in the fleet or the day was not collected; `400` if `date` is not a real day.
 
 ### Chain Entries
 
@@ -158,7 +151,7 @@ GET /telemetry/:mint/proof?date=YYYY-MM-DD
 GET /telemetry/:mint/chain?from=YYYY-MM-DD&to=YYYY-MM-DD
 ```
 
-Confirmed days between `from` and `to` (both optional), in chain order, at most 366. The response has `entries: [{ date, dataHash, dataOrigin, position, headAfter, txSignature }]` and `truncated`. Recomputing the formula over the entries from the first entry's `headBefore` (see its proof) must give the last `headAfter`, and the last entry of the chain must match `Project.telemetry_head`.
+Confirmed days between `from` and `to` (both optional), in chain order, at most 366. The response has `dataOrigin` (of the listed entries), `entries: [{ date, dataHash, dataOrigin, position, headAfter, txSignature }]` and `truncated`. Recomputing the formula over the entries from the first entry's `headBefore` (see its proof) must give the last `headAfter`, and the last entry of the chain must match `Project.telemetry_head`.
 
 **How the backend keeps the chain.**
 - **Before sending.** A signed batch, with the positions and heads it will produce, is stored first. After a crash the next run can tell whether the batch landed:
@@ -244,13 +237,13 @@ The operator's wallet builds `deposit_revenue` with `depositParams`, signs it, a
 2. **Report.** The backend rebuilds it from the stated expenses and the published days. Any difference is refused with the JSON paths that differ.
 3. **Project.** The deposit is for the report's project. The project is `Operating`, its oracle is this backend's key, and the signer in the `operator` slot is `Project.operator`.
 4. **Arguments.** `gross`, `period_start`, `period_end`, `report_hash` and `kind` equal the report's, and the distributable amount is positive.
-5. **Overlaps.** No `RevenuePeriod` on-chain overlaps the period, and no final (car sale) deposit exists. No earlier attested deposit for an overlapping period has landed or can still land (its blockhash is still valid). Attestations for one car run one at a time.
+5. **Overlaps.** No `RevenuePeriod` on-chain overlaps the period, and no final (car sale) deposit exists. No earlier attested deposit for an overlapping period has landed or can still land (its blockhash is still valid). A [deposit draft](#deposit-draft-operator-flow) for an overlapping period that can still land stands in the way only of a deposit built for another period index, since of two deposits for the same index at most one lands. Attestations and drafts for one car run one at a time.
 
 **Response `200`:**
 ```json
 { "reportHash": "<hex>", "dataOrigin": "simulated", "transaction": "<base64, fully signed>", "signature": "<transaction ID>" }
 ```
-The report is stored and published at `/reports/:mint/:reportHash.json`. Sending the same transaction again returns the same answer.
+The report is stored and published at `/published/:mint/reports/:reportHash.json`, and the car's [published index](#published-car-data-read-by-verify) lists it once the deposit is indexed. Sending the same transaction again returns the same answer.
 
 | Status | When |
 |---|---|
@@ -261,19 +254,69 @@ The report is stored and published at `/reports/:mint/:reportHash.json`. Sending
 | `422` | the report differs from the rebuilt one (`differences`), other instructions, the oracle pays or is writable, another oracle or operator, arguments differ, nothing to distribute |
 | `503` | `ORACLE_KEYPAIR_PATH` is not set |
 
+### Deposit Draft (operator flow)
+
+```
+POST /v2/deposits/draft
+Content-Type: application/json
+```
+
+The operator's way to deposit a month's revenue with one wallet signature. The operator sends its monthly report; the backend checks it against the published telemetry, builds the `deposit_revenue` that pays it out, and co-signs it as the oracle. The operator's wallet signs the returned transaction and sends it. Limit: 10 requests a minute per client IP.
+
+**Request:** the monthly report as JSON. It holds at least the operator's part, as for [`/reports/draft`](#revenue-report-draft) (`mint`, `kind`, `period`, `expenses`, `car_sale`). It may also state any other field of the [report](#revenue-report-draft), such as `income` or `totals`, or be a whole report from an earlier draft. Every field it states must equal the one the backend rebuilds from the published days; a field the report does not have is refused too.
+
+**Response `200`:**
+```json
+{
+  "reportHash": "<hex SHA-256 of the report's canonical text>",
+  "dataOrigin": "simulated",
+  "report": { "...": "the rebuilt report" },
+  "depositParams": { "gross": "260500000000", "periodStart": 20260901, "periodEnd": 20260930, "reportHash": "<hex>", "kind": "regular" },
+  "periodIndex": 3,
+  "operator": "<Project.operator>",
+  "transaction": "<base64 v0 transaction, signed by the oracle only>",
+  "lastValidBlockHeight": 312045677
+}
+```
+- **The transaction** holds one instruction, `deposit_revenue` with `depositParams`, for the `RevenuePeriod` at `periodIndex` (`Project.period_count` when it was built). Its fee payer is the operator, who pays from its canonical (associated) payment account; the treasury's account is the treasury's associated account. The oracle's account is read-only. The operator's signature slot is empty. Any change to the message voids the oracle's signature.
+- **It lands only as `periodIndex`**, until `lastValidBlockHeight`. The program creates each period at `Project.period_count`, so once another deposit takes that index the draft can no longer land. Drafting the same period again while an earlier draft can still land is therefore allowed: at most one of them lands.
+- **The report** is stored and published at `/published/:mint/reports/:reportHash.json` right away. The car's published index lists it once its deposit is indexed.
+- **Checks** are those of [`/reports/attest`](#revenue-report-attest-a-deposit) that do not need the operator's transaction: the report is rebuilt from the published days, the project is `Operating` and its oracle is this backend's key, something is left to distribute, no deposit on-chain overlaps the period, and the car's sale has not been paid out. An operator-signed deposit for an overlapping period that has landed or can still land is refused too.
+- **In the console.** The operator's tab of `/admin` calls this endpoint on the backend in `NEXT_PUBLIC_TELEMETRY_API_URL` (`components/admin/DepositDraftPanel.tsx`). The operator types the month's expenses or loads its report as a JSON file; the file's other top-level fields are sent as stated. Before the wallet signs, the browser checks the answer (`lib/operator/depositDraft.ts`): the report hashes (RFC 8785, SHA-256) to `reportHash` and to the deposit's report hash; it is this car's and states the deposit's amount, period and kind; the fee payer is the connected wallet; the transaction holds exactly the `deposit_revenue` the app builds itself from the report, for `periodIndex`, and nothing else; and the car's oracle signed its message. The page shows the report, its hash and the oracle's signature. The wallet signs with `signTransaction` and the app sends the transaction; a wallet that changes the message, for example by adding a priority fee, is refused before anything is sent, since that would void the oracle's signature.
+
+| Status | When |
+|---|---|
+| `400` | the report's operator part is not valid (the message names the field) |
+| `404` | the car is not in `FLEET_CONFIG`, or its project does not exist |
+| `409` | the project is not `Operating`, or its oracle is another key; the period overlaps a deposit on-chain or an attested one that can still land; days are missing; the chain diverged |
+| `422` | a stated field differs from the rebuilt report (`differences`, as JSON paths); nothing to distribute; `gross` would not fit a u64 |
+| `503` | `ORACLE_KEYPAIR_PATH` is not set |
+
 ### Attested Reports
 
 ```
 GET /reports/:mint
-GET /reports/:mint/:reportHash.json
 ```
 
-The first lists the reports the oracle attested for the car, oldest period first:
+The reports the oracle attested or drafted a deposit for, oldest period first:
 
 ```json
-{ "mint": "<share mint>", "reports": [{ "reportHash": "<hex>", "kind": "regular", "periodStart": "2026-09-01", "periodEnd": "2026-09-30", "gross": "260500000000", "dataOrigin": "simulated", "url": "/reports/<mint>/<hash>.json", "attestations": [{ "depositSignature": "<signature>", "attestedAt": "<ISO time>" }] }] }
+{ "mint": "<share mint>", "dataOrigin": "simulated", "reports": [{ "reportHash": "<hex>", "kind": "regular", "periodStart": "2026-09-01", "periodEnd": "2026-09-30", "gross": "260500000000", "dataOrigin": "simulated", "url": "/published/<mint>/reports/<hash>.json", "attestations": [{ "depositSignature": "<signature>", "attestedAt": "<ISO time>" }], "drafts": [{ "periodIndex": 3, "draftedAt": "<ISO time>" }] }] }
 ```
-The second serves a report's canonical text byte for byte. Its SHA-256 is the `report_hash` of the deposit's `RevenuePeriod`.
+`url` serves the report's canonical text byte for byte ([Published Car Data](#published-car-data-read-by-verify)). Its SHA-256 is the `report_hash` of the deposit's `RevenuePeriod`. A listed report did not necessarily land: the car's published index lists only those whose deposit did.
+
+### Published Car Data
+
+```
+GET /published/:mint/index.json
+GET /published/:mint/telemetry/:month.json          e.g. /published/<mint>/telemetry/2026-09.json
+GET /published/:mint/reports/:reportHash.json
+```
+
+Each fleet car's data in the layout the app's "Check the car's data yourself" reads and the demo seed writes, described [below](#published-car-data-read-by-verify). Point `NEXT_PUBLIC_PUBLISHED_DATA_URL` at `<backend>/published` to verify the backend's cars.
+
+- The index and the month files grow as days are confirmed and deposits land: `Cache-Control: no-cache`. A report's text never changes: `public, max-age=31536000, immutable`.
+- `404` for a car outside the fleet, a month without published days, or a report this backend did not attest; `400` for a month that is not `YYYY-MM`.
 
 ### Program Events: what is indexed
 
@@ -419,6 +462,8 @@ Checks the signature over the stored message, burns the nonce (also when the che
 ```
 Pass `accessToken` to the Sumsub WebSDK. It is valid for 30 minutes; a new session gives a new one.
 
+The app's `/verify` page runs this flow when `NEXT_PUBLIC_KYC_API_URL` is set (`hooks/useKycVerification.ts`, `components/kyc/`): the wallet signs the nonce's message with `signMessage`, the page opens the session and launches the WebSDK from Sumsub's script (`lib/kyc/sumsub.ts`) with the token. When the WebSDK's token expires, the page signs a new nonce for a new one. The approval reaches the chain only through the webhook; the page reads the wallet's `Investor` record every 10 s and shows it verified once `set_investor` lands. Without `NEXT_PUBLIC_KYC_API_URL` the page shows the wallet's record and how to get demo access.
+
 | Status | When |
 |---|---|
 | `400` | body fields missing or malformed |
@@ -494,7 +539,7 @@ Every verified event is stored in the `kyc_events` table with its outcome and tr
 | `SUMSUB_WEBHOOK_SECRET` | webhook HMAC | webhook answers `503` |
 | `FLEET_CONFIG` | cars: `{ "<share mint>": { plate, source, parkFeeBps, simulatedDailyRent?, startDate? } }` | `{}`; a `yandex_fleet` car without Yandex credentials, or a simulated car on mainnet, stops the start |
 | `FLEET_UTC_OFFSET` | where a reported day starts | `+05:00` |
-| `ORACLE_KEYPAIR_PATH` | `record_telemetry` signer and fee payer; deposit co-signer | days are published but not written on-chain; `/reports/attest` answers `503`; required in production when there are cars |
+| `ORACLE_KEYPAIR_PATH` | `record_telemetry` signer and fee payer; deposit co-signer | days are collected but not written on-chain; `/reports/attest` and `/v2/deposits/draft` answer `503`; required in production when there are cars |
 | `YANDEX_PARK_ID`, `YANDEX_CLIENT_ID`, `YANDEX_API_KEY` | `YandexFleetClient` | required for `yandex_fleet` cars; set all three or none |
 | `YANDEX_RENT_CATEGORY_IDS` | which park transactions are rent | `partner_service_recurring_payment` |
 | `CRON_SCHEDULE` | telemetry job, registered after `.env` is loaded | `0 1 * * *` (daily 01:00, server time) |
@@ -515,9 +560,10 @@ The v2 program ID comes from `AXEL_PROGRAM_ID` or the vendored IDL; instructions
 | `NEXT_PUBLIC_SOLANA_RPC_URL` | `lib/solana/connection.ts`, `providers/WalletProvider.tsx`, `next.config.mjs` | The cluster's public RPC (`http://127.0.0.1:8899` for `localnet`). Its origin and websocket are added to the CSP. |
 | `NEXT_PUBLIC_PROGRAM_ID` | `lib/solana/connection.ts` | The `address` in `idl-v2/axel_v2.json` (`AXLcoEH3vJXUSL7nEr1T4d77NarThcbVrnbBzBR8XPZi`). |
 | `NEXT_PUBLIC_PAYMENT_MINT_SYMBOLS` | `lib/solana/tokens.ts` | Unset. `<mint>:<symbol>,<mint>:<symbol>` names payment mints without on-chain metadata. A Token-2022 mint's own metadata symbol wins, Circle's USDC is known by address, anything else shows its short address. |
-| `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts`, `next.config.mjs` | Unset: the car page says trip data is not connected and makes no request. Set: the backend's base URL; the widget asks `/telemetry/latest/<share mint>` every minute. The backend answers only the origins in its `CORS_ORIGINS`, so the frontend's origin must be listed there. |
-| `NEXT_PUBLIC_INDEXER_URL` | `lib/api/indexer.ts`, `next.config.mjs` | Unset: payout history comes from the chain. Set: from the [indexer API](#indexer-api-read-by-the-frontend). |
-| `NEXT_PUBLIC_PUBLISHED_DATA_URL` | `lib/api/published.ts`, `next.config.mjs` | `/demo-data` on test networks (the seed's files in `frontend/public/demo-data`), unset on mainnet. The base of the [published car data](#published-car-data-read-by-verify) the asset page's "Check the car's data yourself" hashes. An absolute URL's origin is added to the CSP, and that server must allow CORS. |
+| `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts`, `next.config.mjs` | The backend that runs the cars' oracle; its base URL. Set: the trip data widget asks `/telemetry/latest/<share mint>` every minute, and the operator's console drafts deposits with [`POST /v2/deposits/draft`](#deposit-draft-operator-flow). Unset, or for a car outside the backend's fleet: the widget reads the car's [published files](#published-car-data-read-by-verify) and checks them against the chain; the console says deposits cannot be drafted. The backend answers only the origins in its `CORS_ORIGINS`, so the frontend's origin must be listed there. |
+| `NEXT_PUBLIC_INDEXER_URL` | `lib/api/indexer.ts`, `next.config.mjs` | Unset: payout history comes from the chain. Set: from the [indexer API](#indexer-api-read-by-the-frontend), which the backend serves; its base URL. `/payouts` then shows the wallet's part of each deposit, its claims, and the claimed and claimable totals as of the index's slot, and the portfolio lists the wallet's part of its three newest payouts. |
+| `NEXT_PUBLIC_KYC_API_URL` | `lib/api/kyc.ts`, `next.config.mjs` | Unset: `/verify` shows the wallet's KYC record and how to get demo access. Set: the backend's base URL; `/verify` signs in with [`/kyc/nonce` and `/kyc/session`](#kyc-sign-in-nonce) and runs the Sumsub WebSDK, and a car page offers the check to a wallet without an eligible record. The CSP then allows Sumsub's script (`https://static.sumsub.com`) and its iframe and API (`https://api.sumsub.com`), and the Permissions-Policy lets that iframe use the camera and microphone. |
+| `NEXT_PUBLIC_PUBLISHED_DATA_URL` | `lib/api/published.ts`, `next.config.mjs` | `/demo-data` on test networks (the seed's files in `frontend/public/demo-data`), unset on mainnet. The base of the [published car data](#published-car-data-read-by-verify) the asset page's "Check the car's data yourself" hashes; `<backend>/published` for the backend's cars. An absolute URL's origin is added to the CSP, and that server must allow CORS (the backend answers the origins in its `CORS_ORIGINS`). |
 | `NEXT_PUBLIC_SITE_URL` | `lib/actions/http.ts` | Unset: the [Blinks](#solana-actions-blinks) take their absolute links and icon from the request's host (`X-Forwarded-Host` behind a proxy). |
 | `NEXT_PUBLIC_DEMO_ACCESS` | `lib/demo/config.ts` | Unset. `1` shows the [judge demo](#judge-demo-api) entry points (the demo banner, the mobile menu and the car page) and the `/demo` page, on devnet and localnet only. The routes themselves also need the server variables below. |
 | `NEXT_PUBLIC_E2E` | `lib/solana/e2eBurnerWallet.ts` | Unset. `1` adds the "E2E Burner" wallet to the wallet picker, on any cluster but `mainnet-beta`. It signs with a secret key kept in `localStorage`, for the Playwright suite in `frontend/e2e` ([CONTRIBUTING.md](../CONTRIBUTING.md#end-to-end-tests)), which sets it. Never set it on a deployment. |
@@ -541,7 +587,7 @@ Keys are base58 secret keys or `solana-keygen` JSON arrays. `DEMO_SEED_SECRET=�
 
 ## Indexer API (read by the frontend)
 
-The chain records every revenue deposit (`RevenuePeriod`) and every position, but not how many shares a wallet held when a deposit arrived, nor its past claims (those are `Claimed` events in transaction logs). A wallet's part of each deposit therefore needs an indexer. The frontend reads it from this endpoint when `NEXT_PUBLIC_INDEXER_URL` is set, and validates the answer with Zod (`lib/api/indexer.ts`); without it, `/payouts` lists each deposit with its amount per share, and the totals come from the positions.
+The chain records every revenue deposit (`RevenuePeriod`) and every position, but not how many shares a wallet held when a deposit arrived, nor its past claims (those are `Claimed` events in transaction logs). A wallet's part of each deposit therefore needs an indexer. The backend serves it from its [event index](#program-events-what-is-indexed). The frontend reads it when `NEXT_PUBLIC_INDEXER_URL` is set and validates the answer with Zod (`lib/api/indexer.ts`): `/payouts` takes every figure from it, including the claimed and claimable totals from `projects`, and the portfolio lists the wallet's part of its newest deposits. Without it, `/payouts` lists each deposit with its amount per share, and the totals come from the positions.
 
 ```
 GET /v2/wallets/:wallet/payouts
@@ -550,7 +596,18 @@ GET /v2/wallets/:wallet/payouts
 **Response `200`:**
 ```ts
 interface PayoutHistory {
-  periods: Array<{
+  wallet: string;
+  slot: number | null;    // newest slot the index holds a transaction of: the figures are as of it
+  projects: Array<{       // every project in which the wallet opened a position, in that order
+    project: string;      // project PDA, base58
+    mint: string | null;  // share mint, from the indexed ProjectCreated
+    shares: string;       // u64: shares the wallet holds now
+    claimed: string;      // u64: everything its claims paid out
+    pending: string;      // u64: what `claim` pays now,
+                          // accrued + floor(shares × (acc_per_share − checkpoint) / 2^64)
+  }>;
+  periods: Array<{        // newest first
+    id: number;           // the event's id in the index; ids grow in chain order
     project: string;      // project PDA, base58
     index: number;        // RevenuePeriod.index
     periodStart: number;  // YYYYMMDD
@@ -558,12 +615,13 @@ interface PayoutHistory {
     kind: 'regular' | 'final';
     net: string;          // u64 as a decimal string: paid in for holders, after the fee
     supply: string;       // u64: shares the deposit was split across
-    depositedAt: number;  // unix seconds, RevenuePeriod.deposited_at
+    depositedAt: number;  // unix seconds, the deposit's block time (= RevenuePeriod.deposited_at)
     signature: string;    // deposit transaction
     earned: string;       // u64: what this deposit added to the wallet's position,
                           // floor(shares held × (acc_after − acc_before) / 2^64)
   }>;
-  claims: Array<{
+  claims: Array<{         // newest first
+    id: number;
     project: string;      // project PDA
     amount: string;       // u64, from the Claimed event
     claimedAt: number;    // unix seconds, block time
@@ -572,22 +630,31 @@ interface PayoutHistory {
 }
 ```
 
-`periods` holds the deposits of every project in which the wallet held shares when the deposit was made. Amounts are strings because they can exceed 2^53. Projects the chain does not know are left out; any other answer is shown as a failed read with a retry.
+- **`periods`** holds the deposits of every project in which the wallet held shares when the deposit was made. Amounts are strings because they can exceed 2^53.
+- **`pending` is exact.** The backend replays the wallet's position from the project's events with the program's own math (`math.rs`): the position opens at the accumulator of its `PositionOpened`, `SharesPurchased` and `Refunded` change its shares, and it is settled where the program settles it: on a `SharesTransferred` on either side, a `Claimed` (which then empties it), a `RecoveryExecuted` on either side (which also moves `accrued_moved`), and a `PositionClosed`. Each `RevenueDeposited` moves the accumulator to its `acc_after`. Settling over the whole accumulator can pay one base unit more than the sum of `earned`, which each round down on their own; `pending` is what `claim` pays.
+- `depositedAt` and `claimedAt` are `null` only if the RPC reported no block time for the transaction.
+- A wallet without positions gets empty lists. **`400`:** `wallet` is not a base58 public key.
+- The frontend leaves out projects the chain does not know, and shows any other answer as a failed read with a retry.
 
 ## Published Car Data (read by "Verify")
 
-The chain keeps fingerprints of each car's off-chain records: the telemetry hash chain head (`Project.telemetry_head`, `telemetry_count`, `last_telemetry_date`), each deposit's `report_hash` and `telemetry_head` snapshot (`RevenuePeriod`), and the purchase papers' `acquisition_doc_hash`. The asset page downloads the published records and recomputes every fingerprint in the browser (`lib/verify/`). The layout is the one `scripts/seed-devnet/publish.ts` writes. The backend publishes real cars' days and reports under its own routes ([Published Day](#published-day), [Attested Reports](#attested-reports)) and does not write this layout yet.
+The chain keeps fingerprints of each car's off-chain records: the telemetry hash chain head (`Project.telemetry_head`, `telemetry_count`, `last_telemetry_date`), each deposit's `report_hash` and `telemetry_head` snapshot (`RevenuePeriod`), and the purchase papers' `acquisition_doc_hash`. The asset page downloads the published records and recomputes every fingerprint in the browser (`lib/verify/`).
+
+This is the one layout for published car data. Two publishers write it:
+- **The demo seed** (`scripts/seed-devnet/publish.ts`) writes the fictional fleet's files, served statically from `frontend/public/demo-data` (`NEXT_PUBLIC_PUBLISHED_DATA_URL` defaults to `/demo-data` on test networks).
+- **The backend** serves each car of `FLEET_CONFIG` under `<backend>/published` ([Published Car Data](#published-car-data)).
 
 ```
 GET <base>/<share mint>/index.json
 GET <base>/<share mint>/<file>          every file named by the index
 ```
 
-`index.json` (fields the frontend reads; the seed writes more):
+`index.json` (fields the frontend reads; both publishers write more):
 ```ts
 interface CarIndex {
   mint: string;                 // must equal the share mint in the URL
-  data_origin?: string;         // "devnet-demo-seed" marks fictional demo data
+  data_origin?: string;         // "devnet-demo-seed" marks fictional demo data; the backend
+                                // writes "yandex_fleet", "simulated" or "mixed"
   telemetry: {
     months: Array<{ month: string; file: string }>;   // oldest first, e.g. "telemetry/2026-06.json"
   };
@@ -599,6 +666,7 @@ interface CarIndex {
 A month file:
 ```ts
 interface TelemetryMonth {
+  head_before?: string;   // hex chain head before the month's first day; both publishers write it
   days: Array<{
     record: object;       // the raw daily record; it must carry "date": "YYYY-MM-DD"
     data_hash?: string;   // hex SHA-256 of the record's RFC 8785 canonical JSON
@@ -606,6 +674,11 @@ interface TelemetryMonth {
   }>;
 }
 ```
+
+What the backend writes:
+- **`index.json`**: `schema: "axel.car-data/v1"`, `mint`, `project`, `data_origin` (of the published days; the car's configured source before the first), `telemetry` (`days`, `last_date`, `head`, the chain rule, and `months` with each month's `days` and last `head`), `reports`, and `acquisition: null`: the backend does not hold the purchase documents.
+- **`telemetry/<YYYY-MM>.json`**: `schema: "axel.telemetry.month/v1"`, `mint`, `month`, `data_origin`, `head_before`, `head_after`, and `days` with every `record`, `data_hash` and `head`. Only days whose batch is confirmed on-chain are published, in chain order, starting with the chain's first day. A car whose chain another writer started publishes no days here, since a reader rebuilds the head from 32 zero bytes.
+- **`reports/<report hash>.json`**: the report's canonical text, byte for byte. `reports` in the index lists each report whose deposit the event index has seen, with that deposit's `period_index` and `deposit_tx`. With `INDEXER_ENABLED=false` it stays empty.
 
 The check, in order:
 1. Every `record` is canonicalized (RFC 8785) and hashed with SHA-256; a stated `data_hash` must match.
@@ -616,6 +689,8 @@ The check, in order:
 6. After activation, the acquisition file is compared with `acquisition_doc_hash`.
 
 File paths in the index must be relative `.json` paths inside the car's folder. A missing index (404) is reported as "nothing published".
+
+**Trip data widget.** The asset page's trip data comes from the backend's `GET /telemetry/latest/:mint` for a car of its fleet. For any other car (`available: false`), or when `NEXT_PUBLIC_TELEMETRY_API_URL` is unset, it reads the car's last recorded day from these files (`lib/verify/latestDay.ts`): the month of `Project.last_telemetry_date`, whose days it hashes and chains from the month's `head_before` (from 32 zero bytes through every earlier month when a month file has none). The day is shown only when the rebuilt head equals `Project.telemetry_head`; otherwise the widget says the published data does not match. Stated hashes and heads are not trusted. The widget labels every day with its `data_origin`: Yandex Fleet, simulated, or fictional demo data.
 
 ## Judge Demo API
 

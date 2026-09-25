@@ -1,9 +1,17 @@
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { Test } from '@nestjs/testing';
 import { type ChildProcess, spawn } from 'child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
 import { createServer } from 'net';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { Connection, Keypair, type PublicKey } from '@solana/web3.js';
+import request from 'supertest';
+import type TestAgent from 'supertest/lib/agent';
+
+import { AppModule } from '../app.module';
+import { configureApp } from '../app.setup';
+import { APP_CONFIG, loadAppConfig } from '../config/app-config';
 
 /** The program as `anchor build` writes it in the repository root. */
 export const AXEL_V2_SO = resolve(__dirname, '../../../target/deploy/axel_v2.so');
@@ -152,4 +160,60 @@ export async function startLocalnet(programId: PublicKey): Promise<Localnet> {
     upgradeAuthority,
     stop,
   };
+}
+
+export interface LocalnetBackend {
+  app: NestExpressApplication;
+  http: TestAgent;
+}
+
+/**
+ * The real backend on the validator's RPC and websocket, with `env` on top. The poll runs
+ * once an hour, so after the startup sync only the log subscription brings new events in.
+ */
+export async function startBackend(
+  net: Localnet,
+  databasePath: string,
+  env: Record<string, string> = {},
+): Promise<LocalnetBackend> {
+  const config = loadAppConfig({
+    SOLANA_RPC_URL: net.rpcUrl,
+    SOLANA_CLUSTER: 'localnet',
+    DATABASE_PATH: databasePath,
+    INDEXER_POLL_INTERVAL_MS: '3600000',
+    ...env,
+  });
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(APP_CONFIG)
+    .useValue(config)
+    .compile();
+  const app = moduleRef.createNestApplication<NestExpressApplication>({
+    logger: ['error', 'warn'],
+  });
+  configureApp(app, config);
+  await app.listen(0, '127.0.0.1');
+  return { app, http: request(app.getHttpServer()) };
+}
+
+/**
+ * Asks again every 200 ms until `done` holds, like `expect.poll`: the backend learns about a
+ * confirmed transaction asynchronously, through the websocket or the history.
+ */
+export async function eventually<T>(
+  read: () => Promise<T>,
+  done: (value: T) => boolean,
+  what: string,
+  timeoutMs = 30_000,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = await read();
+    if (done(value)) {
+      return value;
+    }
+    if (Date.now() > deadline) {
+      throw new Error(`Timed out waiting for ${what}; last answer: ${JSON.stringify(value)}`);
+    }
+    await new Promise((wake) => setTimeout(wake, 200));
+  }
 }

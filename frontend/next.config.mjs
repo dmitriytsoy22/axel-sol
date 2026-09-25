@@ -4,8 +4,8 @@ const withNextIntl = createNextIntlPlugin();
 
 /*
  * The browser talks to the Solana RPC node (HTTP and its websocket) and, when configured, to
- * the AXEL backend's telemetry and indexer APIs and to where the cars' data is published, so
- * every configured origin is allowed.
+ * the AXEL backend's telemetry, indexer and KYC APIs and to where the cars' data is published,
+ * so every configured origin is allowed.
  */
 function configuredOrigins() {
   const origins = [];
@@ -17,6 +17,7 @@ function configuredOrigins() {
   for (const api of [
     process.env.NEXT_PUBLIC_TELEMETRY_API_URL,
     process.env.NEXT_PUBLIC_INDEXER_URL,
+    process.env.NEXT_PUBLIC_KYC_API_URL,
     process.env.NEXT_PUBLIC_PUBLISHED_DATA_URL,
   ]) {
     // A path such as /demo-data is on this origin and already allowed by 'self'.
@@ -47,10 +48,33 @@ const connectSources = [
 const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
 const turnstile = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
+/*
+ * The identity check runs Sumsub's WebSDK: a script from its CDN that opens an iframe on its
+ * API, which needs the camera and microphone for the document photo and the selfie video
+ * (docs.sumsub.com, "Get started with WebSDK").
+ */
+const SUMSUB_SCRIPT_ORIGIN = 'https://static.sumsub.com';
+const SUMSUB_API_ORIGIN = 'https://api.sumsub.com';
+const sumsub = Boolean(process.env.NEXT_PUBLIC_KYC_API_URL);
+if (sumsub) connectSources.push(SUMSUB_API_ORIGIN);
+
+const scriptSources = [
+  "'self'",
+  "'unsafe-eval'",
+  "'unsafe-inline'",
+  ...(turnstile ? [TURNSTILE_ORIGIN] : []),
+  ...(sumsub ? [SUMSUB_SCRIPT_ORIGIN] : []),
+];
+const frameSources = [
+  ...(turnstile ? [TURNSTILE_ORIGIN] : []),
+  ...(sumsub ? [SUMSUB_API_ORIGIN] : []),
+];
+const mediaAllow = sumsub ? `(self "${SUMSUB_API_ORIGIN}")` : '()';
+
 const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-eval' 'unsafe-inline'${turnstile ? ` ${TURNSTILE_ORIGIN}` : ''};
-    ${turnstile ? `frame-src ${TURNSTILE_ORIGIN};` : ''}
+    script-src ${scriptSources.join(' ')};
+    ${frameSources.length > 0 ? `frame-src ${frameSources.join(' ')};` : ''}
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data: https://images.unsplash.com;
     font-src 'self';
@@ -100,7 +124,7 @@ const nextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+            value: `camera=${mediaAllow}, microphone=${mediaAllow}, geolocation=(), browsing-topics=()`,
           },
         ],
       },

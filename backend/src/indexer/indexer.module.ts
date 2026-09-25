@@ -8,6 +8,7 @@ import { EventsController } from './events.controller';
 import { INDEXER_RPC, type IndexerRpc, IndexerService, retryDelayMs } from './indexer.service';
 import { IndexerStore } from './indexer.store';
 import { INDEXER_LOGS, type LogStream, WebSocketLogStream } from './log-stream';
+import { PayoutsController } from './payouts.controller';
 
 const HEARTBEAT_MS = 30_000;
 
@@ -33,7 +34,7 @@ const HEARTBEAT_MS = 30_000;
       inject: [APP_CONFIG],
     },
   ],
-  controllers: [EventsController],
-  exports: [IndexerService],
+  controllers: [EventsController, PayoutsController],
+  exports: [IndexerService, IndexerStore],
 })
 export class IndexerModule {}

@@ -79,12 +79,45 @@ describe('PayoutsView', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("shows the wallet's part of each deposit and its claims when an indexer is configured", async () => {
+  it("shows the wallet's part of each deposit, its claims and the indexer's exact totals", async () => {
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
+          wallet: alice.toBase58(),
+          slot: 3_120_560,
+          projects: [
+            {
+              project: operating,
+              mint: fixture.projects.operating.shareMint,
+              shares: '43',
+              claimed: '524691354',
+              pending: '10000001',
+            },
+            // A car the chain does not know is left out.
+            {
+              project: 'Unknown111111111111111111111111111111111111',
+              mint: null,
+              shares: '1',
+              claimed: '5',
+              pending: '5',
+            },
+          ],
           periods: [
             {
+              id: 7,
+              project: operating,
+              index: 1,
+              periodStart: 20261101,
+              periodEnd: 20261130,
+              kind: 'regular',
+              net: '1049382708',
+              supply: '100',
+              depositedAt: null,
+              signature: 'LateSig',
+              earned: '10000001',
+            },
+            {
+              id: 3,
               project: operating,
               index: 0,
               periodStart: 20261001,
@@ -99,6 +132,7 @@ describe('PayoutsView', () => {
           ],
           claims: [
             {
+              id: 5,
               project: operating,
               amount: '524691354',
               claimedAt: 1_791_000_000,
@@ -110,17 +144,23 @@ describe('PayoutsView', () => {
     );
     renderView(alice, INDEXER);
 
-    const [row] = await bodyRows();
+    const [latest, first] = await bodyRows();
     expect(fetchMock).toHaveBeenCalledWith(
       `${INDEXER}/v2/wallets/${alice.toBase58()}/payouts`,
       expect.anything(),
     );
     expect(screen.getByRole('columnheader', { name: /Your part/ })).toBeInTheDocument();
-    expect(within(row).getByText('+524.69 tKZT')).toBeInTheDocument();
-    expect(within(row).getByRole('link')).toHaveAttribute(
+    expect(within(latest).getByText('Payout #1')).toBeInTheDocument();
+    expect(within(latest).getByText('—')).toBeInTheDocument();
+    expect(within(first).getByText('+524.69 tKZT')).toBeInTheDocument();
+    expect(within(first).getByRole('link')).toHaveAttribute(
       'href',
       expect.stringContaining('/tx/DepositSig'),
     );
+    expect(figure('Claimed so far')).toHaveTextContent('524.69 tKZT');
+    expect(figure('Ready to claim')).toHaveTextContent('10 tKZT');
+    expect(figure('Payouts')).toHaveTextContent('2');
+    expect(screen.getByText(/as of Solana slot 3,120,560/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Your claims' })).toBeInTheDocument();
     expect(screen.queryByText(/Read straight from Solana/)).not.toBeInTheDocument();
   });
@@ -132,7 +172,17 @@ describe('PayoutsView', () => {
     expect(
       await screen.findByRole('heading', { name: "Couldn't load your payouts" }),
     ).toBeInTheDocument();
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ periods: [], claims: [] })));
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          wallet: alice.toBase58(),
+          slot: null,
+          projects: [],
+          periods: [],
+          claims: [],
+        }),
+      ),
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(

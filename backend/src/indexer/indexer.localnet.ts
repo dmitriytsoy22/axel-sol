@@ -1,19 +1,18 @@
 import { BN } from '@coral-xyz/anchor';
-import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test } from '@nestjs/testing';
 import { Keypair, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import request from 'supertest';
-import type TestAgent from 'supertest/lib/agent';
 
-import { AppModule } from '../app.module';
-import { configureApp } from '../app.setup';
-import { APP_CONFIG, loadAppConfig } from '../config/app-config';
 import idl from '../solana/idl/axel_v2.json';
 import { AxelClient } from '../testing/axel-client';
-import { type Localnet, startLocalnet } from '../testing/localnet';
+import {
+  eventually,
+  type Localnet,
+  type LocalnetBackend as Backend,
+  startBackend,
+  startLocalnet,
+} from '../testing/localnet';
 
 /**
  * End to end against a real `solana-test-validator` running the built axel_v2 program:
@@ -37,57 +36,6 @@ interface EventBody {
   type: string;
   project: string | null;
   data: Record<string, unknown> | null;
-}
-
-interface Backend {
-  app: NestExpressApplication;
-  http: TestAgent;
-}
-
-/**
- * The real backend on the validator's RPC and websocket. The poll runs once an hour, so
- * after the startup sync only the log subscription can bring new events in.
- */
-async function startBackend(net: Localnet, databasePath: string): Promise<Backend> {
-  const config = loadAppConfig({
-    SOLANA_RPC_URL: net.rpcUrl,
-    SOLANA_CLUSTER: 'localnet',
-    DATABASE_PATH: databasePath,
-    INDEXER_POLL_INTERVAL_MS: '3600000',
-  });
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-    .overrideProvider(APP_CONFIG)
-    .useValue(config)
-    .compile();
-  const app = moduleRef.createNestApplication<NestExpressApplication>({
-    logger: ['error', 'warn'],
-  });
-  configureApp(app, config);
-  await app.listen(0, '127.0.0.1');
-  return { app, http: request(app.getHttpServer()) };
-}
-
-/**
- * Asks again every 200 ms until `done` holds, like `expect.poll`: the backend learns about a
- * confirmed transaction asynchronously, through the websocket or the history.
- */
-async function eventually<T>(
-  read: () => Promise<T>,
-  done: (value: T) => boolean,
-  what: string,
-  timeoutMs = 30_000,
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const value = await read();
-    if (done(value)) {
-      return value;
-    }
-    if (Date.now() > deadline) {
-      throw new Error(`Timed out waiting for ${what}; last answer: ${JSON.stringify(value)}`);
-    }
-    await new Promise((wake) => setTimeout(wake, 200));
-  }
 }
 
 async function allEvents(backend: Backend): Promise<EventBody[]> {

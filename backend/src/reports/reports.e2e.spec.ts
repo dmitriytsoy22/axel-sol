@@ -115,8 +115,11 @@ describe('revenue reports and deposit attestation', () => {
   }
 
   async function publishedDay(date: string): Promise<string> {
-    const response = await t.http.get(`/telemetry/${mint.toBase58()}/${date}.json`).expect(200);
-    return response.text;
+    const response = await t.http
+      .get(`/telemetry/${mint.toBase58()}/proof`)
+      .query({ date })
+      .expect(200);
+    return (response.body as { raw: string }).raw;
   }
 
   beforeEach(async () => {
@@ -323,14 +326,16 @@ describe('revenue reports and deposit attestation', () => {
     const deposit = coder.decode(Buffer.from(signed.message.compiledInstructions[1].data));
     const params = (deposit?.data as { params: { reportHash: number[] } }).params;
     const published = await t.http
-      .get(`/reports/${mint.toBase58()}/${drafted.reportHash}.json`)
+      .get(`/published/${mint.toBase58()}/reports/${drafted.reportHash}.json`)
       .expect(200);
+    expect(published.headers['cache-control']).toBe('public, max-age=31536000, immutable');
     expect(sha256(published.text)).toBe(Buffer.from(params.reportHash).toString('hex'));
     expect(JSON.parse(published.text)).toEqual(drafted.report);
 
     const list = await t.http.get(`/reports/${mint.toBase58()}`).expect(200);
     expect(list.body).toEqual({
       mint: mint.toBase58(),
+      dataOrigin: 'simulated',
       reports: [
         {
           reportHash: drafted.reportHash,
@@ -339,10 +344,11 @@ describe('revenue reports and deposit attestation', () => {
           periodEnd: '2026-09-20',
           gross: drafted.report.deposit.gross,
           dataOrigin: 'simulated',
-          url: `/reports/${mint.toBase58()}/${drafted.reportHash}.json`,
+          url: `/published/${mint.toBase58()}/reports/${drafted.reportHash}.json`,
           attestations: [
             { depositSignature: body.signature, attestedAt: '2026-09-25T06:00:00.000Z' },
           ],
+          drafts: [],
         },
       ],
     });
@@ -360,7 +366,7 @@ describe('revenue reports and deposit attestation', () => {
       differences: ['$.income.rent'],
     });
     const list = await t.http.get(`/reports/${mint.toBase58()}`).expect(200);
-    expect(list.body).toEqual({ mint: mint.toBase58(), reports: [] });
+    expect(list.body).toEqual({ mint: mint.toBase58(), dataOrigin: null, reports: [] });
   });
 
   it.each([

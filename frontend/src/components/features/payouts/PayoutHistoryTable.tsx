@@ -24,7 +24,9 @@ interface PayoutView {
   index: number;
   final: boolean;
   days: string;
+  /** Sorts the rows; 0 when the block time is unknown. */
   depositedAt: number;
+  date: string;
   net: bigint;
   perShare: bigint;
   earned: bigint;
@@ -40,7 +42,8 @@ function toView(row: PayoutRow, locale: string): PayoutView {
     index: row.index,
     final: row.kind === 'final',
     days: `${formatDay(row.periodStart, locale)} – ${formatDay(row.periodEnd, locale)}`,
-    depositedAt: row.depositedAt,
+    depositedAt: row.depositedAt ?? 0,
+    date: row.depositedAt === null ? '—' : formatDate(row.depositedAt, locale),
     net: row.net,
     perShare: row.net / row.supply,
     earned: row.earned ?? 0n,
@@ -89,9 +92,7 @@ export function PayoutHistoryTable({
         header: t('tableDate'),
         accessorKey: 'depositedAt',
         sortable: true,
-        cell: (item) => (
-          <span className="text-muted-foreground">{formatDate(item.depositedAt, locale)}</span>
-        ),
+        cell: (item) => <span className="text-muted-foreground">{item.date}</span>,
       },
       {
         header: t('tableDeposited'),

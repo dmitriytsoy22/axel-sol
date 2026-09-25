@@ -12,8 +12,9 @@ AXEL has five parts:
 - **A NestJS backend** for the jobs that need secrets or a server:
   - binding wallets to Sumsub applicants and writing their KYC records;
   - the daily telemetry job, which publishes each car's day and appends its hash to the chain as the project's oracle;
-  - co-signing revenue deposits whose report matches the published data;
-  - indexing the history of program events for project timelines and claim histories.
+  - co-signing revenue deposits whose report matches the published data, including deposits it drafts for the operator to sign;
+  - publishing each car's data in the layout the app's "Verify" reads;
+  - indexing the history of program events for project timelines, claim histories and each wallet's payouts.
 
   It keeps KYC state, the published days, the attested reports and the indexed events in one SQLite file.
 - **The demo seed** ([`scripts/seed-devnet`](../scripts/seed-devnet/README.md)), which fills a cluster with a fictional fleet in every project state and publishes the files the app verifies.
@@ -30,7 +31,7 @@ AXEL has five parts:
 │ /demo, /api/demo/* (judge routes) · /api/actions/* (Blinks)            │
 │ reads accounts over JSON-RPC, builds transactions from the v2 IDL      │
 └───────┬──────────────────────────────────────────────┬─────────────────┘
-        │ RPC reads + wallet-signed transactions       │ HTTP /telemetry/*, /reports/*, /events
+        │ RPC reads + wallet-signed transactions       │ HTTP /published, /telemetry, /v2, /events
         ▼                                              ▼
 ┌──────────────────────────────────────┐   ┌────────────────────────────────────┐
 │ Solana                               │   │ Backend — NestJS 11 (backend/)     │
@@ -244,12 +245,12 @@ Yandex Fleet API / simulator      Backend                                       
       │ orders, driver profiles,  │ daily job (CRON_SCHEDULE)                        │
       │ rent transactions         │ 1. collect each car's missing days (≤ 31 back)   │
       │ ◄──────────────────────── │    → day record, RFC 8785 text, SHA-256          │
-      │                           │    → SQLite, published at /telemetry/...         │
+      │                           │    → SQLite, published at /published/<mint>/...  │
       │                           │ 2. record_telemetry, ≤ 20 days per tx ─────────► │ Project.telemetry_head
       │                           │                                                  │
- operator wallet ── POST /reports/draft ──► report from published days + expenses    │
- operator wallet ── POST /reports/attest (signed deposit) ──► checks, oracle co-signs│
- operator wallet ── sends deposit_revenue ─────────────────────────────────────────► │ RevenuePeriod.report_hash
+ operator wallet ── POST /v2/deposits/draft (monthly report) ──► checks, the deposit │
+                    co-signed by the oracle comes back; or /reports/draft + /attest  │
+ operator wallet ── signs and sends deposit_revenue ───────────────────────────────► │ RevenuePeriod.report_hash
 ```
 
 1. **Cars.** `FLEET_CONFIG` maps each share mint to a plate, a source (`yandex_fleet` or `simulated`) and the park's fee. The day boundaries follow `FLEET_UTC_OFFSET` (Kazakhstan, `+05:00`).
@@ -259,16 +260,16 @@ Yandex Fleet API / simulator      Backend                                       
      - the rent comes from the park's rent-charge transactions for the drivers currently assigned to the car.
    - If a request fails, the car stops at that day and nothing is invented.
    - Simulated cars use a deterministic generator, and their records say `data_origin: "simulated"`.
-3. **Publishing.** Each day becomes a record whose RFC 8785 text is stored as is, served at `GET /telemetry/:mint/:date.json`, and hashed with SHA-256. The text never changes once collected.
+3. **Publishing.** Each day becomes a record whose RFC 8785 text is stored as is and hashed with SHA-256. The text never changes once collected. Once its batch is confirmed, the day is published in the car's monthly file under `/published/<mint>/`, in the layout the app's "Verify" reads ([api.md](api.md#published-car-data-read-by-verify)).
 4. **Recording.** The oracle key appends the days to the project's chain with `record_telemetry`, 20 per transaction. Each signed batch is stored before it is sent, so after a crash the next run can tell whether it landed.
    - It writes only while the project is Operating or Paused, and only if the project's oracle is its key.
    - It stops if the chain holds a head it did not write.
    - `GET /telemetry/:mint/proof?date=` gives a day's text, hash, chain position, heads and transaction.
 5. **Attesting revenue.**
-   - The operator asks for a draft report for a period. The report adds up the rent from the published days, subtracts the park's fee and the operator's maintenance and insurance items (each with an optional document hash), and gives the deposit amount.
-   - The operator's wallet signs `deposit_revenue` with that report's hash and amount.
-   - The backend rebuilds the report and checks the transaction (only that deposit, nothing else for the oracle to sign). It refuses a period that overlaps an earlier deposit, then adds the oracle's signature.
-   - The report is published at `/reports/:mint/:hash.json`, and its hash is in the deposit's `RevenuePeriod`.
+   - The operator sends its monthly report for a period to `POST /v2/deposits/draft`. The report adds up the rent from the published days, subtracts the park's fee and the operator's maintenance and insurance items (each with an optional document hash), and gives the deposit amount; any figure the operator states must match.
+   - The backend refuses a period that overlaps an earlier deposit, builds `deposit_revenue` for the project's next period with the operator as fee payer, and signs it as the oracle. The operator's wallet adds its signature and sends it. Only one deposit per period index can land, so a draft that is never sent blocks nothing once another deposit takes its index.
+   - The older path still works: the operator's wallet signs a deposit built from `POST /reports/draft`, and `POST /reports/attest` checks the transaction (only that deposit, nothing else for the oracle to sign) before adding the oracle's signature.
+   - The report is published at `/published/<mint>/reports/<hash>.json`, its hash is in the deposit's `RevenuePeriod`, and the car's index lists it once the deposit is indexed.
 
 [api.md](api.md#telemetry-what-is-published) has the record and report formats, the status codes and every check.
 
@@ -278,7 +279,7 @@ Yandex Fleet API / simulator      Backend                                       
 
 ## Event Indexer (v2)
 
-The backend indexes the events `axel_v2` emits, so the frontend can show a car's timeline and an investor's payouts without scanning the chain itself. Endpoints: [api.md](api.md#program-events-what-is-indexed).
+The backend indexes the events `axel_v2` emits, so the frontend can show a car's timeline and an investor's payouts without scanning the chain itself. Endpoints: [api.md](api.md#program-events-what-is-indexed). `GET /v2/wallets/:wallet/payouts` replays each of the wallet's positions from the events with the program's accumulator math, so its `pending` is exactly what a claim pays ([api.md](api.md#indexer-api-read-by-the-frontend)).
 
 ```
 logsSubscribe (confirmed, mentions axel_v2) ── notification ──┐   logs kept, sync starts now
@@ -299,6 +300,7 @@ getSignaturesForAddress(axel_v2, until = cursor), paged to the cursor, then olde
 - The database remembers the genesis hash and program ID it was filled from, and halts on a mismatch.
 - The subscription is a small `ws` client, not web3.js's. web3.js hides its reconnects, so it could not trigger a catch-up, and it keeps a socket reconnecting after shutdown.
 - `npm run test:localnet` runs it against `solana-test-validator` with the built `axel_v2.so`. The test sends real transactions (config, KYC, create, buys, activation, telemetry, a deposit, claims and a hooked transfer), some before the backend starts and some while it runs, then restarts the backend. It checks each event against the chain: the claim against the balance change, and the telemetry head against `Project`.
+- A second local-validator test runs the operator's flow: the backend writes a simulated car's days as its oracle, the operator signs two drafted deposits with a share transfer between them, the published files rebuild the project's telemetry head and each period's `report_hash`, and each holder's `pending` equals the program's settle on the real accounts and what the claim then pays.
 
 ## KYC Flow (v2)
 
@@ -326,8 +328,8 @@ Safety rules:
 - **Fail closed.** Without `SUMSUB_WEBHOOK_SECRET` or the KYC key the webhook answers 503; in production the backend does not start without them ([api.md](api.md#backend-configuration)).
 
 Where the records come from today:
-- The web app does not call `/kyc/nonce` or `/kyc/session` yet and has no Sumsub WebSDK.
-- Its console writes `Investor` records with `set_investor` when the connected wallet holds the KYC key or the demo KYC key.
+- The web app's `/verify` page signs the nonce with the wallet, opens the session and runs the Sumsub WebSDK when `NEXT_PUBLIC_KYC_API_URL` is set ([api.md](api.md#kyc-session)). The approval is written by the webhook above; the page reads the record until it appears.
+- The console writes `Investor` records with `set_investor` when the connected wallet holds the KYC key or the demo KYC key.
 - The judge demo writes DEMO records through its own routes.
 - The Sumsub request shapes have not been run against Sumsub's sandbox.
 
@@ -344,13 +346,14 @@ It uses:
 | Route | What it does | Chain access |
 |---|---|---|
 | `/` | Landing page: figures from the chain (value sold per payment token), the catalog with filters by state, city and class (each shown once the cars differ in it), how it works, Explorer links, risks | `getProgramAccounts` for `Project`, one `getMultipleAccounts` for the share mints' metadata and the payment mints |
-| `/assets/[id]` | Asset page, `id` = share mint: state, price, raise progress with a soft-cap marker, the deadline, the escrow balance read live, a timeline of the state machine, terms and holder count, the buy action, the wallet's shares with a refund for a failed raise, a public "settle the raise" once its outcome is certain, deposit history, "Check the car's data yourself", telemetry, payout calculator | `Project`, the escrow and income vault token accounts (every 15 s), the wallet's `Investor` and `Position`, the car's `Position`s, `RevenuePeriod`s; `buy_shares`, `refund` (with `finalize_raise` first when needed), `finalize_raise` |
-| `/dashboard` | Portfolio: a pending recovery of the wallet's shares with a veto, value, shares, what a claim pays now; per car claim, refund, or send shares; claim all | `RecoveryRequest`s by old owner, `Position`s by owner, `Project`s; `cancel_recovery`, `claim` (up to four per transaction), `refund`, `open_position` + hooked `transfer_checked` |
-| `/payouts` | Deposits of the wallet's cars and its claimed and claimable totals; with an indexer, its part of each deposit and its claims | `Position`s, `RevenuePeriod`s, or the [indexer API](api.md#indexer-api-read-by-the-frontend) |
+| `/assets/[id]` | Asset page, `id` = share mint: state, price, raise progress with a soft-cap marker, the deadline, the escrow balance read live, a timeline of the state machine, terms and holder count, the buy action, the wallet's shares with a refund for a failed raise, a public "settle the raise" once its outcome is certain, deposit history, "Check the car's data yourself", the latest day of trip data with its data origin (from the backend, or from the published files matched to the chain's head), payout calculator | `Project`, the escrow and income vault token accounts (every 15 s), the wallet's `Investor` and `Position`, the car's `Position`s, `RevenuePeriod`s; `buy_shares`, `refund` (with `finalize_raise` first when needed), `finalize_raise` |
+| `/dashboard` | Portfolio: a pending recovery of the wallet's shares with a veto, value, shares, what a claim pays now; per car claim, refund, or send shares; claim all; with an indexer, the wallet's part of its three newest payouts | `RecoveryRequest`s by old owner, `Position`s by owner, `Project`s; `cancel_recovery`, `claim` (up to four per transaction), `refund`, `open_position` + hooked `transfer_checked` |
+| `/payouts` | Deposits of the wallet's cars and its claimed and claimable totals; with an indexer, its part of each deposit, its claims, and the totals as of the index's slot | `Position`s, `RevenuePeriod`s, or the [indexer API](api.md#indexer-api-read-by-the-frontend) |
+| `/verify` | The wallet's record in the KYC registry, and the identity check: a signed nonce, then the Sumsub WebSDK ([api.md](api.md#kyc-session)); without a KYC backend, how to get demo access | The wallet's `Investor` (every 10 s while the page is open) |
 | `/solvency` | Proof of solvency: for every car, the income vault against deposited minus claimed and what holders are owed now, the escrow against (sold − refunded) × price, the share supply against the ledger and the positions, and the revenue checkpoints; checked again every 30 s | Every `Project` and `Position`, then one `getMultipleAccounts` for each car's income vault, escrow and share mint |
 | `/demo` | The judges' path, on a demo deployment (`NEXT_PUBLIC_DEMO_ACCESS=1`, devnet or localnet): demo access, buy in an open raise, shares from the desk, a simulated month, claim, verify, proof of solvency; each step's state read from the chain | The wallet's `Investor`, `Position`s and `Project`s; `claim`. Access, shares and simulated months go through the [demo routes](api.md#judge-demo-api), which send their own transactions |
 | `/api/demo/*`, `/api/actions/*`, `/actions.json` | [Judge demo routes](api.md#judge-demo-api) and [Solana Actions](api.md#solana-actions-blinks) | Server-side: `set_investor`, mint and SOL drip, `open_position` + hooked transfer, `deposit_revenue` co-signed by the oracle (demo); unsigned `buy_shares` and `claim` (Blinks) |
-| `/admin` | Console split by the keys the wallet holds. **Platform admin:** each car's state (settle, activate with the purchase documents' hash, cancel raise, pause, resume, close), its operator and oracle, share recovery (propose, run, withdraw), and the config account. **Operator:** its cars' deposits, keys, live income vault and payout history. **KYC:** looks a wallet's record up, then approves or revokes it; the demo key is stopped before it touches a record it may not change | `Config`, `Project`s, `RecoveryRequest`s, `Investor`; `finalize_raise`, `activate_project`, `cancel_raise`, `pause_project`, `resume_project`, `close_project`, `set_project_roles`, `propose_recovery`, `execute_recovery`, `cancel_recovery`, `set_investor` |
+| `/admin` | Console split by the keys the wallet holds. **Platform admin:** each car's state (settle, activate with the purchase documents' hash, cancel raise, pause, resume, close), its operator and oracle, share recovery (propose, run, withdraw), and the config account. **Operator:** its cars' deposits, keys, live income vault and payout history, and the monthly deposit: the report typed or loaded from a file, the deposit drafted and co-signed by the oracle backend, checked in the browser, then signed by the operator's wallet ([api.md](api.md#deposit-draft-operator-flow)). **KYC:** looks a wallet's record up, then approves or revokes it; the demo key is stopped before it touches a record it may not change | `Config`, `Project`s, `RecoveryRequest`s, `Investor`; `finalize_raise`, `activate_project`, `cancel_raise`, `pause_project`, `resume_project`, `close_project`, `set_project_roles`, `propose_recovery`, `execute_recovery`, `cancel_recovery`, `set_investor`; `deposit_revenue` co-signed by the oracle |
 
 Details:
 
@@ -364,7 +367,7 @@ Details:
 - "Check the car's data yourself" (`components/asset/VerifyData.tsx`, `lib/verify/`) downloads the car's published files ([api.md](api.md#published-car-data-read-by-verify)), rebuilds the telemetry hash chain with the browser's WebCrypto over RFC 8785 canonical JSON, and compares it with the project's `telemetry_head`, `telemetry_count` and `last_telemetry_date`. It also checks every deposit's income report against its `report_hash`, finds the day each deposit's `telemetry_head` snapshot points to, and checks the purchase document against `acquisition_doc_hash`.
 - Proof of solvency (`lib/solana/solvency.ts`) reads the accounts in several RPC calls, so a transaction can land between them; a failed check is read again once before it is reported. The rule that every share account equals its position needs every token account of every share mint and is left to the seed's `verify-invariants` script.
 - Every transaction result is shown in a toast with an Explorer link. Failures are explained in the user's language: every `axel_v2` error code has a message in `messages/*.json` (`ProgramErrors`), and wallet refusals, missing SOL, expired blockhashes and RPC failures have their own (`TxErrors`).
-- Revenue deposits need the oracle's co-signature, which the console cannot produce. The backend's `POST /reports/draft` and `POST /reports/attest` provide it ([Oracle / Telemetry Flow](#oracle--telemetry-flow)), but the console does not call them yet. `create_project` has no UI yet; projects are created by the seed or a script.
+- Revenue deposits need the oracle's co-signature, which the console cannot produce. The backend's `POST /v2/deposits/draft` returns a deposit the oracle already signed, for the operator's wallet to sign and send ([Oracle / Telemetry Flow](#oracle--telemetry-flow)), but the console does not call it yet. `create_project` has no UI yet; projects are created by the seed or a script.
 - Car photos are stock photos picked by make and model (`components/catalog/vehiclePhoto.ts`) and always marked "Illustrative photo": a share mint holds no photo of its car. Credits are in `public/images/CREDITS.md`. Design rules: [`frontend/design.md`](../frontend/design.md).
 - Security headers are set in `next.config.mjs`: a CSP whose `connect-src` allows the public Solana clusters, Helius, a local validator, and the configured RPC, telemetry, indexer and published-data origins; `X-Frame-Options: DENY`; `nosniff`; a Referrer-Policy; and a Permissions-Policy.
 
@@ -385,11 +388,11 @@ Details:
 | Program on LiteSVM (530) | `npm run test:v2` | every instruction, every rejection with its exact error, every state × instruction, authority checks, randomized runs against a BigInt model with the invariants after every step |
 | Program in Rust (35) | `cargo test -p axel-v2` | the math with proptest (no overpayment, bounded dust, no overflow), dates, the telemetry chain, account layouts |
 | SDK (73) | `npm --prefix sdk/axel-v2 test` | the generated client against Anchor's coder for every instruction, account and type |
-| Frontend (522) | `npx vitest run` in `frontend/` | instruction builders against the IDL and `@solana/spl-token`'s hook resolver; readers and payout math against accounts the real program wrote; verification, solvency, demo routes, Blinks and components |
-| Backend (366) | `npm test` in `backend/` | the whole app with only the RPC, Sumsub, Yandex Fleet and the clock replaced; the fake RPC applies `set_investor` and `record_telemetry` as the program does |
-| Backend indexer (1) | `npm run test:localnet` in `backend/` | the indexer against `solana-test-validator` running `axel_v2.so`, including a restart |
+| Frontend (582) | `npx vitest run` in `frontend/` | instruction builders against the IDL and `@solana/spl-token`'s hook resolver; readers and payout math against accounts the real program wrote; verification, solvency, demo routes, Blinks and components; the identity check with a fake Sumsub WebSDK; the operator's drafted deposit, checked and signed, against a fake backend answer signed by a real oracle key |
+| Backend (397) | `npm test` in `backend/` | the whole app with only the RPC, Sumsub, Yandex Fleet and the clock replaced; the fake RPC applies `set_investor` and `record_telemetry` as the program does |
+| Backend on a local validator (2) | `npm run test:localnet` in `backend/` | the indexer against `solana-test-validator` running `axel_v2.so`, including a restart; the operator's drafted deposits, the published files and each holder's exact pending amount against the real accounts |
 | Demo seed (90) | `npm run test:seed` | canonical JSON against RFC 8785, the chain against the program's vectors, keys, the plan, the budget, the ledger model |
-| End to end (3) | `npm run test:e2e` in `frontend/` | the judge path and the KYC refusal against the real app, backend and program on a freshly seeded validator |
+| End to end (4) | `npm run test:e2e` in `frontend/` | the judge path, with the payout history and portfolio read from the backend's index and the trip data widget matched to the chain; the KYC refusal and the identity page; against the real app, backend and program on a freshly seeded validator |
 | v1 (49) | `anchor test --provider.cluster localnet` | the legacy programs on a local validator |
 
 CI (`.github/workflows/ci.yml`) runs the frontend, backend, programs and end-to-end jobs. It also fails when the vendored IDL or the SDK differs from a fresh build. The v1 tests, the backend's `test:localnet` and `test:seed` run locally only.
@@ -419,7 +422,7 @@ These are the known gaps of the current code. None of them is a v1 leftover.
 4. **`close_project` before the `Final` deposit.** Nothing requires the sale proceeds to be deposited before closing. If the admin closes first, they can no longer be deposited on-chain; the admin still cannot take them.
 5. **A stolen key can veto a recovery.** Recovery is designed for lost keys and inheritance, not theft.
 6. **Single keys on devnet.** The admin and the upgrade authority are single keys. The mainnet requirements (Squads multisigs, a recovery delay of at least 72 hours) are documented but not enforced by the program.
-7. **The app is not wired to every backend flow.** It has no Sumsub KYC flow and no operator deposit flow. It does not show the telemetry widget's `dataOrigin`. The payout indexer endpoint (`GET /v2/wallets/:wallet/payouts`) is not served by the backend yet. The backend publishes real cars' days under its own routes, not in the layout "Verify" reads.
+7. **One published data source, and untested outside services.** The app reads published car data from one base URL, so a deployment verifies either the seed's cars (`/demo-data`) or the backend's (`<backend>/published`), not both, and the trip data widget's fallback reads the same base. The backend does not publish the purchase documents of its cars. The Sumsub WebSDK flow and the operator's deposit flow in the console are covered by unit tests with a fake WebSDK and a fake backend answer; neither has run against Sumsub's sandbox or a hosted backend.
 8. **Backend operations.** The backend must run as a single instance (ordering and rate limits live in the process). The KYC and oracle keys are JSON files on disk. The indexer reads at `confirmed` commitment, and days older than 31 are not backfilled.
 9. **Proof of solvency in the browser** skips I3 (every share account equals its position), which needs every token account of every share mint; the seed's `verify-invariants` script checks it.
 10. **Wallets and the hook.** Wallets that do not resolve extra accounts cannot transfer shares on their own. The app builds transfers with the hook's accounts itself.

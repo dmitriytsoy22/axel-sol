@@ -1,8 +1,9 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PublicKey } from '@solana/web3.js';
+import { projectAddress } from '@/lib/solana/pda';
 import { fixture, FixtureNode, key } from '@/lib/solana/__tests__/fixtures/chain';
 import { AppProviders, testWallet } from '@/__tests__/helpers/providers';
 import { shortAddress } from '@/lib/format';
@@ -24,13 +25,34 @@ vi.mock('@/i18n/routing', () => ({
 
 const [alice] = fixture.projects.operating.holders.map(key);
 
-function renderDashboard(owner: PublicKey | null, node = new FixtureNode()) {
+function renderDashboard(
+  owner: PublicKey | null,
+  node = new FixtureNode(),
+  indexerUrl: string | null = null,
+) {
   render(
     <AppProviders connection={node} wallet={testWallet(owner)}>
-      <DashboardView />
+      <DashboardView indexerUrl={indexerUrl} />
     </AppProviders>,
   );
   return node;
+}
+
+/** A deposit of the operating car as the indexer lists it, with Alice's part. */
+function indexedPeriod(index: number, earned: string) {
+  return {
+    id: 10 + index,
+    project: projectAddress(key(fixture.projects.operating.shareMint)).toBase58(),
+    index,
+    periodStart: 20261001 + index * 100,
+    periodEnd: 20261028 + index * 100,
+    kind: 'regular',
+    net: '1000000000',
+    supply: '100',
+    depositedAt: 1_790_900_000 + index * 2_600_000,
+    signature: `Deposit${index}`,
+    earned,
+  };
 }
 
 const figure = (label: string) => screen.getByText(label).closest('div');
@@ -66,6 +88,62 @@ describe('DashboardView', () => {
     expect(
       await screen.findByRole('heading', { name: 'This wallet holds no shares yet' }),
     ).toBeInTheDocument();
+  });
+
+  describe('with an indexer', () => {
+    const INDEXER = 'https://indexer.axel.example';
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("lists the wallet's part of its three newest payouts, newest first", async () => {
+      const fetchMock = vi.fn(
+        async (_url: string) =>
+          new Response(
+            JSON.stringify({
+              wallet: alice.toBase58(),
+              slot: 1,
+              projects: [],
+              periods: [
+                indexedPeriod(3, '4000000'),
+                indexedPeriod(2, '3000000'),
+                indexedPeriod(1, '2000000'),
+                indexedPeriod(0, '1000000'),
+              ],
+              claims: [],
+            }),
+          ),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      renderDashboard(alice, new FixtureNode(), INDEXER);
+
+      const latest = within(
+        (await screen.findByRole('heading', { name: 'Latest payouts' })).closest('section')!,
+      );
+      expect((await latest.findAllByRole('listitem')).map((item) => item.textContent)).toEqual([
+        expect.stringMatching(/Payout #3.*Your part: \+4 tKZT$/),
+        expect.stringMatching(/Payout #2.*Your part: \+3 tKZT$/),
+        expect.stringMatching(/Payout #1.*Your part: \+2 tKZT$/),
+      ]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${INDEXER}/v2/wallets/${alice.toBase58()}/payouts`,
+        expect.anything(),
+      );
+    });
+
+    it('offers a retry when the indexer does not answer', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response('busy', { status: 503 })),
+      );
+      renderDashboard(alice, new FixtureNode(), INDEXER);
+
+      expect(
+        await screen.findByText("Couldn't load your latest payouts from the AXEL event index."),
+      ).toBeInTheDocument();
+      // The holdings come from the chain and stay on screen.
+      expect(screen.getByRole('table')).toBeInTheDocument();
+    });
   });
 
   it('offers a retry when the chain read fails', async () => {

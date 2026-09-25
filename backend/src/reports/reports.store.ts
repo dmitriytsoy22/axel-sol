@@ -23,8 +23,22 @@ export interface Attestation {
   attestedAt: number;
 }
 
+/** A deposit transaction this backend built and co-signed for the operator to sign. */
+export interface DepositDraft {
+  /** The oracle's signature; the transaction ID is the operator's, unknown until it signs. */
+  oracleSignature: string;
+  reportHash: string;
+  mint: string;
+  operator: string;
+  /** The `RevenuePeriod` index the transaction creates; it can land only at that index. */
+  periodIndex: number;
+  recentBlockhash: string;
+  draftedAt: number;
+}
+
 export interface AttestedReport extends StoredReport {
   attestations: { depositSignature: string; attestedAt: number }[];
+  drafts: { periodIndex: number; draftedAt: number }[];
 }
 
 interface ReportRow {
@@ -46,6 +60,21 @@ interface AttestationRow {
   attested_at: number;
 }
 
+interface DraftRow {
+  oracle_signature: string;
+  report_hash: string;
+  mint: string;
+  operator: string;
+  period_index: number;
+  recent_blockhash: string;
+  drafted_at: number;
+}
+
+const INSERT_REPORT = `INSERT INTO revenue_reports
+     (report_hash, mint, kind, period_start, period_end, gross, data_origin, canonical_json, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+   ON CONFLICT (report_hash) DO NOTHING`;
+
 function toReport(row: ReportRow): StoredReport {
   return {
     reportHash: row.report_hash,
@@ -59,6 +88,32 @@ function toReport(row: ReportRow): StoredReport {
   };
 }
 
+function reportValues(report: StoredReport, now: number): (string | number)[] {
+  return [
+    report.reportHash,
+    report.mint,
+    report.kind,
+    report.periodStart,
+    report.periodEnd,
+    report.gross,
+    report.dataOrigin,
+    report.canonical,
+    now,
+  ];
+}
+
+function toDraft(row: DraftRow): DepositDraft {
+  return {
+    oracleSignature: row.oracle_signature,
+    reportHash: row.report_hash,
+    mint: row.mint,
+    operator: row.operator,
+    periodIndex: row.period_index,
+    recentBlockhash: row.recent_blockhash,
+    draftedAt: row.drafted_at,
+  };
+}
+
 function toAttestation(row: AttestationRow): Attestation {
   return {
     depositSignature: row.deposit_signature,
@@ -69,7 +124,10 @@ function toAttestation(row: AttestationRow): Attestation {
   };
 }
 
-/** Attested revenue reports, published by hash, and the deposits the oracle co-signed. */
+/**
+ * Attested revenue reports, published by hash, the operator-signed deposits the oracle
+ * co-signed, and the deposit drafts it co-signed before the operator did.
+ */
 @Injectable()
 export class ReportsStore {
   constructor(@Inject(DATABASE) private readonly db: SqliteDatabase) {}
@@ -77,24 +135,7 @@ export class ReportsStore {
   /** Stores the report (once per hash) and the attestation of one deposit transaction. */
   saveAttested(report: StoredReport, attestation: Attestation, now: number): void {
     this.db.transaction(() => {
-      this.db
-        .prepare(
-          `INSERT INTO revenue_reports
-             (report_hash, mint, kind, period_start, period_end, gross, data_origin, canonical_json, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (report_hash) DO NOTHING`,
-        )
-        .run(
-          report.reportHash,
-          report.mint,
-          report.kind,
-          report.periodStart,
-          report.periodEnd,
-          report.gross,
-          report.dataOrigin,
-          report.canonical,
-          now,
-        );
+      this.db.prepare(INSERT_REPORT).run(...reportValues(report, now));
       this.db
         .prepare(
           `INSERT INTO report_attestations
@@ -108,6 +149,28 @@ export class ReportsStore {
           attestation.mint,
           attestation.recentBlockhash,
           attestation.attestedAt,
+        );
+    })();
+  }
+
+  /** Stores the report (once per hash) and a deposit draft the oracle co-signed for it. */
+  saveDraft(report: StoredReport, draft: DepositDraft, now: number): void {
+    this.db.transaction(() => {
+      this.db.prepare(INSERT_REPORT).run(...reportValues(report, now));
+      this.db
+        .prepare(
+          `INSERT INTO deposit_drafts
+             (oracle_signature, report_hash, mint, operator, period_index, recent_blockhash, drafted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          draft.oracleSignature,
+          draft.reportHash,
+          draft.mint,
+          draft.operator,
+          draft.periodIndex,
+          draft.recentBlockhash,
+          draft.draftedAt,
         );
     })();
   }
@@ -129,6 +192,12 @@ export class ReportsStore {
       )
       .all(mint)
       .map(toAttestation);
+    const drafts = this.db
+      .prepare<[string], DraftRow>(
+        'SELECT * FROM deposit_drafts WHERE mint = ? ORDER BY drafted_at, rowid',
+      )
+      .all(mint)
+      .map(toDraft);
     return this.db
       .prepare<[string], ReportRow>(
         'SELECT * FROM revenue_reports WHERE mint = ? ORDER BY period_start, created_at',
@@ -139,6 +208,9 @@ export class ReportsStore {
         attestations: attestations
           .filter((attestation) => attestation.reportHash === row.report_hash)
           .map(({ depositSignature, attestedAt }) => ({ depositSignature, attestedAt })),
+        drafts: drafts
+          .filter((draft) => draft.reportHash === row.report_hash)
+          .map(({ periodIndex, draftedAt }) => ({ periodIndex, draftedAt })),
       }));
   }
 
@@ -152,5 +224,17 @@ export class ReportsStore {
       )
       .all(mint, end, start)
       .map(toAttestation);
+  }
+
+  /** Deposit drafts of the car whose period overlaps `start`..`end`, or that are final. */
+  conflictingDrafts(mint: string, start: string, end: string): DepositDraft[] {
+    return this.db
+      .prepare<[string, string, string], DraftRow>(
+        `SELECT d.* FROM deposit_drafts d
+           JOIN revenue_reports r ON r.report_hash = d.report_hash
+          WHERE d.mint = ? AND ((r.period_start <= ? AND r.period_end >= ?) OR r.kind = 'final')`,
+      )
+      .all(mint, end, start)
+      .map(toDraft);
   }
 }

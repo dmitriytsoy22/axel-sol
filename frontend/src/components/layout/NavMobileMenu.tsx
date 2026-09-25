@@ -6,7 +6,7 @@ import { usePathname, Link } from '@/i18n/routing';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWalletInfo } from '@/hooks/useWalletInfo';
-import { Copy, FlaskConical, LogOut, Menu, Wallet, X } from 'lucide-react';
+import { Copy, FlaskConical, LogOut, Menu, ShieldCheck, Wallet, X } from 'lucide-react';
 import { buttonClasses } from '@/components/ui/Button';
 import { ConnectionStatus } from '@/components/shared/ConnectionStatus';
 import { formatNumber } from '@/lib/format';
@@ -208,6 +208,14 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
                     <LogOut aria-hidden="true" strokeWidth={1.75} />
                     {tCommon('disconnect')}
                   </button>
+                  <Link
+                    href="/verify"
+                    onClick={() => setIsOpen(false)}
+                    className={buttonClasses({ variant: 'outline', className: 'col-span-2' })}
+                  >
+                    <ShieldCheck aria-hidden="true" strokeWidth={1.75} />
+                    {tNav('verifyIdentity')}
+                  </Link>
                 </div>
               </div>
             ) : (

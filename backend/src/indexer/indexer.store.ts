@@ -68,6 +68,20 @@ interface EventRow {
 }
 
 const CURSOR = 'cursor';
+const EVENT_COLUMNS = 'id, signature, event_index, slot, block_time, type, project, data_json';
+
+function toStoredEvent(row: EventRow): StoredEvent {
+  return {
+    id: row.id,
+    signature: row.signature,
+    index: row.event_index,
+    slot: row.slot,
+    blockTime: row.block_time,
+    type: row.type,
+    project: row.project,
+    data: row.data_json === null ? null : (JSON.parse(row.data_json) as EventData),
+  };
+}
 
 /** Indexed axel_v2 transactions and their events, in chain order. */
 @Injectable()
@@ -169,21 +183,62 @@ export class IndexerStore {
     }
     const where = conditions.length === 0 ? '' : `WHERE ${conditions.join(' AND ')}`;
     const rows = this.db
-      .prepare(
-        `SELECT id, signature, event_index, slot, block_time, type, project, data_json
-         FROM program_events ${where} ORDER BY id DESC LIMIT ?`,
-      )
+      .prepare(`SELECT ${EVENT_COLUMNS} FROM program_events ${where} ORDER BY id DESC LIMIT ?`)
       .all(...params, query.limit) as EventRow[];
-    return rows.map((row) => ({
-      id: row.id,
-      signature: row.signature,
-      index: row.event_index,
-      slot: row.slot,
-      blockTime: row.block_time,
-      type: row.type,
-      project: row.project,
-      data: row.data_json === null ? null : (JSON.parse(row.data_json) as EventData),
-    }));
+    return rows.map(toStoredEvent);
+  }
+
+  /** Every event of `project` of one of `types`, oldest first. */
+  projectEvents(project: string, types: string[]): StoredEvent[] {
+    const rows = this.db
+      .prepare(
+        `SELECT ${EVENT_COLUMNS} FROM program_events
+          WHERE project = ? AND type IN (${types.map(() => '?').join(', ')}) ORDER BY id`,
+      )
+      .all(project, ...types) as EventRow[];
+    return rows.map(toStoredEvent);
+  }
+
+  /** Projects in which `owner` has opened a position, in the order it first did. */
+  positionProjects(owner: string): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT project FROM program_events WHERE owner = ? AND type = 'PositionOpened'
+          GROUP BY project ORDER BY MIN(id)`,
+      )
+      .all(owner) as { project: string }[];
+    return rows.map((row) => row.project);
+  }
+
+  /**
+   * Oldest first: the project's creation and revenue deposits, and every event that changes
+   * `owner`'s position in it, including transfers and recoveries on either side.
+   */
+  positionEvents(project: string, owner: string): StoredEvent[] {
+    const rows = this.db
+      .prepare(
+        `SELECT ${EVENT_COLUMNS} FROM program_events
+          WHERE project = ? AND (
+            type IN ('ProjectCreated', 'RevenueDeposited')
+            OR (owner = ? AND type IN
+              ('PositionOpened', 'SharesPurchased', 'Refunded', 'Claimed', 'PositionClosed'))
+            OR (type = 'SharesTransferred'
+              AND ? IN (json_extract(data_json, '$.from'), json_extract(data_json, '$.to')))
+            OR (type = 'RecoveryExecuted'
+              AND ? IN (json_extract(data_json, '$.fromOwner'), json_extract(data_json, '$.toOwner')))
+          )
+          ORDER BY id`,
+      )
+      .all(project, owner, owner, owner) as EventRow[];
+    return rows.map(toStoredEvent);
+  }
+
+  /** Slot of the newest indexed transaction; `null` while nothing is indexed. */
+  latestSlot(): number | null {
+    const row = this.db.prepare('SELECT MAX(slot) AS slot FROM indexed_transactions').get() as {
+      slot: number | null;
+    };
+    return row.slot;
   }
 
   hasEvent(type: string, project: string): boolean {

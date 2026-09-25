@@ -84,11 +84,6 @@ function telemetryBatches(t: TestApp): { signature: string; dates: number[] }[] 
     }));
 }
 
-async function publishedText(t: TestApp, mint: PublicKey, date: string): Promise<string> {
-  const response = await t.http.get(`/telemetry/${mint.toBase58()}/${date}.json`).expect(200);
-  return response.text;
-}
-
 interface ProofBody {
   raw: string;
   dataHash: string;
@@ -103,6 +98,11 @@ async function proof(t: TestApp, mint: PublicKey, date: string): Promise<ProofBo
     .query({ date })
     .expect(200);
   return response.body as ProofBody;
+}
+
+/** A day's published text, exactly as hashed. */
+async function publishedText(t: TestApp, mint: PublicKey, date: string): Promise<string> {
+  return (await proof(t, mint, date)).raw;
 }
 
 function runJob(t: TestApp): Promise<CarRunReport[]> {
@@ -258,7 +258,10 @@ describe('telemetry oracle', () => {
     ).toEqual([]);
     expect(simulatedRun.collect.collected).toHaveLength(3);
     expect(onChain(t, real.mint)).toMatchObject({ count: 1, lastDate: 20260922 });
-    await t.http.get(`/telemetry/${real.mint.toBase58()}/2026-09-24.json`).expect(404);
+    await t.http
+      .get(`/telemetry/${real.mint.toBase58()}/proof`)
+      .query({ date: '2026-09-24' })
+      .expect(404);
 
     t.yandex.outages.clear();
     const [retry] = await runJob(t);
@@ -449,7 +452,9 @@ describe('telemetry oracle', () => {
 
     expect(report.chain.state).toBe('no_oracle_key');
     expect(telemetryBatches(t)).toEqual([]);
-    await t.http.get(`/telemetry/${car.mint.toBase58()}/2026-09-24.json`).expect(200);
+    const day = await proof(t, car.mint, '2026-09-24');
+    expect(day).toMatchObject({ dataOrigin: 'simulated', chain: null });
+    expect(day.dataHash).toBe(sha256(day.raw).toString('hex'));
   });
 });
 
@@ -486,16 +491,6 @@ describe('published telemetry endpoints', () => {
     await t.app.close();
   });
 
-  it('serves the exact published text as JSON that caches forever', async () => {
-    const response = await t.http.get(`/telemetry/${mint.toBase58()}/2026-09-22.json`).expect(200);
-
-    expect(response.headers['content-type']).toBe('application/json; charset=utf-8');
-    expect(response.headers['cache-control']).toBe('public, max-age=31536000, immutable');
-    expect(sha256(response.text).toString('hex')).toBe(
-      (await proof(t, mint, '2026-09-22')).dataHash,
-    );
-  });
-
   it('proves a day with its text, hash, flag and place in the chain', async () => {
     const body = await proof(t, mint, '2026-09-22');
 
@@ -503,26 +498,31 @@ describe('published telemetry endpoints', () => {
       mint: mint.toBase58(),
       date: '2026-09-22',
       dataOrigin: 'simulated',
-      rawUrl: `/telemetry/${mint.toBase58()}/2026-09-22.json`,
       headFormula: 'sha256(headBefore || u32le(YYYYMMDD) || dataHash)',
       chain: { position: 3 },
     });
     expect(body.record).toEqual(JSON.parse(body.raw));
+    expect(body.dataHash).toBe(sha256(body.raw).toString('hex'));
     expect(body.chain?.headAfter).toBe(
       chainHead([{ date: '2026-09-22', text: body.raw }], body.chain?.headBefore),
     );
   });
 
   it('answers 404 for a day that was not collected and for a car outside the fleet', async () => {
-    await t.http.get(`/telemetry/${mint.toBase58()}/2026-09-19.json`).expect(404);
-    await t.http
-      .get(`/telemetry/${mint.toBase58()}/proof`)
-      .query({ date: '2026-09-25' })
-      .expect(404);
+    for (const date of ['2026-09-19', '2026-09-25']) {
+      await t.http.get(`/telemetry/${mint.toBase58()}/proof`).query({ date }).expect(404);
+    }
     const stranger = Keypair.generate().publicKey.toBase58();
-    const response = await t.http.get(`/telemetry/${stranger}/2026-09-22.json`).expect(404);
+    const response = await t.http
+      .get(`/telemetry/${stranger}/proof`)
+      .query({ date: '2026-09-22' })
+      .expect(404);
 
     expect(response.body).toMatchObject({ message: `${stranger} is not a car of this fleet` });
+  });
+
+  it("serves a day's text only in the car's published data, not at a route of its own", async () => {
+    await t.http.get(`/telemetry/${mint.toBase58()}/2026-09-22.json`).expect(404);
   });
 
   it('answers 400 for a date that is not a day', async () => {
@@ -532,7 +532,6 @@ describe('published telemetry endpoints', () => {
       .expect(400);
 
     expect(response.body).toMatchObject({ message: 'date must be a day as YYYY-MM-DD' });
-    await t.http.get(`/telemetry/${mint.toBase58()}/22-09-2026.json`).expect(400);
   });
 
   it("keeps the asset page widget's shape, with the rent as daily revenue and the data flagged", async () => {
@@ -574,6 +573,15 @@ describe('published telemetry endpoints', () => {
     expect(response.body).toMatchObject({ available: false, dataOrigin: null });
   });
 
+  it('says no data origin for a range without confirmed days', async () => {
+    const response = await t.http
+      .get(`/telemetry/${mint.toBase58()}/chain`)
+      .query({ from: '2026-09-01', to: '2026-09-19' })
+      .expect(200);
+
+    expect(response.body).toMatchObject({ dataOrigin: null, entries: [], truncated: false });
+  });
+
   it('lists confirmed chain entries between two dates, in chain order', async () => {
     const response = await t.http
       .get(`/telemetry/${mint.toBase58()}/chain`)
@@ -585,6 +593,7 @@ describe('published telemetry endpoints', () => {
     };
 
     expect(body.truncated).toBe(false);
+    expect(response.body).toMatchObject({ dataOrigin: 'simulated' });
     expect(body.entries.map((entry) => [entry.date, entry.position])).toEqual([
       ['2026-09-21', 2],
       ['2026-09-22', 3],

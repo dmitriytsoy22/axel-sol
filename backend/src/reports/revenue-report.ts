@@ -271,6 +271,47 @@ export function buildReport(input: ReportInput, context: ReportContext): Revenue
   };
 }
 
+/**
+ * JSON paths of the fields `stated` gives that the rebuilt report lacks or holds with another
+ * value, at most `limit` of them. Fields `stated` leaves out are not compared, so a submission
+ * may carry only the operator's part or the whole report.
+ */
+export function statedDifferences(rebuilt: unknown, stated: unknown, limit = 20): string[] {
+  const found: string[] = [];
+  const walk = (a: unknown, b: unknown, path: string): void => {
+    if (found.length >= limit) {
+      return;
+    }
+    if (isRecord(b)) {
+      if (!isRecord(a)) {
+        found.push(path);
+        return;
+      }
+      Object.keys(b)
+        .sort()
+        .forEach((key) => walk(a[key], b[key], `${path}.${key}`));
+      return;
+    }
+    if (Array.isArray(b)) {
+      if (!Array.isArray(a)) {
+        found.push(path);
+        return;
+      }
+      if (a.length !== b.length) {
+        found.push(`${path} (length)`);
+        return;
+      }
+      b.forEach((item, index) => walk(a[index], item, `${path}[${index}]`));
+      return;
+    }
+    if (a !== b) {
+      found.push(path);
+    }
+  };
+  walk(rebuilt, stated, '$');
+  return found;
+}
+
 /** JSON paths at which two values differ, at most `limit` of them. */
 export function differences(expected: unknown, actual: unknown, limit = 20): string[] {
   const found: string[] = [];

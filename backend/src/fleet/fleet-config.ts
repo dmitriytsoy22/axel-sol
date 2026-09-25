@@ -10,6 +10,18 @@ export type DataOrigin = 'yandex_fleet' | 'simulated';
 
 export const DATA_ORIGINS: readonly DataOrigin[] = ['yandex_fleet', 'simulated'];
 
+/** The origin of several records: `mixed` when they do not all come from the same place. */
+export type CombinedOrigin = DataOrigin | 'mixed';
+
+/** One origin, `mixed` for several, `null` for no records at all. */
+export function combineOrigins(origins: Iterable<CombinedOrigin>): CombinedOrigin | null {
+  const distinct = [...new Set(origins)];
+  if (distinct.length === 0) {
+    return null;
+  }
+  return distinct.length === 1 ? distinct[0] : 'mixed';
+}
+
 interface FleetCarBase {
   mint: PublicKey;
   /** `mint` in base58, the key used in URLs and storage. */

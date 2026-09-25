@@ -11,6 +11,8 @@ export const PROGRAM_ERRORS: ReadonlyMap<number, string> = new Map(
 /** Messages of failures that are not axel_v2 errors, in the `TxErrors` namespace. */
 export type TxErrorKey =
   | 'walletNotConnected'
+  | 'cannotSign'
+  | 'walletChangedTransaction'
   | 'rejected'
   | 'insufficientSol'
   | 'insufficientFunds'

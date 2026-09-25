@@ -115,7 +115,7 @@ function AssetDetails({ project, onChanged }: { project: Project; onChanged: () 
           </div>
           <CarPayouts project={project} />
           <VerifyData project={project} />
-          <TelemetryWidget projectId={project.shareMint.toBase58()} />
+          <TelemetryWidget project={project} />
           <PayoutCalculator project={project} />
         </div>
       </div>

@@ -39,3 +39,26 @@ export async function indexedClaimTotals(
   }
   return ((await response.json()) as { totals: ClaimTotal[] }).totals;
 }
+
+export interface IndexedPayouts {
+  projects: {
+    project: string;
+    mint: string | null;
+    shares: string;
+    claimed: string;
+    pending: string;
+  }[];
+  periods: { project: string; index: number; earned: string }[];
+}
+
+/** `GET /v2/wallets/:wallet/payouts` of the backend: the wallet's payouts, replayed from its event index. */
+export async function indexedPayouts(
+  request: APIRequestContext,
+  owner: PublicKey,
+): Promise<IndexedPayouts> {
+  const response = await request.get(`${URLS.backend}/v2/wallets/${owner.toBase58()}/payouts`);
+  if (!response.ok()) {
+    throw new Error(`The backend answered ${response.status()}: ${await response.text()}`);
+  }
+  return (await response.json()) as IndexedPayouts;
+}

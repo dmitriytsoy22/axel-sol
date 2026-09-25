@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { FlaskConical, Loader2 } from 'lucide-react';
+import { FlaskConical, Loader2, ShieldCheck } from 'lucide-react';
 import type { PositionAccount } from '@/lib/solana/accounts';
 import type { Project } from '@/types/project';
 import { Button, buttonClasses } from '@/components/ui/Button';
@@ -15,6 +15,7 @@ import { finalizeOutcome, isRefundable } from '@/lib/solana/lifecycle';
 import { holdsEscrow } from '@/lib/solana/solvency';
 import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
 import { DEMO_ACCESS_SHOWN } from '@/lib/demo/config';
+import { KYC_API_URL } from '@/lib/api/kyc';
 import { CountdownTimer } from './CountdownTimer';
 import { EscrowBalance } from './EscrowBalance';
 import { InvestButton } from './InvestButton';
@@ -41,6 +42,9 @@ const STATE_HELPER: Record<Exclude<SaleState, 'open'>, string> = {
   failed: 'helperFailed',
   closed: 'helperClosed',
 };
+
+/** Records an identity check can change: none yet, lapsed, revoked, or a demo record. */
+const CHECK_HELPS: readonly Approval[] = ['unverified', 'expired', 'revoked', 'demoNotAllowed'];
 
 const APPROVAL_HELPER: Record<Exclude<Approval, 'checking'>, string> = {
   eligible: 'helperEligible',
@@ -177,13 +181,31 @@ export function InvestPanel({
           {t(helper, { date: formatDate(project.activationDeadline, locale) })}
         </p>
       )}
+      {KYC_API_URL &&
+        connected &&
+        (saleState === 'open' || saleState === 'operating') &&
+        CHECK_HELPS.includes(approval) && (
+          <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
+            <p className="text-small text-muted-foreground">{t('kycHint')}</p>
+            <Link
+              href="/verify"
+              className={buttonClasses({ variant: 'outline', className: 'w-full' })}
+            >
+              <ShieldCheck aria-hidden="true" strokeWidth={1.75} />
+              {t('verifyIdentity')}
+            </Link>
+          </div>
+        )}
       {DEMO_ACCESS_SHOWN &&
         project.allowsDemo &&
         (saleState === 'open' || saleState === 'operating') &&
         (!connected || approval === 'unverified' || approval === 'expired') && (
           <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
             <p className="text-small text-muted-foreground">{t('demoAccessHint')}</p>
-            <Link href="/demo" className={buttonClasses({ variant: 'outline', className: 'w-full' })}>
+            <Link
+              href="/demo"
+              className={buttonClasses({ variant: 'outline', className: 'w-full' })}
+            >
               <FlaskConical aria-hidden="true" strokeWidth={1.75} />
               {t('getDemoAccess')}
             </Link>

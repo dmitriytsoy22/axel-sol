@@ -44,11 +44,13 @@ Frontend:
 - [x] Moved to `axel_v2`: client, hooks, amounts in the payment token, the six project states, KYC records, escrowed buys, refunds, claims, hooked transfers ([architecture.md](architecture.md#frontend))
 - [x] v2 screens: soft-cap marker, live escrow, state timeline, refund dialog, in-browser verification of telemetry, reports and purchase papers, Proof of solvency, recovery flows, console split by role, demo data banner
 - [x] Judge demo path (`/demo` and the `/api/demo` routes) and Solana Actions for investing and claiming ([api.md](api.md#judge-demo-api))
+- [x] Wired to the backend: identity checks on `/verify` (signed nonce, then the Sumsub WebSDK), the operator's monthly deposit in the console (drafted and co-signed by the oracle, checked in the browser, signed by the operator's wallet), payouts and the portfolio from the indexer, and the trip data widget with its data origin, falling back to the published files matched to the chain's head ([api.md](api.md#frontend-environment))
 
 Backend:
 - [x] KYC on v2: wallet sign-in, Sumsub sessions bound to the wallet, a hardened webhook that writes `set_investor` with a dedicated key, CORS, rate limits, startup checks ([api.md](api.md#backend-http-endpoints))
 - [x] The v2 oracle: several cars, the rent model, published RFC 8785 days, crash-safe `record_telemetry` batches, attested revenue reports, simulated data flagged and refused on mainnet ([architecture.md](architecture.md#oracle--telemetry-flow))
 - [x] Event indexer: program history plus a live log subscription in SQLite, `GET /events`, project histories and claim totals, tested against `solana-test-validator` ([architecture.md](architecture.md#event-indexer-v2))
+- [x] Wiring: the payouts API the frontend reads (`GET /v2/wallets/:wallet/payouts`, with `pending` replayed exactly from the events), each car's data published in the layout "Verify" reads, `dataOrigin` on every telemetry and report response, and the operator's deposit flow (`POST /v2/deposits/draft`), tested against `solana-test-validator` ([api.md](api.md#deposit-draft-operator-flow))
 
 Demo data and integration:
 - [x] Demo seed ([scripts/seed-devnet](../scripts/seed-devnet/README.md)): a fictional fleet in every project state, an idempotent and resumable executor, the SOL budget, publishing, and proof of solvency (I1–I5). It ran on local validators at every scale.
@@ -69,10 +71,8 @@ Demo data and integration:
 
 These close the open items in [architecture.md](architecture.md#known-limitations).
 
-- [ ] KYC in the web app: sign in with the wallet, then the Sumsub WebSDK with the token from `POST /kyc/session`; one sandbox run to confirm the Sumsub request formats
-- [ ] The operator's attested deposit flow in the console (`POST /reports/draft` → operator signs → `POST /reports/attest` → send), and the telemetry widget's `dataOrigin` label
-- [ ] Serve the indexer API the frontend reads payout history from ([api.md](api.md#indexer-api-read-by-the-frontend)) from the backend's event index
-- [ ] Publish real cars' telemetry, income reports and purchase papers from the backend in the layout "Verify" reads ([api.md](api.md#published-car-data-read-by-verify))
+- [ ] One Sumsub sandbox run, through `/verify` and the webhook, to confirm the request formats and the WebSDK's messages
+- [ ] Publish real cars' purchase papers from the backend, and let one deployment verify both the seed's cars and the backend's ([api.md](api.md#published-car-data-read-by-verify))
 - [ ] Run the Yandex Fleet requests against a real park's credentials: the orders, driver profiles and transactions formats, and the rent category
 - [ ] Require the `Final` deposit before `close_project`, or make the order explicit in the console
 - [ ] Project creation in the console

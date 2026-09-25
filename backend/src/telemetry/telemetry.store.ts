@@ -26,6 +26,11 @@ export interface StoredDay {
   chain: ChainLink | null;
 }
 
+/** A day whose batch landed: it is in the on-chain chain at `chain.position`. */
+export interface ConfirmedDay extends StoredDay {
+  chain: ChainLink;
+}
+
 export interface Submission {
   signature: string;
   mint: string;
@@ -88,6 +93,10 @@ function requireLink(row: DayRow): ChainLink {
     throw new Error(`${row.mint} ${row.date} is in a batch but has no chain position`);
   }
   return link;
+}
+
+function toConfirmedDay(row: DayRow): ConfirmedDay {
+  return { ...toDay(row), chain: requireLink(row) };
 }
 
 function toDay(row: DayRow): StoredDay {
@@ -178,6 +187,17 @@ export class TelemetryStore {
       )
       .all(mint, start, end, limit)
       .map(toDay);
+  }
+
+  /** Every confirmed day of a car, in chain order. */
+  confirmedChain(mint: string): ConfirmedDay[] {
+    return this.db
+      .prepare<[string], DayRow>(
+        `SELECT * FROM telemetry_days WHERE mint = ? AND confirmed_at IS NOT NULL
+          ORDER BY chain_position`,
+      )
+      .all(mint)
+      .map(toConfirmedDay);
   }
 
   /** Link of the newest confirmed day: the chain state this backend last saw. */

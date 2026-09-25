@@ -27,7 +27,7 @@ const RelativeFile = z
 
 const Hex32 = z.string().regex(/^[0-9a-fA-F]{64}$/, 'expected 32 bytes of hex');
 
-const IndexSchema = z.object({
+export const IndexSchema = z.object({
   mint: z.string(),
   data_origin: z.string().optional(),
   telemetry: z.object({
@@ -48,7 +48,9 @@ const IndexSchema = z.object({
   acquisition: z.object({ file: RelativeFile }).nullable(),
 });
 
-const MonthSchema = z.object({
+export const MonthSchema = z.object({
+  /** The chain head before the month's first day; both publishers write it. */
+  head_before: Hex32.optional(),
   days: z.array(
     z.object({
       record: z.record(z.string(), z.unknown()),

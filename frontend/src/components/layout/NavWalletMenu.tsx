@@ -5,7 +5,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWalletInfo } from '@/hooks/useWalletInfo';
-import { Copy, LogOut, Wallet } from 'lucide-react';
+import { Copy, LogOut, ShieldCheck, Wallet } from 'lucide-react';
+import { Link } from '@/i18n/routing';
 import { buttonClasses } from '@/components/ui/Button';
 import { formatNumber } from '@/lib/format';
 
@@ -36,6 +37,7 @@ export function useCopyAddress(publicKey: string | null): {
 
 export const NavWalletMenu = (): JSX.Element => {
   const tCommon = useTranslations('Common');
+  const tNav = useTranslations('Navigation');
   const locale = useLocale();
   const { disconnect, connected } = useWallet();
   const { setVisible } = useWalletModal();
@@ -120,6 +122,14 @@ export const NavWalletMenu = (): JSX.Element => {
             <Copy aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
             <span aria-live="polite">{copied ? tCommon('copied') : tCommon('copyAddress')}</span>
           </button>
+          <Link
+            href="/verify"
+            onClick={() => setOpen(false)}
+            className="flex h-10 w-full items-center gap-2 rounded-control px-2 text-small text-foreground no-underline transition-colors duration-fast ease-move hover:bg-secondary"
+          >
+            <ShieldCheck aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+            {tNav('verifyIdentity')}
+          </Link>
           <button
             id="wallet-disconnect"
             type="button"
