@@ -141,7 +141,7 @@ async function main() {
       year: YEAR,
       valuationSol: new BN(CAR_COST_SOL * LAMPORTS_PER_SOL),
     })
-    .accounts({
+    .accountsPartial({
       admin: admin.publicKey,
       mint: mint.publicKey,
       projectState: projectStatePda,

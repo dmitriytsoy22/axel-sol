@@ -395,7 +395,7 @@ Details:
 | End to end (4) | `npm run test:e2e` in `frontend/` | the judge path, with the payout history and portfolio read from the backend's index and the trip data widget matched to the chain; the KYC refusal and the identity page; against the real app, backend and program on a freshly seeded validator |
 | v1 (49) | `anchor test --provider.cluster localnet` | the legacy programs on a local validator |
 
-CI (`.github/workflows/ci.yml`) runs the frontend, backend, programs and end-to-end jobs. It also fails when the vendored IDL or the SDK differs from a fresh build. The v1 tests, the backend's `test:localnet` and `test:seed` run locally only.
+CI (`.github/workflows/ci.yml`) runs the frontend, backend, demo seed, programs, backend localnet and end-to-end jobs. It also fails when the vendored IDL or the SDK differs from a fresh build. The v1 tests are typechecked in CI but run locally only.
 
 ## Security Properties (v2, as implemented)
 

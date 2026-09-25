@@ -89,6 +89,21 @@ const cspHeader = `
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  /*
+   * Next 14 shows middleware a request on a loopback address (127.0.0.1, [::1]) as
+   * http://localhost, and rewrites its rewrite and redirect URLs back to localhost, while the
+   * server compares them with the address it is bound to. Bound with --hostname 127.0.0.1, the
+   * locale middleware's rewrite of an English page then looked external: it was proxied to
+   * http://localhost, whose answer redirected the browser there, and on to the same redirect.
+   * Unnormalized, middleware gets the server's own URL, so its rewrites stay internal and its
+   * redirects keep the address the browser used.
+   */
+  skipMiddlewareUrlNormalize: true,
+  env: {
+    // Next inlines a NEXT_PUBLIC_ variable only when it is set. Defining this one always lets a
+    // build without it drop the e2e burner wallet's import (providers/WalletProvider.tsx).
+    NEXT_PUBLIC_E2E: process.env.NEXT_PUBLIC_E2E ?? '',
+  },
   images: {
     remotePatterns: [
       {

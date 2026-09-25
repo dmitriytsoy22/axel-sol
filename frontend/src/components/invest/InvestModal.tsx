@@ -11,7 +11,7 @@ import { usePaymentBalance } from '@/hooks/usePaymentBalance';
 import { useRaise } from '@/hooks/useRaise';
 import { Link } from '@/i18n/routing';
 import { durationParts, formatCount, formatDate, formatTokenAmount } from '@/lib/format';
-import { ON_TEST_NETWORK } from '@/lib/network';
+import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
 import { carTitle } from '@/lib/solana/tokens';
 import type { Project } from '@/types/project';
 
@@ -226,7 +226,11 @@ export function InvestModal({
             {t('confirmInvest')}
           </Button>
 
-          {ON_TEST_NETWORK && <p className="text-small text-muted-foreground">{t('devnetNote')}</p>}
+          {ON_TEST_NETWORK && (
+            <p className="text-small text-muted-foreground">
+              {t('devnetNote', { network: NETWORK_NAME })}
+            </p>
+          )}
         </div>
       )}
     </Modal>

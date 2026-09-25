@@ -63,7 +63,7 @@ npm run start:prod    # node dist/main
 
 Cars come from `FLEET_CONFIG`. A `simulated` car needs no credentials and is published with `data_origin: "simulated"`, while a `yandex_fleet` car needs the `YANDEX_*` credentials. `backend/.env.example` documents every variable the backend reads.
 
-Backend tests boot the real `AppModule` (`src/testing/test-app.ts`) and replace only the outside world: the Solana RPC with `FakeRpc`, which checks signatures and applies `set_investor` with the IDL coder, the program's history and log subscription with `FakeLedger`, whose logs carry events encoded by the IDL coder, the Sumsub API with `FakeSumsub`, which checks request signatures, and the clock. The indexer is off in `createTestApp` unless a test sets `INDEXER_ENABLED=true`. `npm run test:localnet` (`*.localnet.ts`) starts its own `solana-test-validator` on free ports with `target/deploy/axel_v2.so` and sends real transactions; it is not part of `npm test` or CI. The v2 IDL is vendored in `backend/src/solana/idl/`; `npm run export-idl` in the root refreshes it with the frontend copy.
+Backend tests boot the real `AppModule` (`src/testing/test-app.ts`) and replace only the outside world: the Solana RPC with `FakeRpc`, which checks signatures and applies `set_investor` with the IDL coder, the program's history and log subscription with `FakeLedger`, whose logs carry events encoded by the IDL coder, the Sumsub API with `FakeSumsub`, which checks request signatures, and the clock. The indexer is off in `createTestApp` unless a test sets `INDEXER_ENABLED=true`. `npm run test:localnet` (`*.localnet.ts`) starts its own `solana-test-validator` on free ports with `target/deploy/axel_v2.so` and sends real transactions; it is not part of `npm test`, and CI runs it in the `backend-localnet` job with the program the programs job built. The v2 IDL is vendored in `backend/src/solana/idl/`; `npm run export-idl` in the root refreshes it with the frontend copy.
 
 ## End-to-end tests
 
@@ -72,7 +72,7 @@ Backend tests boot the real `AppModule` (`src/testing/test-app.ts`) and replace 
 1. `solana-test-validator` from an empty ledger, with `target/deploy/axel_v2.so` loaded as an upgradeable program.
 2. The demo seed at `--scale tiny` with a random `DEMO_SEED_SECRET`, while `npm run build` compiles the backend. The seed takes about two minutes, most of it waiting for the failed raise's deadline.
 3. The demo routes' keys from `frontend/scripts/demo-env.mjs`, and 5 SOL airdropped to the demo faucet.
-4. A file server for the seed's published files, the backend with the event indexer, and `next dev` with `NEXT_PUBLIC_E2E=1`, reading trip data and payouts from that backend (`NEXT_PUBLIC_TELEMETRY_API_URL`, `NEXT_PUBLIC_INDEXER_URL`). The setup waits until the indexer has caught up with the seeded chain and `next dev` has compiled every page the tests open.
+4. A file server for the seed's published files, the backend with the event indexer, and `next dev` bound to 127.0.0.1 with `NEXT_PUBLIC_E2E=1`, reading trip data and payouts from that backend (`NEXT_PUBLIC_TELEMETRY_API_URL`, `NEXT_PUBLIC_INDEXER_URL`). The setup waits until the indexer has caught up with the seeded chain and `next dev` has compiled every page the tests open.
 
 | Service | URL |
 | :--- | :--- |
@@ -96,8 +96,9 @@ The seed installs its own dependencies (`npm run seed:deps`). The tests:
 
 - `judge-path.spec.ts`, the judge path on `/demo`: connect a wallet, get demo access, buy a share in the open raise, receive the desk's shares of the Demo Fleet car, simulate a month and claim it, verify that car's published data in the browser, and open the proof of solvency. The claim is also checked outside the app: the wallet's tKZT balance on the validator grew by exactly the amount the page showed, which is also what the backend's `GET /v2/wallets/:wallet/payouts` said was pending, and the backend's `GET /positions/:owner/claims` and payouts recorded that amount. The payout history and the portfolio then show that amount as the wallet's part of the simulated month, read from the same index. On the fleet car's page, the trip data widget shows the seed's last published day (the backend runs no oracle for the seeded cars), matched to the chain's telemetry head.
 - `kyc-required.spec.ts`: a wallet without a KYC record sees a disabled "Wallet not verified" button and no way to buy, and the invest Blink refuses to build a purchase for it. On `/verify` it sees that it has no record and, since the stack runs no Sumsub, is pointed to demo access.
+- `locale-routing.spec.ts`: English pages open without a prefix and `/en/…` redirects to them, `/ru/…` stays Russian, and the language menu switches between them, all on the address the browser opened. `next.config.mjs` sets `skipMiddlewareUrlNormalize` for this: Next 14 otherwise shows the locale middleware a request to 127.0.0.1 as `localhost`, and with `--hostname 127.0.0.1` every English page redirected to itself on `http://localhost`.
 
-**Wallet.** A build with `NEXT_PUBLIC_E2E=1` adds "E2E Burner" to the wallet picker, on any cluster but mainnet (`lib/solana/e2eBurnerWallet.ts`). It signs transactions and messages with the secret key stored in `localStorage` under `axel:e2e-burner-secret-key`, or creates one there, so a reload stays the same wallet. Each test stores a new key before the app loads and picks the burner in the wallet dialog, so every test has a wallet of its own. Never set `NEXT_PUBLIC_E2E` on a deployment.
+**Wallet.** A build with `NEXT_PUBLIC_E2E=1` adds "E2E Burner" to the wallet picker, on any cluster but mainnet (`lib/solana/e2eBurnerWallet.ts`). `providers/WalletProvider.tsx` loads it with a dynamic import behind that flag, which `next.config.mjs` always defines, so any other build drops it; the frontend CI job checks that its production build has no trace of the burner. It signs transactions and messages with the secret key stored in `localStorage` under `axel:e2e-burner-secret-key`, or creates one there, so a reload stays the same wallet. Each test stores a new key before the app loads and picks the burner in the wallet dialog, so every test has a wallet of its own. Never set `NEXT_PUBLIC_E2E` on a deployment.
 
 **Isolation.** Nothing carries over between runs: a new ledger, new keys, a new backend database, and demo limits (3 access grants per IP address per day, one simulated month a minute) that live in the memory of the new dev server. Those limits also make the judge path one scenario per run, so `--repeat-each` does not apply to it. Retries are off; a red test is a bug to find, not to rerun.
 
@@ -113,14 +114,14 @@ Run from the repository root:
 npm install                              # test and codegen dependencies
 anchor build                             # target/deploy/*.so, target/idl, target/types
 anchor test --provider.cluster localnet  # local validator + tests/**/*.ts
-npm run lint                             # tsc --noEmit over tests/ and scripts/ (needs anchor build)
+npm run lint                             # tsc --noEmit over tests/ and scripts/ (needs anchor build; CI runs it)
 cargo test -p axel-v2                    # v2 math (unit + proptest), dates, telemetry chain, account layouts
 npm run test:v2                          # v2 program on LiteSVM (needs anchor build; reinstalls tests-v2 deps when its lockfile changes)
 npm run export-idl                       # copy target/idl/axel_v2.json and target/types/axel_v2.ts into frontend/src/lib/solana/idl-v2
 npm run generate                         # regenerate sdk/axel-v2 from target/idl/axel_v2.json
 npm --prefix sdk/axel-v2 ci && npm --prefix sdk/axel-v2 test   # generated client against the IDL
 npx tsx scripts/init-project.ts --cluster devnet   # create a project; admin = ~/.config/solana/id.json
-npm run test:seed                        # v2 demo seed unit tests (no validator)
+npm run test:seed                        # v2 demo seed unit tests (no validator; CI runs them)
 npm run seed:validator                   # local validator with axel_v2 as upgradeable program (needs anchor build)
 npm run seed -- --scale tiny             # seed it; needs DEMO_SEED_SECRET, see scripts/seed-devnet/README.md
 ```

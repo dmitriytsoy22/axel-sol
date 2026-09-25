@@ -131,7 +131,7 @@ describe("transfer-hook execute", () => {
 
     await hookProgram.methods
       .initializeExtraAccountMetaList()
-      .accounts({
+      .accountsPartial({
         payer: admin.publicKey,
         mint: mint.publicKey,
         extraAccountMetaList: extraAccountMetaListPda,
@@ -180,7 +180,7 @@ describe("transfer-hook execute", () => {
 
     await axelProgram.methods
       .addToWhitelist(sender.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: senderWl,
         systemProgram: SystemProgram.programId,
@@ -190,7 +190,7 @@ describe("transfer-hook execute", () => {
 
     await axelProgram.methods
       .addToWhitelist(receiver.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: receiverWl,
         systemProgram: SystemProgram.programId,
@@ -271,7 +271,7 @@ describe("transfer-hook execute", () => {
 
     await axelProgram.methods
       .removeFromWhitelist(sender.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: senderWl,
       })
@@ -306,7 +306,7 @@ describe("transfer-hook execute", () => {
     // Re-whitelist sender for any subsequent tests
     await axelProgram.methods
       .addToWhitelist(sender.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: senderWl,
         systemProgram: SystemProgram.programId,

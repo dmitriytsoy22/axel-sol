@@ -111,7 +111,7 @@ describe("record_telemetry", () => {
         year: 2023,
         valuationSol: new BN(10 * LAMPORTS_PER_SOL),
       })
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         mint: mint.publicKey,
         projectState: projectStatePda,
@@ -208,7 +208,7 @@ describe("record_telemetry", () => {
     try {
       await strangerProgram.methods
         .recordTelemetry(date, sampleHash())
-        .accounts({
+        .accountsPartial({
           oracle: stranger.publicKey,
           projectState: projectStatePda,
           telemetryRecord: telemetryPda,

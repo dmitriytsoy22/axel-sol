@@ -89,7 +89,7 @@ async function initProject(
       year: 2023,
       valuationSol: new BN(carCost),
     })
-    .accounts({
+    .accountsPartial({
       admin: admin.publicKey,
       mint: mint.publicKey,
       projectState: projectStatePda,
@@ -132,7 +132,7 @@ describe("revoke_mint_authority", () => {
     try {
       await program.methods
         .revokeMintAuthority()
-        .accounts({
+        .accountsPartial({
           admin: admin.publicKey,
           projectState: projectStatePda,
           mint: mint.publicKey,
@@ -166,7 +166,7 @@ describe("revoke_mint_authority", () => {
     const [whitelistPda] = findWhitelistPda(investor.publicKey);
     await program.methods
       .addToWhitelist(investor.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: whitelistPda,
         systemProgram: SystemProgram.programId,
@@ -188,7 +188,7 @@ describe("revoke_mint_authority", () => {
 
     await investorProgram.methods
       .buyTokens(new BN(TOTAL_TOKENS))
-      .accounts({
+      .accountsPartial({
         investor: investor.publicKey,
         admin: admin.publicKey,
         projectState: projectStatePda,
@@ -213,7 +213,7 @@ describe("revoke_mint_authority", () => {
     // Revoke
     await program.methods
       .revokeMintAuthority()
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         projectState: projectStatePda,
         mint: mint.publicKey,
@@ -246,7 +246,7 @@ describe("revoke_mint_authority", () => {
     try {
       await strangerProgram.methods
         .revokeMintAuthority()
-        .accounts({
+        .accountsPartial({
           admin: stranger.publicKey,
           projectState: projectStatePda,
           mint: mint.publicKey,
