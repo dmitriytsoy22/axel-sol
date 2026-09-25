@@ -1,45 +1,31 @@
-import React, { useEffect } from 'react';
+'use client';
+
+import React from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2 } from 'lucide-react';
-import { EnrichedRevenuePeriod } from '@/hooks/useDashboard';
 import { useClaim } from '@/hooks/useClaim';
-import { useToast } from '@/components/ui/toast/ToastProvider';
 import { Button } from '@/components/ui/Button';
+import type { Project } from '@/types/project';
 
 interface ClaimButtonProps {
-  period: EnrichedRevenuePeriod;
-  onSuccess?: () => void;
+  project: Project;
+  onClaimed: () => void;
 }
 
-export function ClaimButton({ period, onSuccess }: ClaimButtonProps): JSX.Element {
+/** Claims everything one car has earned for this wallet; failures are reported in a toast. */
+export function ClaimButton({ project, onClaimed }: ClaimButtonProps): JSX.Element {
   const t = useTranslations('Dashboard');
-  const { state, errorMsg, claim, reset } = useClaim();
-  const { addToast } = useToast();
+  const { status, claim } = useClaim();
+  const busy = status !== 'idle' && status !== 'success' && status !== 'error';
 
-  const isProcessing = state !== 'idle' && state !== 'error' && state !== 'success';
-
-  useEffect(() => {
-    // The confirmation hook already reports success with an Explorer link; only failures
-    // that never reach the chain (a rejected signature, a failed build) are reported here.
-    if (state === 'success') {
-      reset();
-      onSuccess?.();
-    } else if (state === 'error') {
-      addToast({ variant: 'error', title: t('claimFailed'), message: errorMsg || t('txFailed') });
-      reset();
-    }
-  }, [state, errorMsg, addToast, reset, onSuccess, t]);
+  const handleClick = async () => {
+    if (await claim(project)) onClaimed();
+  };
 
   return (
-    <Button
-      variant="secondary"
-      size="sm"
-      onClick={() => claim(period.period.project, period.period.index)}
-      disabled={isProcessing}
-      data-testid={`claim-button-${period.period.index}`}
-    >
-      {isProcessing && <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />}
-      {isProcessing ? t('claiming') : t('claimNow')}
+    <Button variant="secondary" size="sm" onClick={handleClick} disabled={busy}>
+      {busy && <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />}
+      {busy ? t('claiming') : t('claimNow')}
     </Button>
   );
 }

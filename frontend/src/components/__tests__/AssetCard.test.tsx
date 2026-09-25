@@ -1,77 +1,95 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { describe, it, expect, vi } from 'vitest';
+import messagesEn from '../../../messages/en.json';
+import { makeCar, makeProject } from '@/components/catalog/__tests__/fixtures';
+import type { Project } from '@/types/project';
 import { AssetCard } from '../catalog/AssetCard';
-import { ProjectState } from '@/types/project';
-
-// MOCK next-intl
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => `mock_t_${key}`,
-  useLocale: () => 'en',
-}));
 
 vi.mock('@/i18n/routing', () => ({
-  Link: ({ children, href }: any) => <a href={href}>{children}</a>
+  Link: ({ children, href, className }: any) => (
+    <a href={href} className={className}>
+      {children}
+    </a>
+  ),
 }));
 
-const mockProject: ProjectState = {
-  admin: 'adminAddress',
-  mint: 'mintAddress',
-  revenueVault: 'revenue1',
-  status: 'active',
-  totalTokenSupply: 10000,
-  tokensRemaining: 4000,
-  tokensSold: 5000,
-  pricePerToken: 1_000_000_000, // 1 SOL
-  carMake: 'Tesla',
-  carModel: 'Model 3',
-  carYear: 2024,
-  vin: '1234567890ABC',
-  imageUrl: 'https://example.com/image.jpg',
-  periodCount: 0,
-  oraclePubkey: 'oracleAddr',
-  bump: 0,
-  revenueVaultBump: 0,
-};
+function renderCard(project: Project) {
+  render(
+    <NextIntlClientProvider locale="en" messages={messagesEn}>
+      <AssetCard project={project} />
+    </NextIntlClientProvider>,
+  );
+}
 
 describe('AssetCard', () => {
-  it('renders project details correctly', () => {
-    render(<AssetCard project={mockProject} />);
+  it('shows the price, the raise and the payouts in the payment token', () => {
+    const project = makeProject({
+      status: 'operating',
+      sharesSold: 50n,
+      totalShares: 100n,
+      pricePerShare: 10_000_000_000n,
+      periodCount: 3,
+    });
+    renderCard(project);
 
-    // Check title presence
-    expect(screen.getByText(/Tesla Model 3/)).toBeInTheDocument();
-    expect(screen.getByText(/2024/)).toBeInTheDocument();
-
-    // Check progress bar exists
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
-
-    // tokensSold=5000, totalTokenSupply=10000, pricePerToken=1 SOL => 50%
-    const bar = screen.getByRole('progressbar');
-    expect(bar).toHaveStyle('width: 50%');
-
-    // Check Badge text rendered from translation function
-    expect(screen.getByText('mock_t_statusActive')).toBeInTheDocument();
-
-    // 5000 tokens sold * 1 SOL = 5,000 SOL; total = 10,000 SOL
-    expect(screen.getByText(/5,000[\s\S]*\/[\s\S]*10,000 SOL/)).toBeInTheDocument();
-
-    // Check price per token
-    expect(screen.getByText(/1 SOL/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Toyota Camry');
+    expect(screen.getByText('10,000 tKZT')).toBeInTheDocument();
+    expect(screen.getByText('500,000 tKZT of 1,000,000 tKZT')).toBeInTheDocument();
+    expect(screen.getByText('50% sold')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveStyle('width: 50%');
+    expect(screen.getByText('3')).toBeInTheDocument();
   });
 
-  it('shows the stock photo of the model and marks it as illustrative when the vehicle has no photo', () => {
-    render(<AssetCard project={{ ...mockProject, carMake: 'Toyota', carModel: 'Camry', imageUrl: '' }} />);
+  it('shows a running raise against its goal and its deadline', () => {
+    renderCard(makeProject({ status: 'fundraising', sharesSold: 30n, softCapShares: 60n }));
+
+    expect(screen.getByRole('progressbar', { name: 'Shares sold' })).toHaveAttribute(
+      'aria-valuetext',
+      '30 of 100 shares sold. The raise succeeds at 60.',
+    );
+    expect(screen.getByText('Goal: 60')).toBeInTheDocument();
+    expect(screen.getByTestId('soft-cap-marker')).toHaveStyle('left: 60%');
+    expect(screen.getByText('Raise closes').nextSibling).toHaveTextContent('Oct 15, 2026');
+  });
+
+  it('links to the car by its share mint and invites a purchase while the raise runs', () => {
+    const project = makeProject({ status: 'fundraising' });
+    renderCard(project);
+
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      `/assets/${project.shareMint.toBase58()}`,
+    );
+    expect(screen.getByText('Raising')).toBeInTheDocument();
+    expect(screen.getByText('Buy shares')).toBeInTheDocument();
+  });
+
+  it('offers a look, not a purchase, once the car is on the road', () => {
+    renderCard(makeProject({ status: 'operating' }));
+
+    expect(screen.getByText('On the road')).toBeInTheDocument();
+    expect(screen.getByText('View car')).toBeInTheDocument();
+  });
+
+  it('shows the stock photo of the model and marks it as illustrative', () => {
+    renderCard(makeProject({ car: makeCar({ make: 'Toyota', model: 'Camry' }) }));
 
     expect(screen.getByRole('img', { name: 'Toyota Camry' })).toHaveAttribute(
       'src',
       expect.stringContaining(encodeURIComponent('/images/cars/toyota-camry.webp')),
     );
-    expect(screen.getByText('mock_t_illustrativePhoto')).toBeInTheDocument();
+    expect(screen.getByText('Illustrative photo')).toBeInTheDocument();
   });
 
   it('does not present the Almaty fallback image as the model', () => {
     const { container } = render(
-      <AssetCard project={{ ...mockProject, carMake: 'Chevrolet', carModel: 'Cobalt', imageUrl: '' }} />,
+      <NextIntlClientProvider locale="en" messages={messagesEn}>
+        <AssetCard
+          project={makeProject({ car: makeCar({ make: 'Chevrolet', model: 'Cobalt' }) })}
+        />
+      </NextIntlClientProvider>,
     );
 
     expect(screen.queryByRole('img', { name: /Chevrolet Cobalt/ })).not.toBeInTheDocument();
@@ -79,13 +97,5 @@ describe('AssetCard', () => {
       'src',
       expect.stringContaining(encodeURIComponent('/images/places/almaty-taxi-mountains.webp')),
     );
-    expect(screen.getByText('mock_t_illustrativePhoto')).toBeInTheDocument();
-  });
-
-  it('does not mark the vehicle\'s own photo as illustrative', () => {
-    render(<AssetCard project={mockProject} />);
-
-    expect(screen.getByRole('img', { name: 'Tesla Model 3' })).toBeInTheDocument();
-    expect(screen.queryByText('mock_t_illustrativePhoto')).not.toBeInTheDocument();
   });
 });

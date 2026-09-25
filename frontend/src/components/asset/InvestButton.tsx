@@ -16,15 +16,22 @@ interface InvestButtonProps {
 }
 
 const CLOSED_LABEL: Record<Exclude<SaleState, 'open'>, string> = {
-  paused: 'salesPaused',
+  ended: 'raiseEnded',
+  funded: 'raiseFunded',
+  operating: 'raiseComplete',
+  paused: 'raiseComplete',
+  failed: 'raiseFailed',
   closed: 'projectClosed',
-  soldOut: 'soldOut',
 };
 
-const APPROVAL_LABEL: Record<Exclude<Approval, 'approved'>, string> = {
+const APPROVAL_LABEL: Record<Exclude<Approval, 'eligible'>, string> = {
   checking: 'checking',
-  notApproved: 'notApproved',
   unknown: 'approvalUnknown',
+  unverified: 'notVerified',
+  revoked: 'kycRevoked',
+  frozen: 'walletFrozen',
+  expired: 'kycExpired',
+  demoNotAllowed: 'demoNotAccepted',
 };
 
 /*
@@ -59,7 +66,7 @@ export function InvestButton({
     );
   }
 
-  if (approval !== 'approved') {
+  if (approval !== 'eligible') {
     return (
       <Button
         size="lg"

@@ -1,45 +1,43 @@
 'use client';
 
-import React from 'react';
+import React, { useId } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ProjectState } from '@/types/project';
-import { Badge } from '@/components/ui/Badge';
+import type { Project } from '@/types/project';
+import { ProjectStatusBadge } from '@/components/catalog/ProjectStatusBadge';
 import { ExplorerLink } from '@/components/ui/ExplorerLink';
-import { formatNumber } from '@/lib/format';
+import { formatCount, formatNumber, formatTokenAmount } from '@/lib/format';
+import { outstandingShares } from '@/lib/solana/accounts';
+import { sharesValue } from '@/lib/solana/math';
+import { carTitle } from '@/lib/solana/tokens';
 
 interface AdminMetricsProps {
-  project: ProjectState;
+  project: Project;
+  /** Every car this wallet may manage, to switch between them. */
+  projects: Project[];
+  onSelect: (address: string) => void;
 }
 
-/** The operator's header: which car this console manages and where it stands on-chain. */
-export function AdminMetrics({ project }: AdminMetricsProps) {
+/** The console's header: which car it manages, a switch to the others, and where it stands. */
+export function AdminMetrics({ project, projects, onSelect }: AdminMetricsProps) {
   const t = useTranslations('Admin');
-  const tCat = useTranslations('Catalog');
   const locale = useLocale();
+  const selectId = useId();
 
-  const statusLabel: Record<ProjectState['status'], string> = {
-    active: tCat('statusActive'),
-    paused: tCat('statusPaused'),
-    closed: tCat('statusClosed'),
-  };
-
+  const escrowed =
+    project.status === 'fundraising' || project.status === 'funded' || project.status === 'failed'
+      ? sharesValue(outstandingShares(project), project.pricePerShare)
+      : 0n;
   const items = [
-    {
-      label: t('metricStatus'),
-      value: <Badge status={project.status}>{statusLabel[project.status]}</Badge>,
-    },
+    { label: t('metricStatus'), value: <ProjectStatusBadge status={project.status} /> },
     {
       label: t('tokensSold'),
       value: t('ofTotal', {
-        part: formatNumber(project.tokensSold, locale),
-        whole: formatNumber(project.totalTokenSupply, locale),
+        part: formatCount(project.sharesSold, locale),
+        whole: formatCount(project.totalShares, locale),
       }),
     },
+    { label: t('inEscrow'), value: formatTokenAmount(escrowed, project.payment, locale) },
     { label: t('revenuePeriods'), value: formatNumber(project.periodCount, locale) },
-    {
-      label: t('incomeVault'),
-      value: <ExplorerLink address={project.revenueVault} srLabel={t('openInExplorer')} />,
-    },
   ];
 
   return (
@@ -50,13 +48,36 @@ export function AdminMetrics({ project }: AdminMetricsProps) {
           id="admin-title"
           className="mt-3 font-heading text-h2 font-medium text-foreground md:text-h1"
         >
-          {project.carMake} {project.carModel}{' '}
-          <span className="tabular-nums text-muted-foreground">{project.carYear}</span>
+          {carTitle(project.car)}{' '}
+          <span className="tabular-nums text-muted-foreground">{project.car.year}</span>
         </h1>
-        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-muted-foreground">
-          {t('shareToken')}
-          <ExplorerLink address={project.mint} srLabel={t('openInExplorer')} />
-        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-small text-muted-foreground">
+          {projects.length > 1 && (
+            <label htmlFor={selectId} className="flex items-center gap-2">
+              {t('selectCar')}
+              <select
+                id={selectId}
+                value={project.address.toBase58()}
+                onChange={(e) => onSelect(e.target.value)}
+                className="h-10 rounded-control border border-border bg-card px-3 text-small text-foreground"
+              >
+                {projects.map((entry) => (
+                  <option key={entry.address.toBase58()} value={entry.address.toBase58()}>
+                    {carTitle(entry.car)} · {entry.car.symbol}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <span className="flex flex-wrap items-center gap-x-2">
+            {t('shareToken')}
+            <ExplorerLink address={project.shareMint.toBase58()} srLabel={t('openInExplorer')} />
+          </span>
+          <span className="flex flex-wrap items-center gap-x-2">
+            {t('incomeVault')}
+            <ExplorerLink address={project.revenueVault.toBase58()} srLabel={t('openInExplorer')} />
+          </span>
+        </div>
 
         <dl
           aria-label={t('metricsLabel')}

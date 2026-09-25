@@ -1,11 +1,13 @@
 # API Reference
 
-AXEL exposes two interfaces:
+AXEL exposes these interfaces:
 
 1. **A small HTTP backend** in `backend/`: health, published telemetry, revenue reports and deposit attestation, KYC, and the history of v2 program events.
-2. **The `axel` and `transfer_hook` Solana programs.** Clients call them directly.
+2. **The Solana programs.** Clients call them directly. The frontend and the backend use `axel_v2` ([v2.md](v2.md)); the v1 `axel` and `transfer_hook` programs below are what runs on devnet today.
+3. **The indexer API** that the frontend reads payout history from when one is configured. The backend indexes every v2 event ([below](#program-events-what-is-indexed)) but does not serve this wallet-payout endpoint yet; its contract is fixed [below](#indexer-api-read-by-the-frontend).
+4. **The judge demo routes and Solana Actions (Blinks)** of the frontend, in `frontend/src/app/api/`: [demo access, shares and simulated months](#judge-demo-api) on devnet, and [invest and claim Blinks](#solana-actions-blinks).
 
-All business actions (buy, deposit, claim, whitelist, pause and so on) are Solana transactions. The backend signs three kinds of v2 transactions: `set_investor` after a Sumsub review (KYC key), `record_telemetry` batches (oracle key), and its co-signature on an operator's `deposit_revenue` (oracle key).
+All business actions (buy, deposit, claim, KYC, pause and so on) are Solana transactions. The backend signs three kinds of v2 transactions: `set_investor` after a Sumsub review (KYC key), `record_telemetry` batches (oracle key), and its co-signature on an operator's `deposit_revenue` (oracle key).
 
 ## Backend HTTP Endpoints
 
@@ -503,23 +505,146 @@ The v2 program ID comes from `AXEL_PROGRAM_ID` or the vendored IDL; instructions
 
 ## Frontend Environment
 
-`frontend/.env.local.example` lists these variables:
+`frontend/.env.local.example` lists these variables, all read at build time:
 
-| Variable | Read in | Notes |
+| Variable | Read in | Default and notes |
 |---|---|---|
-| `NEXT_PUBLIC_SOLANA_RPC_URL` | `lib/solana/connection.ts`, `providers/WalletProvider.tsx` | Defaults to devnet |
-| `NEXT_PUBLIC_SOLANA_NETWORK` | `lib/solana/connection.ts`, `app/opengraph-image.tsx` | Used for Explorer links and the social card; default `devnet` |
-| `NEXT_PUBLIC_PROGRAM_ID` | `lib/solana/connection.ts` | Defaults to `DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M` |
-| `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts` | That client is not used by any component |
-| `NEXT_PUBLIC_KYC_URL` | — | Not read anywhere |
+| `NEXT_PUBLIC_SOLANA_NETWORK` | `lib/solana/connection.ts`, `app/opengraph-image.tsx` | `devnet`. One of `devnet`, `testnet`, `mainnet-beta`, `localnet`; any other value fails the build. Explorer links follow it; `localnet` opens Explorer on the local RPC. |
+| `NEXT_PUBLIC_SOLANA_RPC_URL` | `lib/solana/connection.ts`, `providers/WalletProvider.tsx`, `next.config.mjs` | The cluster's public RPC (`http://127.0.0.1:8899` for `localnet`). Its origin and websocket are added to the CSP. |
+| `NEXT_PUBLIC_PROGRAM_ID` | `lib/solana/connection.ts` | The `address` in `idl-v2/axel_v2.json` (`AXLcoEH3vJXUSL7nEr1T4d77NarThcbVrnbBzBR8XPZi`). |
+| `NEXT_PUBLIC_PAYMENT_MINT_SYMBOLS` | `lib/solana/tokens.ts` | Unset. `<mint>:<symbol>,<mint>:<symbol>` names payment mints without on-chain metadata. A Token-2022 mint's own metadata symbol wins, Circle's USDC is known by address, anything else shows its short address. |
+| `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts`, `next.config.mjs` | Unset: the car page says trip data is not connected and makes no request. Set: the backend's base URL; the widget asks `/telemetry/latest/<share mint>` every minute. The backend answers only the origins in its `CORS_ORIGINS`, so the frontend's origin must be listed there. |
+| `NEXT_PUBLIC_INDEXER_URL` | `lib/api/indexer.ts`, `next.config.mjs` | Unset: payout history comes from the chain. Set: from the [indexer API](#indexer-api-read-by-the-frontend). |
+| `NEXT_PUBLIC_PUBLISHED_DATA_URL` | `lib/api/published.ts`, `next.config.mjs` | `/demo-data` on test networks (the seed's files in `frontend/public/demo-data`), unset on mainnet. The base of the [published car data](#published-car-data-read-by-verify) the asset page's "Check the car's data yourself" hashes. An absolute URL's origin is added to the CSP, and that server must allow CORS. |
+| `NEXT_PUBLIC_SITE_URL` | `lib/actions/http.ts` | Unset: the [Blinks](#solana-actions-blinks) take their absolute links and icon from the request's host (`X-Forwarded-Host` behind a proxy). |
+| `NEXT_PUBLIC_DEMO_ACCESS` | `lib/demo/config.ts` | Unset. `1` shows the [judge demo](#judge-demo-api) entry points (the demo banner, the mobile menu and the car page) and the `/demo` page, on devnet and localnet only. The routes themselves also need the server variables below. |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | `lib/demo/config.ts`, `next.config.mjs` | Unset. With `TURNSTILE_SECRET`, the access request shows a Cloudflare Turnstile check; the CSP then allows `challenges.cloudflare.com` scripts and frames. |
 
-The asset page's telemetry widget (`hooks/useTelemetry.ts`) reads `NEXT_PUBLIC_API_URL`, which is not in the example file.
+Server-only variables of the judge demo (never `NEXT_PUBLIC_`, read per request by `lib/demo/server/env.ts`; missing ones make every demo route answer 503 with their names):
+
+| Variable | Holds |
+|---|---|
+| `DEMO_FAUCET_SECRET` | The faucet: fee payer and SOL pool of every demo transaction, and mint authority of the test tenge. It pays the rent the other roles need in the same transaction, so it is the only key to fund: about 0.018 SOL per judge and 0.0024 SOL per simulated month. |
+| `DEMO_KYC_SECRET` | `Config.demo_kyc_authority`. The program lets it write DEMO records for at most 30 days and nothing else. |
+| `DEMO_DESK_SECRET` | The desk wallet, which holds the demo fleet car's share inventory. |
+| `DEMO_OPERATOR_SECRET`, `DEMO_ORACLE_SECRET` | The demo fleet car's operator and oracle. |
+| `DEMO_FLEET_MINT` | Share mint of the demo fleet car (`demo.demo_fleet` in the seed's output). |
+| `DEMO_SESSION_SECRET` | Signs nonces and sessions (HMAC-SHA256); at least 32 characters. |
+| `DEMO_RPC_URL` | Optional server-side RPC for the demo routes and Blinks, e.g. a keyed Helius URL. |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Optional. The limits in Upstash Redis, shared by every serverless instance; without them each server process keeps its own. |
+| `TURNSTILE_SECRET` | Optional. The access request must carry a solved Turnstile token. |
+
+Keys are base58 secret keys or `solana-keygen` JSON arrays. `DEMO_SEED_SECRET=… node frontend/scripts/demo-env.mjs --cluster devnet --fleet <mint>` prints the five keys the seed derived for a cluster (HKDF, as `scripts/seed-devnet/lib/keys.ts`) and a fresh session secret; `--public` prints only the addresses, to compare with the seed's output. The admin, KYC authority, treasury and upgrade keys never reach the web server.
+
+## Indexer API (read by the frontend)
+
+The chain records every revenue deposit (`RevenuePeriod`) and every position, but not how many shares a wallet held when a deposit arrived, nor its past claims (those are `Claimed` events in transaction logs). A wallet's part of each deposit therefore needs an indexer. The frontend reads it from this endpoint when `NEXT_PUBLIC_INDEXER_URL` is set, and validates the answer with Zod (`lib/api/indexer.ts`); without it, `/payouts` lists each deposit with its amount per share, and the totals come from the positions.
+
+```
+GET /v2/wallets/:wallet/payouts
+```
+
+**Response `200`:**
+```ts
+interface PayoutHistory {
+  periods: Array<{
+    project: string;      // project PDA, base58
+    index: number;        // RevenuePeriod.index
+    periodStart: number;  // YYYYMMDD
+    periodEnd: number;    // YYYYMMDD
+    kind: 'regular' | 'final';
+    net: string;          // u64 as a decimal string: paid in for holders, after the fee
+    supply: string;       // u64: shares the deposit was split across
+    depositedAt: number;  // unix seconds, RevenuePeriod.deposited_at
+    signature: string;    // deposit transaction
+    earned: string;       // u64: what this deposit added to the wallet's position,
+                          // floor(shares held × (acc_after − acc_before) / 2^64)
+  }>;
+  claims: Array<{
+    project: string;      // project PDA
+    amount: string;       // u64, from the Claimed event
+    claimedAt: number;    // unix seconds, block time
+    signature: string;
+  }>;
+}
+```
+
+`periods` holds the deposits of every project in which the wallet held shares when the deposit was made. Amounts are strings because they can exceed 2^53. Projects the chain does not know are left out; any other answer is shown as a failed read with a retry.
+
+## Published Car Data (read by "Verify")
+
+The chain keeps fingerprints of each car's off-chain records: the telemetry hash chain head (`Project.telemetry_head`, `telemetry_count`, `last_telemetry_date`), each deposit's `report_hash` and `telemetry_head` snapshot (`RevenuePeriod`), and the purchase papers' `acquisition_doc_hash`. The asset page downloads the published records and recomputes every fingerprint in the browser (`lib/verify/`). The layout is the one `scripts/seed-devnet/publish.ts` writes. The backend publishes real cars' days and reports under its own routes ([Published Day](#published-day), [Attested Reports](#attested-reports)) and does not write this layout yet.
+
+```
+GET <base>/<share mint>/index.json
+GET <base>/<share mint>/<file>          every file named by the index
+```
+
+`index.json` (fields the frontend reads; the seed writes more):
+```ts
+interface CarIndex {
+  mint: string;                 // must equal the share mint in the URL
+  data_origin?: string;         // "devnet-demo-seed" marks fictional demo data
+  telemetry: {
+    months: Array<{ month: string; file: string }>;   // oldest first, e.g. "telemetry/2026-06.json"
+  };
+  reports: Array<{ id: string; file: string; period_index: number | null }>;
+  acquisition: { file: string } | null;
+}
+```
+
+A month file:
+```ts
+interface TelemetryMonth {
+  days: Array<{
+    record: object;       // the raw daily record; it must carry "date": "YYYY-MM-DD"
+    data_hash?: string;   // hex SHA-256 of the record's RFC 8785 canonical JSON
+    head?: string;        // hex chain head after this day
+  }>;
+}
+```
+
+The check, in order:
+1. Every `record` is canonicalized (RFC 8785) and hashed with SHA-256; a stated `data_hash` must match.
+2. Days must be real calendar days in strictly increasing order.
+3. The chain starts from 32 zero bytes and steps `head = SHA-256(head ‖ date as u32 little-endian ‖ data_hash)`, as `record_telemetry` does; a stated `head` must match.
+4. After `telemetry_count` days the rebuilt head and last date must equal the project's. More published days than on-chain is reported as ahead; fewer, as not finished.
+5. Each report file with a `period_index` is hashed the same way and compared with that period's `report_hash`; each period's `telemetry_head` is looked up among the rebuilt heads. A period with no published report is checked against the report the demo's "Simulate a month" attests (`lib/demo/simulation.ts`), which holds only fields of the period account; a match is shown as a simulated demo month rather than a missing report.
+6. After activation, the acquisition file is compared with `acquisition_doc_hash`.
+
+File paths in the index must be relative `.json` paths inside the car's folder. A missing index (404) is reported as "nothing published".
+
+## Judge Demo API
+
+Next.js route handlers under `frontend/src/app/api/demo/` let a judge run the whole cycle on devnet with nothing but a wallet (`lib/demo/`). They exist on devnet and localnet only and answer 404 on any other cluster. Every answer is JSON with `Cache-Control: no-store`; a refusal is `{ code, message, retryAfter?, reason?, signature? }`, where `code` is one of `DEMO_ERROR_CODES` in `lib/demo/config.ts` (the app shows each in EN / RU / KK) and `reason` is the translated cause of a transaction Solana refused. A route that sent its transaction waits up to 30 s for confirmation and otherwise answers `confirmed: false`; the app then confirms it itself.
+
+| Route | Does | Limits |
+|---|---|---|
+| `GET /api/demo/nonce?wallet=` | A nonce (HMAC-signed, stateless, valid 5 minutes) and the exact message to sign with it | |
+| `POST /api/demo/access {wallet, nonce, signature, turnstileToken?}` | Checks the wallet's Ed25519 signature of the message (and Turnstile when configured). Then, in one faucet-paid transaction: `set_investor` (DEMO, 29 days, signed by the demo KYC key after the faucet sends it the record's rent), the wallet's tKZT account, 50,000 tKZT minted to it and 0.01 SOL. A wallet with a valid KYC record keeps it and only gets the drip; an expired DEMO record is renewed; a revoked, frozen or lapsed real record is refused (`kyc_locked`). Answers a session token (7 days) for the next two routes | Once per wallet (a returning wallet only gets a new session), 3 per IP address per UTC day, 80 in total. Refused below 0.05 SOL in the faucet |
+| `POST /api/demo/shares {wallet, session}` | The desk sends 5 shares of the demo fleet car: `open_position` (rent paid by the faucet) and the hooked `transfer_checked`, which checks both KYC records and settles both positions first | Once per wallet; the wallet must be eligible for the car |
+| `POST /api/demo/simulate-month {wallet, session}` | The faucet sends the operator the new period's rent and mints it the month's income; the operator deposits it with `deposit_revenue`, co-signed by the car's oracle. The month is the calendar month after the latest one the car's payouts cover, the amount the average of its latest three regular payouts in whole tokens, and the report hash that of a report which says it is simulated | One per minute across all wallets (`429` with `Retry-After`), 3 per wallet per UTC day, 150 payouts on the car |
+| `GET /api/demo/status[?wallet=]` | Whether access can be granted now, the faucet's balance, the limits, the fleet car (state, payouts, desk inventory, cooldown) and the wallet's one-time steps. `503` with the same body when the demo is unavailable, `code` saying why | |
+
+The server checks its configuration against the chain on each call: the demo KYC key must be `Config.demo_kyc_authority`, the faucet the payment mint's mint authority, and the operator and oracle keys the fleet car's; otherwise the route answers `misconfigured`.
+
+The `/demo` page walks through the path: access → buy in an open raise (the app's own purchase dialog) → receive shares → simulate a month → claim → verify the car's data → proof of solvency. Each step's state is read from the chain, so the path continues on another device.
+
+## Solana Actions (Blinks)
+
+`frontend/src/app/api/actions/` implements the [Solana Actions](https://solana.com/docs/advanced/actions) spec, so a car can be bought or its payout claimed from a post on X or Telegram. Every response carries the spec's CORS headers, `X-Action-Version: 2.4` and, on a public cluster, `X-Blockchain-Ids` (devnet: `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`); `OPTIONS` answers the preflight. The transactions are unsigned, with the reader's account as fee payer.
+
+| Route | GET | POST `{ account }` |
+|---|---|---|
+| `/api/actions/invest/[mint]` | The car's photo, price, raise progress, escrow and refund rule; buttons for 1, 3 and 5 shares (those that are left) and a number field. A car not raising is shown disabled | `?shares=N`: `buy_shares` capped at N × price. Refused with a message when the raise is closed, N is not a whole number of shares left, the wallet has no eligible KYC record (with the link to `/demo` on a demo deployment) or too little of the payment token |
+| `/api/actions/claim/[mint]` | The car's payouts so far and one "Claim payout" button; disabled before the car pays out | `claim` to the wallet's own account, when it holds a position with something to claim and is not frozen; the message names the amount |
+
+`GET /actions.json` maps `/assets/*` (and `/ru/assets/*`, `/kk/assets/*`) to the invest action. The car page links both Blinks on dial.to (`?action=solana-action:<url>&cluster=devnet`).
 
 ## Program Reference: `axel`
 
 - Program ID: `DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M`
-- IDL: [`frontend/src/lib/solana/idl/axel.json`](../frontend/src/lib/solana/idl/axel.json), fetched from devnet
-- TypeScript type: `idl/axel.ts`
+- IDL: `target/idl/axel.json` and `target/types/axel.ts`, produced by `anchor build`. The frontend no longer vendors it: it runs on `axel_v2`.
 
 Anchor instruction discriminators are the first 8 bytes of `sha256("global:<instruction_name>")`.
 
@@ -650,78 +775,31 @@ Errors: `6000 SourceNotWhitelisted`, `6001 DestinationNotWhitelisted`.
 
 To send shares from a client, build the transfer with `createTransferCheckedWithTransferHookInstruction` or `transferCheckedWithTransferHook` from `@solana/spl-token`, using `TOKEN_2022_PROGRAM_ID`. These helpers resolve the extra accounts from the on-chain list, as `tests/transfer-hook-execute.test.ts` does.
 
-## TypeScript Client
+## TypeScript Client (frontend, `axel_v2`)
 
-The frontend talks to the program through `@coral-xyz/anchor` and the vendored IDL. The helpers live in `frontend/src/lib/solana/`:
+The frontend talks to `axel_v2` through `@coral-xyz/anchor` and the IDL vendored in `frontend/src/lib/solana/idl-v2/`. `lib/solana/program.ts` builds the `Program` at the configured address; it only builds instructions and decodes accounts, and every read goes through the `Connection` the caller passes.
 
-- **`pda.ts`:**
-  - `deriveProjectState(mint)`
-  - `deriveRevenueVault(mint)`
-  - `deriveWhitelistEntry(wallet)`
-  - `deriveRevenuePeriod(mint, index)`
-  - `deriveClaimRecord(periodPda, wallet)`
-  - `deriveTelemetryRecord(mint, date)`
-- **`readers.ts`:**
-  - `fetchAllProjects(connection)`, which uses `program.account.projectState.all()` plus Token-2022 metadata
-  - `fetchProjectState`
-  - `fetchWhitelistEntry`
-  - `fetchInvestorHolding`
-  - `fetchAllRevenuePeriods`
-  - `fetchClaimRecord`
-- **`instructions.ts`** builds a `TransactionInstruction` for each of these:
-  - `buy_tokens` and `claim_revenue`
-  - `deposit_revenue`
-  - `pause_project`, `resume_project` and `close_project`
-  - `update_price`
-  - `add_to_whitelist` and `remove_from_whitelist`
+| Module | What it has |
+|---|---|
+| `connection.ts` | Cluster, RPC URL and program ID from the environment; Explorer links |
+| `pda.ts` | `configAddress`, `investorAddress(wallet)`, `projectAddress(shareMint)`, `positionAddress(project, owner)`, `periodAddress(project, index)`, `escrowAddress(project)`, `revenueAddress(project)`, `extraAccountMetasAddress(shareMint)`; `shareAccountAddress` and `paymentAccountAddress` for the owners' canonical token accounts |
+| `accounts.ts` | Decoders from account bytes to plain types with `bigint` amounts; account sizes and the memcmp offsets readers filter by |
+| `readers.ts` | `fetchConfig`, `fetchInvestor(wallet)`, `fetchProjects` (one `getProgramAccounts` plus one `getMultipleAccounts` for the share and payment mints), `fetchProject(shareMint)`, `fetchPositions(owner)` (memcmp on the owner at offset 40), `fetchPosition`, `fetchRevenuePeriods(project)` (memcmp at offset 8), `fetchTokenBalance` |
+| `tokens.ts` | The car from the share mint's Token-2022 metadata (`make`, `model`, `year`, `city`, `class`, `park`); the payment token's decimals and symbol; sums per payment token |
+| `math.ts` | The program's `math.rs` on BigInt: `splitFee`, `sharesValue`, `proRata`, `accIncrement`, `owed`, `deposit`, and `pendingRevenue(position, accPerShare)` = `accrued + (shares × (acc − checkpoint)) >> 64`, which is exactly what a claim pays |
+| `instructions.ts` | `buySharesInstruction`, `refundInstruction`, `claimInstruction`, `openPositionInstruction`, `closePositionInstruction`, `transferSharesInstruction`; `finalizeRaiseInstruction`; admin `manageProjectInstruction` (cancel raise, pause, resume, close), `setProjectRolesInstruction`, `activateProjectInstruction`, `depositRevenueInstruction` (the oracle co-signs), `setInvestorInstruction` |
+| `transaction.ts` | Compute unit limits per action, `buildTransaction` (limit first), `MAX_CLAIMS_PER_TRANSACTION` = 4, `confirmSignature` |
+| `errors.ts` | `describeTxError`: the i18n message of a failed transaction, from Anchor's log line, a program's custom error in the logs or in a signature status (by instruction index), a wallet refusal, missing SOL, an expired blockhash or an unreachable node |
+| `eligibility.ts`, `lifecycle.ts`, `kyc.ts` | The program's KYC eligibility rule, what each project state allows, and the records the console's KYC form writes |
 
-Minimal example, a whitelisted wallet buying shares. `wallet` comes from `useAnchorWallet()` in `@solana/wallet-adapter-react`:
+`transferSharesInstruction` is a Token-2022 `transfer_checked` with the hook's accounts appended in the order wallets resolve them (config, project, both investors, both positions, the hook program, the validation account), so it needs no RPC call and works in wallets that do not resolve transfer hooks. A recipient without a position is onboarded with `openPositionInstruction` in the same transaction.
 
-```ts
-import { AnchorProvider, BN, Program } from '@coral-xyz/anchor';
-import type { AnchorWallet } from '@solana/wallet-adapter-react';
-import { Connection, PublicKey, SystemProgram } from '@solana/web3.js';
-import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  TOKEN_2022_PROGRAM_ID,
-  getAssociatedTokenAddressSync,
-} from '@solana/spl-token';
-import type { Axel } from '@/lib/solana/idl/axel';
-import IDL from '@/lib/solana/idl/axel.json';
+Every send goes through `hooks/useTransactionSender.ts`: it sets the compute unit limit, has the wallet sign, polls the signature until confirmed, and shows the outcome in a toast with the Explorer link.
 
-const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+The client is tested in `frontend/src/lib/solana/__tests__` without mocks: builders against the IDL's account lists, flags, fixed addresses and PDA seeds, and exact bytes; the transfer against `@solana/spl-token`'s own hook resolver; readers, math and PDAs against accounts the real program wrote in LiteSVM (`tests-v2/scripts/export-frontend-fixture.ts` exports them, with what each holder's claim paid).
 
-export async function buyShares(wallet: AnchorWallet, mint: PublicKey, shares: number): Promise<string> {
-  const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
-  const program = new Program(IDL as Axel, provider);
-
-  const [projectState] = PublicKey.findProgramAddressSync(
-    [Buffer.from('project'), mint.toBuffer()],
-    program.programId,
-  );
-  const [whitelistEntry] = PublicKey.findProgramAddressSync(
-    [Buffer.from('whitelist'), wallet.publicKey.toBuffer()],
-    program.programId,
-  );
-  const project = await program.account.projectState.fetch(projectState);
-
-  return program.methods
-    .buyTokens(new BN(shares))
-    .accountsPartial({
-      investor: wallet.publicKey,
-      admin: project.admin,
-      projectState,
-      mint,
-      investorTokenAccount: getAssociatedTokenAddressSync(mint, wallet.publicKey, false, TOKEN_2022_PROGRAM_ID),
-      whitelistEntry,
-      tokenExtensionsProgram: TOKEN_2022_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc();
-}
-```
+v1 clients build instructions from `target/idl/axel.json` after `anchor build`, as `tests/` and `scripts/init-project.ts` do.
 
 ## Codama SDK (`sdk/axel-v2`)
 
-The Codama client covers the v2 program only. `npm run generate` runs `scripts/generate-clients.ts`, which reads `target/idl/axel_v2.json` and renders a `@solana/kit` client into `sdk/axel-v2/src/generated`. See [v2.md](v2.md#idl-and-typescript-client). The stale v1 output that used to live in `sdk/generated` was removed; v1 clients use the vendored IDL in `frontend/src/lib/solana/idl/` with Anchor.
+The Codama client covers the v2 program only. `npm run generate` runs `scripts/generate-clients.ts`, which reads `target/idl/axel_v2.json` and renders a `@solana/kit` client into `sdk/axel-v2/src/generated`. See [v2.md](v2.md#idl-and-typescript-client). The stale v1 output that used to live in `sdk/generated` was removed. The frontend keeps using Anchor with the vendored IDL, because the wallet adapter and the existing hooks are built on `@solana/web3.js` 1.

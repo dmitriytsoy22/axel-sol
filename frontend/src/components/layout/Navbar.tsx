@@ -9,6 +9,7 @@ import { NavWalletMenu } from './NavWalletMenu';
 import { NavMobileMenu } from './NavMobileMenu';
 import { Logo } from './Logo';
 import { ConnectionStatus } from '../shared/ConnectionStatus';
+import { DemoBanner } from './DemoBanner';
 
 const SCROLL_THRESHOLD = 16;
 
@@ -69,7 +70,9 @@ export const Navbar = (): JSX.Element => {
         </div>
       </header>
 
+      {/* The home hero sits under the transparent bar and carries the demo note itself. */}
       {!isHome && <div aria-hidden="true" className="h-16" />}
+      {!isHome && <DemoBanner />}
     </>
   );
 };

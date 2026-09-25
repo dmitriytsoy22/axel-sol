@@ -2,13 +2,59 @@ import createNextIntlPlugin from 'next-intl/plugin';
 
 const withNextIntl = createNextIntlPlugin();
 
+/*
+ * The browser talks to the Solana RPC node (HTTP and its websocket) and, when configured, to
+ * the AXEL backend's telemetry and indexer APIs and to where the cars' data is published, so
+ * every configured origin is allowed.
+ */
+function configuredOrigins() {
+  const origins = [];
+  const rpc = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
+  if (rpc) {
+    const url = new URL(rpc);
+    origins.push(url.origin, `${url.protocol === 'https:' ? 'wss:' : 'ws:'}//${url.host}`);
+  }
+  for (const api of [
+    process.env.NEXT_PUBLIC_TELEMETRY_API_URL,
+    process.env.NEXT_PUBLIC_INDEXER_URL,
+    process.env.NEXT_PUBLIC_PUBLISHED_DATA_URL,
+  ]) {
+    // A path such as /demo-data is on this origin and already allowed by 'self'.
+    if (api && /^https?:\/\//.test(api)) origins.push(new URL(api).origin);
+  }
+  return origins;
+}
+
+const connectSources = [
+  "'self'",
+  'https://*.helius-rpc.com',
+  'wss://*.helius-rpc.com',
+  'https://api.devnet.solana.com',
+  'wss://api.devnet.solana.com',
+  'https://api.testnet.solana.com',
+  'wss://api.testnet.solana.com',
+  'https://api.mainnet-beta.solana.com',
+  'wss://api.mainnet-beta.solana.com',
+  // A local solana-test-validator: RPC on 8899, websocket on 8900.
+  'http://localhost:*',
+  'ws://localhost:*',
+  'http://127.0.0.1:*',
+  'ws://127.0.0.1:*',
+  ...configuredOrigins(),
+];
+
+// Cloudflare Turnstile, the demo's optional bot check, runs a script and an iframe of its own.
+const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
+const turnstile = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+
 const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-eval' 'unsafe-inline';
+    script-src 'self' 'unsafe-eval' 'unsafe-inline'${turnstile ? ` ${TURNSTILE_ORIGIN}` : ''};
+    ${turnstile ? `frame-src ${TURNSTILE_ORIGIN};` : ''}
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data: https://images.unsplash.com;
     font-src 'self';
-    connect-src 'self' https://*.helius-rpc.com wss://*.helius-rpc.com https://api.devnet.solana.com wss://api.devnet.solana.com https://api.mainnet-beta.solana.com wss://api.mainnet-beta.solana.com http://localhost:*;
+    connect-src ${[...new Set(connectSources)].join(' ')};
     object-src 'none';
     base-uri 'self';
     form-action 'self';

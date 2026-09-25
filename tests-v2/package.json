@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "test": "node --import tsx --test *.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "export-frontend-fixture": "tsx scripts/export-frontend-fixture.ts",
+    "fixture-validator": "tsx scripts/fixture-validator.ts"
   },
   "devDependencies": {
     "@coral-xyz/anchor": "0.32.1",

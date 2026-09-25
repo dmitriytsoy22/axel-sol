@@ -23,20 +23,13 @@ export default defineConfig({
         'tests/',
         'src/types/**',
         'src/providers/**',
-        'src/lib/solana/readers.ts',
-        'src/lib/solana/connection.ts',
-        'src/lib/solana/errors.ts',
-        'src/lib/solana/index.ts',
+        'src/lib/solana/idl-v2/**',
         'src/i18n/**',
         'src/app/**',
         'src/components/layout/**',
-        'src/hooks/useAdminAccess.ts',
-        'src/hooks/usePayoutHistory.ts',
-        'src/hooks/useProjectState.ts',
         'src/hooks/useWalletInfo.ts',
-        'src/hooks/useWhitelistStatus.ts',
-        'src/lib/api/**',
-        'src/**/index.ts'
+        'src/**/index.ts',
+        'src/**/__tests__/**'
       ],
       thresholds: {
         lines: 80,

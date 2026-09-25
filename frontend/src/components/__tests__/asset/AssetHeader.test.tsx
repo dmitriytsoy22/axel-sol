@@ -1,37 +1,30 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { NextIntlClientProvider } from 'next-intl';
+import { describe, it, expect } from 'vitest';
+import messagesEn from '../../../../messages/en.json';
+import { makeCar, makeProject } from '@/components/catalog/__tests__/fixtures';
 import { AssetHeader } from '../../asset/AssetHeader';
-import { ProjectState } from '@/types/project';
-
-// Mock next-intl translations
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => `translated_${key}`,
-}));
 
 describe('AssetHeader', () => {
-  const mockProject: ProjectState = {
-    carMake: 'Tesla',
-    carModel: 'Model S',
-    carYear: 2023,
-    vin: '5YJ3E1EA0NF',
-    status: 'active',
-    imageUrl: '/mock-image.png',
-    // Dummy values for the rest
-    admin: 'addr', mint: 'addr', revenueVault: 'addr',
-    totalTokenSupply: 1, tokensRemaining: 1, pricePerToken: 1,
-    tokensSold: 0, periodCount: 0,
-    oraclePubkey: 'addr', bump: 0, revenueVaultBump: 0,
-  };
+  it('names the car, its state and where it works from the share mint metadata', () => {
+    const car = makeCar({
+      make: 'Kia',
+      model: 'Rio',
+      year: '2024',
+      city: 'Almaty',
+      class: 'economy',
+    });
+    render(
+      <NextIntlClientProvider locale="en" messages={messagesEn}>
+        <AssetHeader project={makeProject({ car, status: 'operating' })} />
+      </NextIntlClientProvider>,
+    );
 
-  it('renders correctly', () => {
-    render(<AssetHeader project={mockProject} />);
-
-    expect(screen.getByText(/Tesla Model S/i)).toBeInTheDocument();
-    expect(screen.getByText('2023')).toBeInTheDocument();
-    expect(screen.getByText('5YJ3E1EA0NF')).toBeInTheDocument();
-
-    // Status translation check
-    expect(screen.getByText('translated_statusActive')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Kia Rio 2024');
+    expect(screen.getByText('On the road')).toBeInTheDocument();
+    expect(screen.getByText(car.symbol)).toBeInTheDocument();
+    expect(screen.getByText('Almaty')).toBeInTheDocument();
+    expect(screen.getByText('economy')).toBeInTheDocument();
   });
 });

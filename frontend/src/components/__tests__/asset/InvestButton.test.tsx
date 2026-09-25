@@ -13,7 +13,7 @@ vi.mock('@solana/wallet-adapter-react', () => ({ useWallet: vi.fn() }));
 vi.mock('@solana/wallet-adapter-react-ui', () => ({ useWalletModal: vi.fn() }));
 
 function renderButton(
-  { saleState = 'open', approval = 'approved' }: { saleState?: SaleState; approval?: Approval },
+  { saleState = 'open', approval = 'eligible' }: { saleState?: SaleState; approval?: Approval },
   { connected }: { connected: boolean },
 ) {
   vi.mocked(useWallet).mockReturnValue({ connected } as ReturnType<typeof useWallet>);
@@ -35,15 +35,15 @@ describe('InvestButton', () => {
   });
 
   it('opens the wallet picker when no wallet is connected', async () => {
-    renderButton({ approval: 'notApproved' }, { connected: false });
+    renderButton({ approval: 'unverified' }, { connected: false });
 
     await userEvent.click(screen.getByRole('button', { name: 'Connect wallet to buy' }));
 
     expect(setVisible).toHaveBeenCalledWith(true);
   });
 
-  it('opens the purchase for an approved wallet', async () => {
-    const { onInvestClick } = renderButton({ approval: 'approved' }, { connected: true });
+  it('opens the purchase for a verified wallet', async () => {
+    const { onInvestClick } = renderButton({ approval: 'eligible' }, { connected: true });
 
     await userEvent.click(screen.getByRole('button', { name: 'Buy shares' }));
 
@@ -51,7 +51,11 @@ describe('InvestButton', () => {
   });
 
   it.each([
-    ['notApproved', 'Wallet not approved'],
+    ['unverified', 'Wallet not verified'],
+    ['revoked', 'Verification withdrawn'],
+    ['frozen', 'Wallet frozen'],
+    ['expired', 'Verification expired'],
+    ['demoNotAllowed', 'Demo access not accepted'],
     ['checking', 'Checking wallet…'],
     ['unknown', "Couldn't check wallet"],
   ] as const)('names a %s wallet instead of offering the purchase', (approval, label) => {
@@ -62,9 +66,12 @@ describe('InvestButton', () => {
   });
 
   it.each([
-    ['paused', 'Sales paused'],
+    ['ended', 'Raise ended'],
+    ['funded', 'Fully funded'],
+    ['operating', 'Raise complete'],
+    ['paused', 'Raise complete'],
+    ['failed', 'Raise failed'],
     ['closed', 'Project closed'],
-    ['soldOut', 'Sold out'],
   ] as const)('says why a %s car cannot be bought, even before connecting', (saleState, label) => {
     renderButton({ saleState }, { connected: false });
 

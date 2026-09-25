@@ -1,160 +1,131 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { useProjectState } from './useProjectState';
-import {
-  fetchInvestorHolding,
-  fetchAllRevenuePeriods,
-  fetchClaimRecord,
-} from '@/lib/solana/readers';
-import { deriveRevenuePeriod } from '@/lib/solana/pda';
-import { getExplorerUrl } from '@/lib/solana/connection';
+import { useWallet } from '@solana/wallet-adapter-react';
+import type { Connection, PublicKey } from '@solana/web3.js';
+import { fetchPayoutHistory, INDEXER_URL } from '@/lib/api/indexer';
+import type { RevenueKind } from '@/lib/solana/accounts';
+import { periodAddress } from '@/lib/solana/pda';
+import { fetchPositions, fetchProjects, fetchRevenuePeriods } from '@/lib/solana/readers';
+import type { Project } from '@/types/project';
+import { useChainQuery } from './useChainQuery';
 
-export interface PayoutRecord {
-  id: string;
-  period: string;
-  deposited: number; // SOL
-  share: number; // fraction 0..1
-  claimAmount: number; // SOL
-  status: 'claimed' | 'available';
-  txLink: string;
-  timestamp: number;
+export interface PayoutRow {
+  project: Project;
+  index: number;
+  /** YYYYMMDD. */
+  periodStart: number;
+  periodEnd: number;
+  kind: RevenueKind;
+  depositedAt: number;
+  /** Paid in for holders, after the platform fee. */
+  net: bigint;
+  /** Shares the deposit was split across. */
+  supply: bigint;
+  /** The period account, which holds the attested report hash. */
+  period: PublicKey;
+  /** The wallet's part; only the indexer knows the shares it held at the time. */
+  earned: bigint | null;
+  signature: string | null;
 }
 
-export interface PayoutSummary {
-  totalClaimed: number; // SOL
-  unclaimed: number; // SOL
-  periods: number;
+export interface ClaimRow {
+  project: Project;
+  amount: bigint;
+  claimedAt: number;
+  signature: string;
 }
 
-export function usePayoutHistory() {
-  const { projects, isLoading: isProjectsLoading, error: projectsError } = useProjectState();
-  const { connection } = useConnection();
-  const { publicKey, connected } = useWallet();
+export interface PayoutHistory {
+  /** Where the rows came from: the indexer, or the chain alone. */
+  source: 'indexer' | 'chain';
+  /** Newest deposit first. */
+  rows: PayoutRow[];
+  /** Newest claim first; the chain alone keeps no claim history. */
+  claims: ClaimRow[];
+}
 
-  const [data, setData] = useState<PayoutRecord[]>([]);
-  const [summary, setSummary] = useState<PayoutSummary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+const newestFirst = (
+  a: { depositedAt: number; index: number },
+  b: { depositedAt: number; index: number },
+) => b.depositedAt - a.depositedAt || b.index - a.index;
 
-  useEffect(() => {
-    let mounted = true;
+/** Every deposit of every car the wallet has a position in, straight from the period accounts. */
+async function historyFromChain(connection: Connection, wallet: PublicKey): Promise<PayoutHistory> {
+  const [projects, positions] = await Promise.all([
+    fetchProjects(connection),
+    fetchPositions(connection, wallet),
+  ]);
+  const held = projects.filter((project) =>
+    positions.some((position) => position.project.equals(project.address)),
+  );
+  const periods = await Promise.all(
+    held.map(async (project) =>
+      (await fetchRevenuePeriods(connection, project.address)).map(
+        (period): PayoutRow => ({
+          project,
+          index: period.index,
+          periodStart: period.periodStart,
+          periodEnd: period.periodEnd,
+          kind: period.kind,
+          depositedAt: period.depositedAt,
+          net: period.net,
+          supply: period.supply,
+          period: period.address,
+          earned: null,
+          signature: null,
+        }),
+      ),
+    ),
+  );
+  return { source: 'chain', rows: periods.flat().sort(newestFirst), claims: [] };
+}
 
-    if (projectsError) {
-      setError(projectsError);
-      setIsLoading(false);
-      return;
-    }
+async function historyFromIndexer(
+  connection: Connection,
+  indexerUrl: string,
+  wallet: PublicKey,
+): Promise<PayoutHistory> {
+  const [projects, history] = await Promise.all([
+    fetchProjects(connection),
+    fetchPayoutHistory(indexerUrl, wallet.toBase58()),
+  ]);
+  const byAddress = new Map(projects.map((project) => [project.address.toBase58(), project]));
+  const rows = history.periods.flatMap((period): PayoutRow[] => {
+    const project = byAddress.get(period.project);
+    return project
+      ? [{ ...period, project, period: periodAddress(project.address, period.index) }]
+      : [];
+  });
+  const claims = history.claims.flatMap((claim): ClaimRow[] => {
+    const project = byAddress.get(claim.project);
+    return project ? [{ ...claim, project }] : [];
+  });
+  return {
+    source: 'indexer',
+    rows: rows.sort(newestFirst),
+    claims: claims.sort((a, b) => b.claimedAt - a.claimedAt),
+  };
+}
 
-    if (!connected || !publicKey || isProjectsLoading || projects.length === 0) {
-      if (mounted) {
-        setData([]);
-        setSummary(null);
-        setIsLoading(isProjectsLoading);
-        setError(null);
-      }
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    async function loadPayoutHistory() {
-      try {
-        const allRecords: PayoutRecord[] = [];
-
-        for (const project of projects) {
-          if (project.periodCount === 0) continue;
-
-          const mint = new PublicKey(project.mint);
-
-          // Check if the user holds tokens for this project
-          const holding = await fetchInvestorHolding(
-            connection,
-            publicKey!,
-            mint,
-            project.totalTokenSupply,
-          );
-          if (!holding || holding.tokenBalance === 0) continue;
-
-          // Fetch all revenue periods
-          const periods = await fetchAllRevenuePeriods(
-            connection,
-            mint,
-            project.periodCount,
-          );
-
-          // Check claim status for each period
-          for (const period of periods) {
-            const [periodPda] = deriveRevenuePeriod(mint, period.index);
-            const claimRecord = await fetchClaimRecord(
-              connection,
-              periodPda,
-              publicKey!,
-            );
-
-            const depositedSol = period.totalDeposited / LAMPORTS_PER_SOL;
-            const share =
-              period.tokenSupplySnapshot > 0
-                ? holding.tokenBalance / period.tokenSupplySnapshot
-                : 0;
-            const claimAmountSol =
-              period.tokenSupplySnapshot > 0
-                ? (holding.tokenBalance / period.tokenSupplySnapshot) * period.totalDeposited / LAMPORTS_PER_SOL
-                : 0;
-
-            const isClaimed = claimRecord?.claimed ?? false;
-
-            allRecords.push({
-              id: `${project.mint}-${period.index}`,
-              period: `${project.carMake} ${project.carModel} #${period.index}`,
-              deposited: depositedSol,
-              share,
-              claimAmount: claimAmountSol,
-              status: isClaimed ? 'claimed' : 'available',
-              txLink: period.pda ? getExplorerUrl(period.pda) : '',
-              timestamp: period.depositedAt * 1000,
-            });
-          }
-        }
-
-        // Sort by timestamp descending
-        allRecords.sort((a, b) => b.timestamp - a.timestamp);
-
-        const calculatedSummary = allRecords.reduce(
-          (acc, record) => {
-            if (record.status === 'claimed') {
-              acc.totalClaimed += record.claimAmount;
-            } else {
-              acc.unclaimed += record.claimAmount;
-            }
-            return acc;
-          },
-          { totalClaimed: 0, unclaimed: 0, periods: allRecords.length },
-        );
-
-        if (mounted) {
-          setData(allRecords);
-          setSummary(calculatedSummary);
-          setIsLoading(false);
-        }
-      } catch (err) {
-        console.error('Payout history fetch error:', err);
-        if (mounted) {
-          setError(err instanceof Error ? err : new Error('Failed to load payout history'));
-          setIsLoading(false);
-        }
-      }
-    }
-
-    loadPayoutHistory();
-
-    return () => {
-      mounted = false;
-    };
-  }, [connected, publicKey, isProjectsLoading, projects, projectsError, connection]);
-
-  return { data, summary, isLoading, error };
+/**
+ * The connected wallet's payout history: from the indexer when NEXT_PUBLIC_INDEXER_URL is
+ * set, otherwise from the chain, which lists deposits but not the wallet's part of each.
+ */
+export function usePayoutHistory(indexerUrl: string | null = INDEXER_URL): {
+  history: PayoutHistory | null;
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => void;
+} {
+  const { publicKey } = useWallet();
+  const { data, isLoading, error, refetch } = useChainQuery(
+    publicKey ? `payouts:${publicKey.toBase58()}:${indexerUrl ?? 'chain'}` : null,
+    async (connection) => {
+      if (!publicKey) return null;
+      return indexerUrl
+        ? historyFromIndexer(connection, indexerUrl, publicKey)
+        : historyFromChain(connection, publicKey);
+    },
+  );
+  return { history: data ?? null, isLoading, error, refetch };
 }

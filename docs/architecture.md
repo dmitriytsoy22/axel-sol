@@ -17,13 +17,15 @@ AXEL has four parts:
 
   It keeps KYC state, the published days, the attested reports and the indexed events in one SQLite file.
 
+The frontend and the backend run on the v2 program, `axel_v2` ([v2.md](v2.md)), which is not deployed yet. The program sections of this document describe v1, which is what devnet runs.
+
 ```
              Investor / admin browser (Phantom or Solflare, devnet)
                                    │
                                    ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │ Frontend — Next.js 14 (frontend/)                                │
-│ catalog · asset page · dashboard · payouts · admin panel         │
+│ catalog · asset page · dashboard · payouts · solvency · admin    │
 │ reads accounts over JSON-RPC, builds transactions from the IDL   │
 └───────┬───────────────────────────────────────────┬──────────────┘
         │ RPC reads + wallet-signed transactions    │ HTTP /telemetry/*, /reports/*, /events
@@ -71,9 +73,12 @@ sdk/axel-v2/                    Codama TypeScript client of the v2 program (see 
 backend/src/                    health, kyc, fleet (Yandex Fleet client, simulator), telemetry, reports, indexer, solana modules
 frontend/src/
   app/[locale]/                 routes (en default, ru, kk)
-  hooks/                        chain reads and transaction hooks
-  lib/solana/                   connection, PDA derivation, readers, instruction builders, vendored IDL (idl/ v1, idl-v2/ v2)
-  lib/api/                      telemetry HTTP client
+  app/api/demo/                 judge demo routes (devnet and localnet only)
+  app/api/actions/, app/actions.json   Solana Actions (Blinks): invest and claim
+  hooks/                        chain reads and transaction hooks (axel_v2)
+  lib/solana/                   axel_v2 client: cluster config, PDAs, readers, math, instruction builders, error messages, vendored IDL (idl-v2/)
+  lib/api/                      telemetry and indexer HTTP clients
+  lib/demo/, lib/actions/       demo route logic (keys, limits, tokens, transactions) and the Actions handlers
 Anchor.toml                     program IDs for localnet and devnet; provider cluster = devnet
 ```
 
@@ -310,31 +315,44 @@ Safety rules:
 - **Retries are safe.** Sumsub retries any non-2xx answer. An RPC outage, a failed transaction or a Sumsub API error returns 5xx, and the retry finds the on-chain record as it really is.
 - **Fail closed.** Without `SUMSUB_WEBHOOK_SECRET` or the KYC key the webhook answers 503; in production the backend does not start without them ([api.md](api.md#backend-configuration)).
 
-v2 is not deployed yet, so these records exist only on a local validator or LiteSVM. v1 wallets are still approved from the admin panel (`WhitelistManager`) or by calling `add_to_whitelist` directly; the backend no longer calls v1.
+v2 is not deployed yet, so these records exist only on a local validator or LiteSVM. The frontend does not call `/kyc/nonce` or `/kyc/session` yet and has no Sumsub WebSDK: its console writes `Investor` records with `set_investor` when the connected wallet holds the KYC key or the demo KYC key, and the judge demo writes DEMO records through its own routes. v1 wallets are whitelisted by calling `add_to_whitelist` directly; the backend no longer calls v1.
 
 ## Frontend
 
-The frontend uses:
+The frontend runs on `axel_v2`. The v1 client and IDL were removed from it; with v2 not deployed, devnet shows an empty catalog, and the app is used against a local validator (`NEXT_PUBLIC_SOLANA_NETWORK=localnet`).
+
+It uses:
 - Next.js 14 App Router, React 18, TypeScript and Tailwind.
 - `next-intl`. Locales are `en` (default, no URL prefix), `ru` and `kk`, so for example `/ru/dashboard`.
-- Wallet Adapter with Phantom and Solflare, `autoConnect`, and devnet RPC by default.
+- Wallet Adapter with Phantom and Solflare and `autoConnect`. The cluster, RPC and program ID come from the environment ([api.md](api.md#frontend-environment)).
+- The client in `lib/solana/` ([api.md](api.md#typescript-client-frontend-axel_v2)). Amounts are `bigint` base units of the project's payment token and are shown with its symbol and decimals (tKZT, USDC), never in SOL; the SOL balance in the wallet menu is for fees.
 
 | Route | What it does | Chain access |
 |---|---|---|
-| `/` | Landing page: figures from the chain, the catalog of all projects (with a status filter once cars differ in status), how it works, Explorer links to verify the program, risks | `program.account.projectState.all()` plus Token-2022 metadata for each mint, read once and shared by every section |
-| `/assets/[id]` | Asset page: car metadata, sale progress, price, terms with Explorer links (mint, vault, operator, oracle), buy panel and invest modal, the car's payout history, a payout calculator on the reader's own inputs, telemetry widget. `id` is the mint address or the list index. | The wallet's `WhitelistEntry`, the project's `RevenuePeriod`s; `buy_tokens` |
-| `/dashboard` | Portfolio: holdings, revenue periods with claim status, claim / claim-all | ATA balances, `RevenuePeriod`, `ClaimRecord`; `claim_revenue` (claim-all packs several claims into one transaction) |
-| `/payouts` | Payout history across the wallet's holdings | `RevenuePeriod`, `ClaimRecord` |
-| `/admin` | Metrics, whitelist manager, revenue deposit form, pause / resume / close | `add_to_whitelist`, `remove_from_whitelist`, `deposit_revenue`, `pause_project`, `resume_project`, `close_project` |
+| `/` | Landing page: figures from the chain (value sold per payment token), the catalog with filters by state, city and class (each shown once the cars differ in it), how it works, Explorer links, risks | `getProgramAccounts` for `Project`, one `getMultipleAccounts` for the share mints' metadata and the payment mints |
+| `/assets/[id]` | Asset page, `id` = share mint: state, price, raise progress with a soft-cap marker, the deadline, the escrow balance read live, a timeline of the state machine, terms and holder count, the buy action, the wallet's shares with a refund for a failed raise, a public "settle the raise" once its outcome is certain, deposit history, "Check the car's data yourself", telemetry, payout calculator | `Project`, the escrow and income vault token accounts (every 15 s), the wallet's `Investor` and `Position`, the car's `Position`s, `RevenuePeriod`s; `buy_shares`, `refund` (with `finalize_raise` first when needed), `finalize_raise` |
+| `/dashboard` | Portfolio: a pending recovery of the wallet's shares with a veto, value, shares, what a claim pays now; per car claim, refund, or send shares; claim all | `RecoveryRequest`s by old owner, `Position`s by owner, `Project`s; `cancel_recovery`, `claim` (up to four per transaction), `refund`, `open_position` + hooked `transfer_checked` |
+| `/payouts` | Deposits of the wallet's cars and its claimed and claimable totals; with an indexer, its part of each deposit and its claims | `Position`s, `RevenuePeriod`s, or the [indexer API](api.md#indexer-api-read-by-the-frontend) |
+| `/solvency` | Proof of solvency: for every car, the income vault against deposited minus claimed and what holders are owed now, the escrow against (sold − refunded) × price, the share supply against the ledger and the positions, and the revenue checkpoints; checked again every 30 s | Every `Project` and `Position`, then one `getMultipleAccounts` for each car's income vault, escrow and share mint |
+| `/demo` | The judges' path, on a demo deployment (`NEXT_PUBLIC_DEMO_ACCESS=1`, devnet or localnet): demo access, buy in an open raise, shares from the desk, a simulated month, claim, verify, proof of solvency; each step's state read from the chain | The wallet's `Investor`, `Position`s and `Project`s; `claim`. Access, shares and simulated months go through the [demo routes](api.md#judge-demo-api), which send their own transactions |
+| `/api/demo/*`, `/api/actions/*`, `/actions.json` | [Judge demo routes](api.md#judge-demo-api) and [Solana Actions](api.md#solana-actions-blinks) | Server-side: `set_investor`, mint and SOL drip, `open_position` + hooked transfer, `deposit_revenue` co-signed by the oracle (demo); unsigned `buy_shares` and `claim` (Blinks) |
+| `/admin` | Console split by the keys the wallet holds. **Platform admin:** each car's state (settle, activate with the purchase documents' hash, cancel raise, pause, resume, close), its operator and oracle, share recovery (propose, run, withdraw), and the config account. **Operator:** its cars' deposits, keys, live income vault and payout history. **KYC:** looks a wallet's record up, then approves or revokes it; the demo key is stopped before it touches a record it may not change | `Config`, `Project`s, `RecoveryRequest`s, `Investor`; `finalize_raise`, `activate_project`, `cancel_raise`, `pause_project`, `resume_project`, `close_project`, `set_project_roles`, `propose_recovery`, `execute_recovery`, `cancel_recovery`, `set_investor` |
 
 Details:
 
-- `/admin` is not in the navigation bar. `useAdminAccess` shows the panel only when the connected wallet is the admin of the **first** project returned by the catalog query; other visitors see why the panel is unavailable. The panel manages only that project.
-- The buy button either connects a wallet or, during an open sale, buys with a wallet whose `WhitelistEntry` is approved. In every other case it is disabled and states the reason. The asset page reads the entry with `components/asset/useWalletApproval.ts`, not with the broken `useWhitelistStatus` (limitation 8).
-- `lib/solana/instructions.ts` also has a builder for `update_price`, but no component uses it.
-- `initialize_project` and `revoke_mint_authority` have no UI. Projects are created with `npm run init-project`.
-- Car photos are stock photos picked by make and model (`components/catalog/vehiclePhoto.ts`) and marked "Illustrative photo". Credits are in `public/images/CREDITS.md`. Design rules: [`frontend/design.md`](../frontend/design.md).
-- Security headers are set in `next.config.mjs`: a CSP whose `connect-src` allows Solana devnet and mainnet RPC, Helius and `http://localhost:*`; `X-Frame-Options: DENY`; `nosniff`; a Referrer-Policy; and a Permissions-Policy.
+- Access comes from the roles on-chain (`hooks/useAdminRoles.ts`): `Config.admin`, `Config.kyc_authority`, `Config.demo_kyc_authority` and each project's `operator`. `/admin` is not in the navigation bar; a wallet with several roles switches between them with tabs.
+- On every test network a banner under the navigation bar says the data is the fictional demo seed of `scripts/seed-devnet`; on the home page the hero says it. On a demo deployment the banner, the mobile menu and a car page's purchase panel (for a wallet without KYC) lead to `/demo`.
+- The demo routes hold five keys, each for one role (faucet, demo KYC, desk, the demo car's operator and oracle), never the admin's. The limits live in Upstash Redis when configured; a wallet's session from the access route is an HMAC token, so the shares and simulation routes need no storage to know who went through access. A simulated month's report holds only what the period account records, so "Check the car's data yourself" rebuilds it and labels the deposit as simulated.
+- The buy button reads the wallet's `Investor` record (`hooks/useInvestor.ts`) and judges it with the program's rule (`lib/solana/eligibility.ts`): active, not expired, and DEMO only where the project accepts it. Otherwise it names the reason. The purchase dialog says where the money goes (escrow, refund rule) and discloses a payment token whose issuer can freeze, seize or pause.
+- Portfolio figures use `pendingRevenue`, the program's settle on BigInt, so "Ready to claim" is exactly what a claim pays.
+- A transfer reads the recipient's KYC record and position while the address is typed, refuses a wallet the hook would refuse, and adds `open_position` when the recipient has no position yet.
+- A refund opens a dialog with the amount, the shares burned and the only account it can go to. When a raise has failed but nobody settled it, the refund transaction runs `finalize_raise` first.
+- "Check the car's data yourself" (`components/asset/VerifyData.tsx`, `lib/verify/`) downloads the car's published files ([api.md](api.md#published-car-data-read-by-verify)), rebuilds the telemetry hash chain with the browser's WebCrypto over RFC 8785 canonical JSON, and compares it with the project's `telemetry_head`, `telemetry_count` and `last_telemetry_date`. It also checks every deposit's income report against its `report_hash`, finds the day each deposit's `telemetry_head` snapshot points to, and checks the purchase document against `acquisition_doc_hash`.
+- Proof of solvency (`lib/solana/solvency.ts`) reads the accounts in several RPC calls, so a transaction can land between them; a failed check is read again once before it is reported. The rule that every share account equals its position needs every token account of every share mint and is left to the seed's `verify-invariants` script.
+- Every transaction result is shown in a toast with an Explorer link. Failures are explained in the user's language: every `axel_v2` error code has a message in `messages/*.json` (`ProgramErrors`), and wallet refusals, missing SOL, expired blockhashes and RPC failures have their own (`TxErrors`).
+- Revenue deposits need the oracle's co-signature, which the console cannot produce. The backend's `POST /reports/draft` and `POST /reports/attest` provide it ([Oracle / Telemetry Flow](#oracle--telemetry-flow)), but the console does not call them yet. `create_project` has no UI yet.
+- Car photos are stock photos picked by make and model (`components/catalog/vehiclePhoto.ts`) and always marked "Illustrative photo": a share mint holds no photo of its car. Credits are in `public/images/CREDITS.md`. Design rules: [`frontend/design.md`](../frontend/design.md).
+- Security headers are set in `next.config.mjs`: a CSP whose `connect-src` allows the public Solana clusters, Helius, a local validator, and the configured RPC, telemetry, indexer and published-data origins; `X-Frame-Options: DENY`; `nosniff`; a Referrer-Policy; and a Permissions-Policy.
 
 ## Security Properties (as implemented)
 
@@ -349,7 +367,7 @@ Details:
 
 ## Known Limitations
 
-These come from reading the code on 2026-09-24. None of the program's limitations is fixed in v1. Items 5 and 6 are fixed in the backend, which now serves the v2 program only.
+These come from reading the v1 code on 2026-09-24. The program items are fixed in `axel_v2` ([v2.md](v2.md#v1-limitation--v2-fix)); items 5 and 6 were fixed when the backend moved to v2, and items 7 and 8 when the frontend did.
 
 1. **Anyone can whitelist anyone.** `add_to_whitelist` and `remove_from_whitelist` accept any signer. Any wallet can approve itself, which defeats KYC gating for `buy_tokens` and for the hook. It can also revoke other wallets. The integration tests call both instructions with a freshly generated keypair.
 2. **Revenue claims use the current balance.** `claim_revenue` pays `current balance / snapshot × deposit`. Two cases pay out more than intended:
@@ -364,11 +382,8 @@ These come from reading the code on 2026-09-24. None of the program's limitation
    - Anyone can create an ATA for any wallet. If a wallet's ATA is created before its first purchase, the ATA stays frozen and that wallet's `buy_tokens` fails when minting.
 5. **No telemetry was written on-chain.** The backend's v1 `record_telemetry` transaction passed an extra `mint` account, so the telemetry PDA check always failed. That path is removed. The backend now writes v2 `record_telemetry` batches built from the IDL ([Oracle / Telemetry Flow](#oracle--telemetry-flow)), so v1 projects get no telemetry.
 6. **Simulated telemetry was not flagged.** It was served like real data, and the backend fell back to it silently when Yandex failed. Now every record carries `data_origin` inside its hashed text, there is no fallback, and simulated cars are refused on mainnet.
-7. **The telemetry widget does not reach the backend.**
-   - `useTelemetry` fetches `${NEXT_PUBLIC_API_URL}/telemetry/latest/:mint`. That variable is not in `.env.local.example`, and when it is empty the request goes to the Next.js origin, which has no such route.
-   - The separate client `lib/api/telemetry.ts` uses `NEXT_PUBLIC_TELEMETRY_API_URL`, but no component calls it.
-   - The backend allows only the origins in `CORS_ORIGINS` (default `http://localhost:3000`).
-8. **The whitelist status hook always returns false.** `useWhitelistStatus` derives the whitelist PDA and then passes it to `fetchWhitelistEntry`, which derives a PDA again from that address. Nothing calls it any more: the asset page uses its own correct reader, `components/asset/useWalletApproval.ts`.
+7. **The telemetry widget did not reach the backend.** It fetched `${NEXT_PUBLIC_API_URL}/telemetry/latest/:mint`, a variable no example file set, and it kept showing the first car's data after moving to another car. The v2 frontend reads `NEXT_PUBLIC_TELEMETRY_API_URL`, makes no request when it is unset, and reads again when the car changes. The backend answers only the origins in `CORS_ORIGINS`, so the frontend's origin must be listed there.
+8. **The whitelist status hook always returned false.** `useWhitelistStatus` passed the whitelist PDA where the reader expected the wallet. It is gone; the v2 frontend reads `Investor` records with `useInvestor`.
 9. **The revenue vault is subject to rent rules.** The vault is a 0-byte system account, so Solana's rent-state rules apply. A deposit that would leave an empty vault below the rent-exempt minimum (890,880 lamports) is rejected. So is a claim that would leave a non-zero balance below that minimum. Rounding dust can therefore block the last claim of a period, unless the vault holds extra SOL.
 10. **Transfer-fee rounding.** Token-2022 rounds the fee up, and shares have 0 decimals, so every transfer pays at least one whole share. A 1-share transfer delivers nothing to the recipient.
 11. **The admin holds strong powers.** The admin receives all sale proceeds immediately and sweeps the vault on close. The admin is also the permanent delegate: it can move or burn any holder's shares with Token-2022 directly. On devnet these are single keys. The code comment mentions a Squads multisig for production, but none is configured.

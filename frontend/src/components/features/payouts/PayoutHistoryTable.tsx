@@ -4,94 +4,142 @@ import { ArrowUpRight } from 'lucide-react';
 import { DataTable, ColumnDef } from '@/components/ui/DataTable';
 import { Pill } from '@/components/ui/Pill';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { PayoutRecord } from '@/hooks/usePayoutHistory';
-import { formatDate, formatPercent, formatSolAmount } from '@/lib/format';
+import type { PayoutRow } from '@/hooks/usePayoutHistory';
+import { formatDate, formatDay, formatTokenAmount } from '@/lib/format';
+import { getExplorerUrl } from '@/lib/solana/connection';
+import { carTitle, type PaymentToken } from '@/lib/solana/tokens';
 
 interface PayoutHistoryTableProps {
-  data: PayoutRecord[];
+  rows: PayoutRow[];
+  /** Whether each row knows the wallet's part; the chain alone does not. */
+  showEarned: boolean;
   isLoading: boolean;
 }
 
-export function PayoutHistoryTable({ data, isLoading }: PayoutHistoryTableProps): JSX.Element {
+/** One table row with flat fields, so every column sorts on its own value. */
+interface PayoutView {
+  id: string;
+  car: string;
+  symbol: string;
+  index: number;
+  final: boolean;
+  days: string;
+  depositedAt: number;
+  net: bigint;
+  perShare: bigint;
+  earned: bigint;
+  unit: PaymentToken;
+  href: string;
+}
+
+function toView(row: PayoutRow, locale: string): PayoutView {
+  return {
+    id: `${row.project.address.toBase58()}:${row.index}`,
+    car: carTitle(row.project.car),
+    symbol: row.project.car.symbol,
+    index: row.index,
+    final: row.kind === 'final',
+    days: `${formatDay(row.periodStart, locale)} – ${formatDay(row.periodEnd, locale)}`,
+    depositedAt: row.depositedAt,
+    net: row.net,
+    perShare: row.net / row.supply,
+    earned: row.earned ?? 0n,
+    unit: row.project.payment,
+    // The deposit transaction when the indexer knows it, else the period account on-chain.
+    href: row.signature
+      ? getExplorerUrl(row.signature, 'tx')
+      : getExplorerUrl(row.period.toBase58()),
+  };
+}
+
+export function PayoutHistoryTable({
+  rows,
+  showEarned,
+  isLoading,
+}: PayoutHistoryTableProps): JSX.Element {
   const t = useTranslations('Payouts');
   const locale = useLocale();
+  const data = useMemo(() => rows.map((row) => toView(row, locale)), [rows, locale]);
 
-  const columns = useMemo<ColumnDef<PayoutRecord>[]>(
-    () => [
+  const columns = useMemo<ColumnDef<PayoutView>[]>(() => {
+    const amount = (value: bigint, unit: PaymentToken) => formatTokenAmount(value, unit, locale);
+    const all: (ColumnDef<PayoutView> | null)[] = [
       {
         header: t('tablePeriod'),
-        accessorKey: 'period',
-        sortable: true,
-        cell: (item) => <span className="font-medium text-foreground">{item.period}</span>,
-      },
-      {
-        header: t('tableDate'),
-        accessorKey: 'timestamp',
+        accessorKey: 'car',
         sortable: true,
         cell: (item) => (
-          <span className="text-muted-foreground">{formatDate(item.timestamp / 1000, locale)}</span>
-        ),
-      },
-      {
-        header: t('tableDeposited'),
-        accessorKey: 'deposited',
-        sortable: true,
-        align: 'right',
-        cell: (item) => formatSolAmount(item.deposited, locale),
-      },
-      {
-        header: t('tableShare'),
-        accessorKey: 'share',
-        sortable: true,
-        align: 'right',
-        cell: (item) => formatPercent(item.share, 1, locale),
-      },
-      {
-        header: t('tableClaim'),
-        accessorKey: 'claimAmount',
-        sortable: true,
-        align: 'right',
-        cell: (item) => (
-          <span className="font-semibold text-foreground">
-            +{formatSolAmount(item.claimAmount, locale)}
+          <span className="flex flex-col">
+            <span className="font-medium text-foreground">
+              {item.car} <span className="font-mono text-muted-foreground">{item.symbol}</span>
+            </span>
+            <span className="inline-flex items-center gap-2 text-muted-foreground">
+              {t('payoutNumber', { index: item.index })}
+              {item.final && <Pill tone="info">{t('finalPayout')}</Pill>}
+            </span>
           </span>
         ),
       },
       {
-        header: t('tableStatus'),
-        accessorKey: 'status',
-        sortable: true,
-        cell: (item) =>
-          item.status === 'claimed' ? (
-            <Pill tone="success">{t('statusClaimed')}</Pill>
-          ) : (
-            <Pill tone="info">{t('statusAvailable')}</Pill>
-          ),
+        header: t('tableDays'),
+        accessorKey: 'days',
+        cell: (item) => <span className="text-muted-foreground">{item.days}</span>,
       },
       {
-        header: t('tableTxLink'),
-        accessorKey: 'txLink',
-        sortable: false,
-        align: 'right',
-        cell: (item) =>
-          item.txLink ? (
-            <a
-              href={item.txLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center gap-1 font-medium text-primary underline-offset-4 transition-colors duration-fast ease-move hover:text-primary-hover hover:underline sm:min-h-0"
-            >
-              {t('viewRecord')}
-              <ArrowUpRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
-              <span className="sr-only">{t('openInExplorer')}</span>
-            </a>
-          ) : (
-            <span className="text-subtle-foreground">—</span>
-          ),
+        header: t('tableDate'),
+        accessorKey: 'depositedAt',
+        sortable: true,
+        cell: (item) => (
+          <span className="text-muted-foreground">{formatDate(item.depositedAt, locale)}</span>
+        ),
       },
-    ],
-    [t, locale],
-  );
+      {
+        header: t('tableDeposited'),
+        accessorKey: 'net',
+        sortable: true,
+        align: 'right',
+        cell: (item) => amount(item.net, item.unit),
+      },
+      {
+        header: t('tablePerShare'),
+        accessorKey: 'perShare',
+        sortable: true,
+        align: 'right',
+        cell: (item) => amount(item.perShare, item.unit),
+      },
+      showEarned
+        ? {
+            header: t('tableEarned'),
+            accessorKey: 'earned',
+            sortable: true,
+            align: 'right',
+            cell: (item) => (
+              <span className="font-semibold text-foreground">
+                +{amount(item.earned, item.unit)}
+              </span>
+            ),
+          }
+        : null,
+      {
+        header: t('tableTxLink'),
+        accessorKey: 'href',
+        align: 'right',
+        cell: (item) => (
+          <a
+            href={item.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center gap-1 font-medium text-primary underline-offset-4 transition-colors duration-fast ease-move hover:text-primary-hover hover:underline sm:min-h-0"
+          >
+            {t('viewRecord')}
+            <ArrowUpRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+            <span className="sr-only">{t('openInExplorer')}</span>
+          </a>
+        ),
+      },
+    ];
+    return all.filter((column): column is ColumnDef<PayoutView> => column !== null);
+  }, [t, locale, showEarned]);
 
   if (isLoading) {
     return (

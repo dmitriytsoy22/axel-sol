@@ -1,10 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { RotateCw } from 'lucide-react';
-import { useDashboard } from '@/hooks/useDashboard';
+import { ArrowRight, RotateCw } from 'lucide-react';
+import { Link } from '@/i18n/routing';
+import { usePositions, type Holding } from '@/hooks/usePositions';
+import { canClaim } from '@/lib/solana/lifecycle';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
 import { Button } from '@/components/ui/Button';
@@ -15,7 +17,9 @@ import { shortAddress } from '@/lib/format';
 import { NETWORK_NAME } from '@/lib/network';
 import { PortfolioSummary } from './PortfolioSummary';
 import { HoldingsTable } from './HoldingsTable';
-import { RevenuePeriodsCard } from './RevenuePeriodsCard';
+import { ClaimAllButton } from './ClaimAllButton';
+import { RecoveryAlerts } from './RecoveryAlerts';
+import { TransferModal } from './TransferModal';
 
 function DashboardSkeleton({ summaryLabels }: { summaryLabels: string[] }): JSX.Element {
   return (
@@ -31,17 +35,14 @@ function DashboardSkeleton({ summaryLabels }: { summaryLabels: string[] }): JSX.
 
 export function DashboardView(): JSX.Element {
   const t = useTranslations('Dashboard');
-  const { connecting, publicKey } = useWallet();
-  const { holdings, revenuePeriods, summary, isLoading, connected, error, refetch } =
-    useDashboard();
+  const { connected, connecting, publicKey } = useWallet();
+  const { holdings, summary, isLoading, error, refetch } = usePositions();
+  const [transferring, setTransferring] = useState<Holding | null>(null);
 
   const summaryLabels = [t('totalValue'), t('tokensHeld'), t('unclaimedRevenue')];
-  const cars = Object.fromEntries(
-    holdings.map(({ project }) => [
-      project.mint,
-      { name: `${project.carMake} ${project.carModel} ${project.carYear}`, vin: project.vin },
-    ]),
-  );
+  const claimable = holdings
+    .filter(({ project, pending }) => pending > 0n && canClaim(project.status))
+    .map(({ project }) => project);
 
   let body: React.ReactNode;
   if (!connected) {
@@ -74,18 +75,26 @@ export function DashboardView(): JSX.Element {
   } else if (isLoading) {
     body = <DashboardSkeleton summaryLabels={summaryLabels} />;
   } else if (holdings.length === 0) {
-    body = <HoldingsTable holdings={holdings} />;
+    body = <HoldingsTable holdings={holdings} onChanged={refetch} onTransfer={setTransferring} />;
   } else {
     body = (
       <div data-testid="dashboard-view" className="flex flex-col gap-12 md:gap-16">
-        <PortfolioSummary
-          totalValue={summary.totalValue}
-          tokensHeld={summary.tokensHeld}
-          carCount={holdings.length}
-          unclaimedRevenue={summary.unclaimedRevenue}
-        />
-        <HoldingsTable holdings={holdings} />
-        <RevenuePeriodsCard periods={revenuePeriods} cars={cars} onClaimed={refetch} />
+        <RecoveryAlerts projects={holdings.map(({ project }) => project)} onChanged={refetch} />
+        <PortfolioSummary summary={summary} carCount={holdings.length} />
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-border bg-muted px-5 py-4">
+          <p className="max-w-[60ch] text-body text-muted-foreground">
+            {claimable.length > 0 ? t('claimLead') : t('nothingToClaim')}
+          </p>
+          {claimable.length > 0 && <ClaimAllButton projects={claimable} onClaimed={refetch} />}
+        </div>
+        <HoldingsTable holdings={holdings} onChanged={refetch} onTransfer={setTransferring} />
+        <Link
+          href="/payouts"
+          className="inline-flex min-h-11 items-center gap-1 self-start text-small font-medium text-primary underline-offset-4 hover:underline"
+        >
+          {t('fullHistory')}
+          <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+        </Link>
       </div>
     );
   }
@@ -105,6 +114,11 @@ export function DashboardView(): JSX.Element {
         }
       />
       {body}
+      <TransferModal
+        holding={transferring}
+        onClose={() => setTransferring(null)}
+        onTransferred={refetch}
+      />
     </div>
   );
 }

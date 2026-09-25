@@ -3,16 +3,17 @@
 import React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowUpRight, RotateCw } from 'lucide-react';
-import { ProjectState } from '@/types/project';
-import type { RevenuePeriod } from '@/types/revenue';
+import type { RevenuePeriodAccount } from '@/lib/solana/accounts';
+import type { Project } from '@/types/project';
 import { Button } from '@/components/ui/Button';
+import { Pill } from '@/components/ui/Pill';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useRevenuePeriods } from '@/hooks/useRevenuePeriods';
 import { getExplorerUrl } from '@/lib/solana/connection';
-import { formatDate, formatNumber, formatSol } from '@/lib/format';
-import { useCarPayouts } from './useCarPayouts';
+import { formatCount, formatDate, formatDay, formatTokenAmount } from '@/lib/format';
 
 interface CarPayoutsProps {
-  project: ProjectState;
+  project: Project;
 }
 
 function RecordLink({
@@ -20,13 +21,13 @@ function RecordLink({
   label,
   srLabel,
 }: {
-  period: RevenuePeriod;
+  period: RevenuePeriodAccount;
   label: string;
   srLabel: string;
 }) {
   return (
     <a
-      href={getExplorerUrl(period.pda)}
+      href={getExplorerUrl(period.address.toBase58())}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 transition-colors duration-fast ease-move hover:text-primary-hover hover:underline md:min-h-0"
@@ -38,20 +39,23 @@ function RecordLink({
   );
 }
 
-/** Every payout the operator has deposited for this car, straight from its period accounts. */
+/** Every revenue deposit of this car, newest first, straight from its period accounts. */
 export function CarPayouts({ project }: CarPayoutsProps): JSX.Element {
   const t = useTranslations('Asset');
   const locale = useLocale();
-  const { periods, isLoading, error, retry } = useCarPayouts(project.mint, project.periodCount);
+  const { periods, isLoading, error, refetch } = useRevenuePeriods(project);
+  const newestFirst = [...periods].reverse();
 
-  const perShare = (period: RevenuePeriod) =>
-    period.tokenSupplySnapshot > 0 ? period.totalDeposited / period.tokenSupplySnapshot : 0;
-
-  const retryButton = (
-    <Button variant="secondary" size="sm" onClick={retry}>
-      <RotateCw aria-hidden="true" strokeWidth={1.75} />
-      {t('retry')}
-    </Button>
+  const amount = (value: bigint) => formatTokenAmount(value, project.payment, locale);
+  const perShare = (period: RevenuePeriodAccount) =>
+    formatTokenAmount(period.net / period.supply, project.payment, locale);
+  const days = (period: RevenuePeriodAccount) =>
+    `${formatDay(period.periodStart, locale)} – ${formatDay(period.periodEnd, locale)}`;
+  const label = (period: RevenuePeriodAccount) => (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      #{period.index}
+      {period.kind === 'final' && <Pill tone="info">{t('finalPayout')}</Pill>}
+    </span>
   );
 
   let body: React.ReactNode;
@@ -60,6 +64,16 @@ export function CarPayouts({ project }: CarPayoutsProps): JSX.Element {
       <div className="rounded-card border border-dashed border-border px-6 py-8">
         <p className="text-body font-semibold text-foreground">{t('payoutsEmptyTitle')}</p>
         <p className="mt-1 max-w-[52ch] text-body text-muted-foreground">{t('payoutsEmptyBody')}</p>
+      </div>
+    );
+  } else if (error) {
+    body = (
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-border bg-card px-5 py-4">
+        <p className="text-body text-muted-foreground">{t('payoutsError')}</p>
+        <Button variant="secondary" size="sm" onClick={refetch}>
+          <RotateCw aria-hidden="true" strokeWidth={1.75} />
+          {t('retry')}
+        </Button>
       </div>
     );
   } else if (isLoading) {
@@ -73,13 +87,6 @@ export function CarPayouts({ project }: CarPayoutsProps): JSX.Element {
         ))}
       </div>
     );
-  } else if (error || periods.length === 0) {
-    body = (
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-border bg-card px-5 py-4">
-        <p className="text-body text-muted-foreground">{t('payoutsError')}</p>
-        {retryButton}
-      </div>
-    );
   } else {
     const srLabel = t('openInExplorer');
     body = (
@@ -91,7 +98,7 @@ export function CarPayouts({ project }: CarPayoutsProps): JSX.Element {
                 {t('colPayout')}
               </th>
               <th scope="col" className="px-3 py-3 font-medium">
-                {t('colDate')}
+                {t('colPeriod')}
               </th>
               <th scope="col" className="px-3 py-3 text-right font-medium">
                 {t('colPaidIn')}
@@ -108,22 +115,23 @@ export function CarPayouts({ project }: CarPayoutsProps): JSX.Element {
             </tr>
           </thead>
           <tbody className="divide-y divide-border tabular-nums">
-            {periods.map((period) => (
-              <tr key={period.pda}>
-                <td className="py-3 pl-5 pr-3 font-medium text-foreground">
-                  #{period.index}
-                </td>
+            {newestFirst.map((period) => (
+              <tr key={period.index}>
+                <td className="py-3 pl-5 pr-3 font-medium text-foreground">{label(period)}</td>
                 <td className="px-3 py-3 text-muted-foreground">
-                  {formatDate(period.depositedAt, locale)}
+                  {days(period)}
+                  <span className="block text-small">
+                    {t('depositedOn', { date: formatDate(period.depositedAt, locale) })}
+                  </span>
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 text-right text-foreground">
+                  {amount(period.net)}
                 </td>
                 <td className="px-3 py-3 text-right text-foreground">
-                  {formatSol(period.totalDeposited, locale)}
+                  {formatCount(period.supply, locale)}
                 </td>
-                <td className="px-3 py-3 text-right text-foreground">
-                  {formatNumber(period.tokenSupplySnapshot, locale)}
-                </td>
-                <td className="px-3 py-3 text-right font-medium text-foreground">
-                  {formatSol(perShare(period), locale)}
+                <td className="whitespace-nowrap px-3 py-3 text-right font-medium text-foreground">
+                  {perShare(period)}
                 </td>
                 <td className="py-3 pl-3 pr-5 text-right">
                   <RecordLink period={period} label={t('viewRecord')} srLabel={srLabel} />
@@ -134,29 +142,19 @@ export function CarPayouts({ project }: CarPayoutsProps): JSX.Element {
         </table>
 
         <ul className="divide-y divide-border sm:hidden">
-          {periods.map((period) => (
-            <li key={period.pda} className="px-5 py-4">
+          {newestFirst.map((period) => (
+            <li key={period.index} className="px-5 py-4">
               <div className="flex items-baseline justify-between gap-4">
-                <p className="text-body font-medium text-foreground">
-                  #{period.index}
-                </p>
-                <p className="text-small text-muted-foreground">
-                  {formatDate(period.depositedAt, locale)}
-                </p>
+                <p className="text-body font-medium text-foreground">{label(period)}</p>
+                <p className="text-small text-muted-foreground">{days(period)}</p>
               </div>
               <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-small tabular-nums">
                 <dt className="text-muted-foreground">{t('colPaidIn')}</dt>
-                <dd className="text-right text-foreground">
-                  {formatSol(period.totalDeposited, locale)}
-                </dd>
+                <dd className="text-right text-foreground">{amount(period.net)}</dd>
                 <dt className="text-muted-foreground">{t('colSharesCounted')}</dt>
-                <dd className="text-right text-foreground">
-                  {formatNumber(period.tokenSupplySnapshot, locale)}
-                </dd>
+                <dd className="text-right text-foreground">{formatCount(period.supply, locale)}</dd>
                 <dt className="text-muted-foreground">{t('colPerShare')}</dt>
-                <dd className="text-right font-medium text-foreground">
-                  {formatSol(perShare(period), locale)}
-                </dd>
+                <dd className="text-right font-medium text-foreground">{perShare(period)}</dd>
               </dl>
               <div className="mt-1">
                 <RecordLink period={period} label={t('viewRecord')} srLabel={srLabel} />
@@ -164,18 +162,6 @@ export function CarPayouts({ project }: CarPayoutsProps): JSX.Element {
             </li>
           ))}
         </ul>
-
-        {periods.length < project.periodCount && (
-          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border bg-muted px-5 py-3">
-            <p className="text-small text-muted-foreground">
-              {t('payoutsPartial', {
-                shown: formatNumber(periods.length, locale),
-                total: formatNumber(project.periodCount, locale),
-              })}
-            </p>
-            {retryButton}
-          </div>
-        )}
       </div>
     );
   }

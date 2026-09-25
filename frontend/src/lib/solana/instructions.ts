@@ -1,253 +1,510 @@
-import { PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js';
-import { TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@solana/spl-token';
-import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
-import type { Axel } from './idl/axel';
-import IDL from './idl/axel.json';
+import BN from 'bn.js';
+import { AccountMeta, PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js';
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  createTransferCheckedInstruction,
+  TOKEN_2022_PROGRAM_ID,
+} from '@solana/spl-token';
+import type {
+  InvestorStatus,
+  KycProvider,
+  ProjectAccount,
+  RecoveryRequestAccount,
+  RevenueKind,
+} from './accounts';
 import { PROGRAM_ID } from './connection';
 import {
-  deriveProjectState,
-  deriveRevenueVault,
-  deriveWhitelistEntry,
-  deriveRevenuePeriod,
-  deriveClaimRecord,
+  configAddress,
+  extraAccountMetasAddress,
+  investorAddress,
+  paymentAccountAddress,
+  periodAddress,
+  positionAddress,
+  projectAddress,
+  recoveryAddress,
+  shareAccountAddress,
 } from './pda';
+import { program } from './program';
+
+/** Shares are whole units (`SHARE_DECIMALS`). */
+export const SHARE_DECIMALS = 0;
+
+/** The addresses of a project that instructions need; all are stored in the project account. */
+export type ProjectKeys = Pick<
+  ProjectAccount,
+  'address' | 'shareMint' | 'paymentMint' | 'paymentTokenProgram' | 'escrowVault' | 'revenueVault'
+>;
+
+function u64(value: bigint): BN {
+  return new BN(value.toString());
+}
+
+function bytes32(hex: string): number[] {
+  if (!/^[0-9a-f]{64}$/i.test(hex)) {
+    throw new Error('Expected a 32-byte hash as 64 hex characters');
+  }
+  return [...Buffer.from(hex, 'hex')];
+}
+
+const INVESTOR_STATUS = {
+  active: { active: {} },
+  revoked: { revoked: {} },
+  frozen: { frozen: {} },
+} as const;
+
+const KYC_PROVIDER = {
+  manual: { manual: {} },
+  sumsub: { sumsub: {} },
+  demo: { demo: {} },
+} as const;
+
+const REVENUE_KIND = {
+  regular: { regular: {} },
+  final: { final: {} },
+} as const;
+
+const programs = {
+  associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+  systemProgram: SystemProgram.programId,
+};
+
+/* ── Investor ─────────────────────────────────────────── */
 
 /**
- * Creates an Anchor program instance using the connected wallet.
+ * Buys `shares` in an open raise. The owner pays from its canonical payment account into the
+ * escrow; `maxTotalCost` bounds the price in case the project differs from what was shown.
  */
-function getProgramWithWallet(wallet: any, connection: any): Program<Axel> {
-  const provider = new AnchorProvider(connection, wallet, {
-    preflightCommitment: 'confirmed',
+export function buySharesInstruction(args: {
+  project: ProjectKeys;
+  owner: PublicKey;
+  payer?: PublicKey;
+  shares: bigint;
+  maxTotalCost: bigint;
+}): Promise<TransactionInstruction> {
+  const { project, owner } = args;
+  return program.methods
+    .buyShares(u64(args.shares), u64(args.maxTotalCost))
+    .accountsStrict({
+      payer: args.payer ?? owner,
+      owner,
+      config: configAddress(),
+      investor: investorAddress(owner),
+      project: project.address,
+      position: positionAddress(project.address, owner),
+      shareMint: project.shareMint,
+      ownerShareAccount: shareAccountAddress(owner, project.shareMint),
+      paymentMint: project.paymentMint,
+      ownerPaymentAccount: paymentAccountAddress(
+        owner,
+        project.paymentMint,
+        project.paymentTokenProgram,
+      ),
+      escrowVault: project.escrowVault,
+      shareTokenProgram: TOKEN_2022_PROGRAM_ID,
+      paymentTokenProgram: project.paymentTokenProgram,
+      ...programs,
+    })
+    .instruction();
+}
+
+/** Returns a failed raise's price of the owner's shares to its payment account. */
+export function refundInstruction(args: {
+  project: ProjectKeys;
+  owner: PublicKey;
+}): Promise<TransactionInstruction> {
+  const { project, owner } = args;
+  return program.methods
+    .refund()
+    .accountsStrict({
+      owner,
+      investor: investorAddress(owner),
+      project: project.address,
+      position: positionAddress(project.address, owner),
+      shareMint: project.shareMint,
+      ownerShareAccount: shareAccountAddress(owner, project.shareMint),
+      paymentMint: project.paymentMint,
+      ownerPaymentAccount: paymentAccountAddress(
+        owner,
+        project.paymentMint,
+        project.paymentTokenProgram,
+      ),
+      escrowVault: project.escrowVault,
+      shareTokenProgram: TOKEN_2022_PROGRAM_ID,
+      paymentTokenProgram: project.paymentTokenProgram,
+      ...programs,
+    })
+    .instruction();
+}
+
+/** Pays the owner's revenue to its canonical payment account; anyone may trigger it. */
+export function claimInstruction(args: {
+  project: ProjectKeys;
+  owner: PublicKey;
+  claimer?: PublicKey;
+}): Promise<TransactionInstruction> {
+  const { project, owner } = args;
+  return program.methods
+    .claim()
+    .accountsStrict({
+      claimer: args.claimer ?? owner,
+      owner,
+      investor: investorAddress(owner),
+      project: project.address,
+      position: positionAddress(project.address, owner),
+      paymentMint: project.paymentMint,
+      ownerPaymentAccount: paymentAccountAddress(
+        owner,
+        project.paymentMint,
+        project.paymentTokenProgram,
+      ),
+      revenueVault: project.revenueVault,
+      paymentTokenProgram: project.paymentTokenProgram,
+      ...programs,
+    })
+    .instruction();
+}
+
+/** Onboards a verified `owner` so it can receive shares; the owner does not sign. */
+export function openPositionInstruction(args: {
+  project: ProjectKeys;
+  owner: PublicKey;
+  payer: PublicKey;
+}): Promise<TransactionInstruction> {
+  const { project, owner } = args;
+  return program.methods
+    .openPosition()
+    .accountsStrict({
+      payer: args.payer,
+      owner,
+      investor: investorAddress(owner),
+      project: project.address,
+      position: positionAddress(project.address, owner),
+      shareMint: project.shareMint,
+      ownerShareAccount: shareAccountAddress(owner, project.shareMint),
+      shareTokenProgram: TOKEN_2022_PROGRAM_ID,
+      ...programs,
+    })
+    .instruction();
+}
+
+/** Closes an empty position and its share account, returning the rent to the owner. */
+export function closePositionInstruction(args: {
+  project: ProjectKeys;
+  owner: PublicKey;
+}): Promise<TransactionInstruction> {
+  const { project, owner } = args;
+  return program.methods
+    .closePosition()
+    .accountsStrict({
+      owner,
+      project: project.address,
+      position: positionAddress(project.address, owner),
+      shareMint: project.shareMint,
+      ownerShareAccount: shareAccountAddress(owner, project.shareMint),
+      shareTokenProgram: TOKEN_2022_PROGRAM_ID,
+      ...programs,
+    })
+    .instruction();
+}
+
+/**
+ * The accounts Token-2022 passes to the share mint's transfer hook, in the order of the
+ * validation account (`programs/axel-v2/src/hook.rs`): config and project as fixed keys, then
+ * the investors and positions of the two token accounts' owners.
+ */
+export function hookExtraAccounts(
+  project: Pick<ProjectKeys, 'address'>,
+  from: PublicKey,
+  to: PublicKey,
+): AccountMeta[] {
+  const readonly = (pubkey: PublicKey): AccountMeta => ({
+    pubkey,
+    isSigner: false,
+    isWritable: false,
   });
-  return new Program(IDL as Axel, provider);
+  const writable = (pubkey: PublicKey): AccountMeta => ({
+    pubkey,
+    isSigner: false,
+    isWritable: true,
+  });
+  return [
+    readonly(configAddress()),
+    readonly(project.address),
+    readonly(investorAddress(from)),
+    readonly(investorAddress(to)),
+    writable(positionAddress(project.address, from)),
+    writable(positionAddress(project.address, to)),
+  ];
 }
 
-/* ── Investor Instructions ─────────────────────────── */
-
-export interface BuyTokensParams {
-  wallet: any; // AnchorWallet
-  connection: any;
-  mint: PublicKey;
-  adminPubkey: PublicKey;
-  tokenAmount: number;
-}
-
-export async function buildBuyTokensInstruction(
-  params: BuyTokensParams,
-): Promise<TransactionInstruction> {
-  const program = getProgramWithWallet(params.wallet, params.connection);
-  const investor = params.wallet.publicKey;
-  const [projectStatePda] = deriveProjectState(params.mint);
-  const [whitelistPda] = deriveWhitelistEntry(investor);
-  const investorAta = getAssociatedTokenAddressSync(
-    params.mint,
-    investor,
-    false,
+/**
+ * A Token-2022 `transfer_checked` of shares between the owners' canonical accounts, with the
+ * hook accounts listed explicitly: the extra accounts, the hook program and the validation
+ * account, as wallets resolve them. It needs no RPC call, so it works in wallets that do not
+ * resolve transfer hooks. The recipient needs a position first (`openPositionInstruction`).
+ */
+export function transferSharesInstruction(args: {
+  project: Pick<ProjectKeys, 'address' | 'shareMint'>;
+  from: PublicKey;
+  to: PublicKey;
+  shares: bigint;
+}): TransactionInstruction {
+  const { project, from, to } = args;
+  const instruction = createTransferCheckedInstruction(
+    shareAccountAddress(from, project.shareMint),
+    project.shareMint,
+    shareAccountAddress(to, project.shareMint),
+    from,
+    args.shares,
+    SHARE_DECIMALS,
+    [],
     TOKEN_2022_PROGRAM_ID,
   );
-
-  return await program.methods
-    .buyTokens(new BN(params.tokenAmount))
-    .accountsPartial({
-      investor,
-      admin: params.adminPubkey,
-      projectState: projectStatePda,
-      mint: params.mint,
-      investorTokenAccount: investorAta,
-      whitelistEntry: whitelistPda,
-      tokenExtensionsProgram: TOKEN_2022_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-    })
-    .instruction();
-}
-
-export interface ClaimRevenueParams {
-  wallet: any;
-  connection: any;
-  mint: PublicKey;
-  periodIndex: number;
-}
-
-export async function buildClaimRevenueInstruction(
-  params: ClaimRevenueParams,
-): Promise<TransactionInstruction> {
-  const program = getProgramWithWallet(params.wallet, params.connection);
-  const investor = params.wallet.publicKey;
-  const [projectStatePda] = deriveProjectState(params.mint);
-  const [revenueVaultPda] = deriveRevenueVault(params.mint);
-  const [revenuePeriodPda] = deriveRevenuePeriod(params.mint, params.periodIndex);
-  const [claimRecordPda] = deriveClaimRecord(revenuePeriodPda, investor);
-  const investorAta = getAssociatedTokenAddressSync(
-    params.mint,
-    investor,
-    false,
-    TOKEN_2022_PROGRAM_ID,
+  instruction.keys.push(
+    ...hookExtraAccounts(project, from, to),
+    { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: extraAccountMetasAddress(project.shareMint), isSigner: false, isWritable: false },
   );
+  return instruction;
+}
 
-  return await program.methods
-    .claimRevenue(params.periodIndex)
-    .accountsPartial({
-      investor,
-      projectState: projectStatePda,
-      revenuePeriod: revenuePeriodPda,
-      revenueVault: revenueVaultPda,
-      claimRecord: claimRecordPda,
-      investorTokenAccount: investorAta,
-      tokenExtensionsProgram: TOKEN_2022_PROGRAM_ID,
+/* ── Anyone ───────────────────────────────────────────── */
+
+/** Settles a raise whose outcome is certain: Funded or Failed. */
+export function finalizeRaiseInstruction(args: {
+  project: Pick<ProjectKeys, 'address'>;
+}): Promise<TransactionInstruction> {
+  return program.methods
+    .finalizeRaise()
+    .accountsStrict({ project: args.project.address })
+    .instruction();
+}
+
+/* ── Admin ────────────────────────────────────────────── */
+
+type ManageAction = 'cancelRaise' | 'pauseProject' | 'resumeProject' | 'closeProject';
+
+/** The admin actions that change only the project's state. */
+export function manageProjectInstruction(args: {
+  action: ManageAction;
+  project: Pick<ProjectKeys, 'address'>;
+  admin: PublicKey;
+}): Promise<TransactionInstruction> {
+  return program.methods[args.action]()
+    .accountsStrict({ admin: args.admin, config: configAddress(), project: args.project.address })
+    .instruction();
+}
+
+/** `null` keeps the current role. */
+export function setProjectRolesInstruction(args: {
+  project: Pick<ProjectKeys, 'address'>;
+  admin: PublicKey;
+  operator: PublicKey | null;
+  oracle: PublicKey | null;
+}): Promise<TransactionInstruction> {
+  return program.methods
+    .setProjectRoles(args.operator, args.oracle)
+    .accountsStrict({ admin: args.admin, config: configAddress(), project: args.project.address })
+    .instruction();
+}
+
+/**
+ * Releases a funded raise: the fee to the treasury's canonical account, the rest to the
+ * operator's. `acquisitionDocHash` is the hex SHA-256 of the car's purchase documents.
+ */
+export function activateProjectInstruction(args: {
+  project: ProjectKeys & Pick<ProjectAccount, 'operator'>;
+  admin: PublicKey;
+  treasury: PublicKey;
+  acquisitionDocHash: string;
+}): Promise<TransactionInstruction> {
+  const { project } = args;
+  return program.methods
+    .activateProject(bytes32(args.acquisitionDocHash))
+    .accountsStrict({
+      admin: args.admin,
+      config: configAddress(),
+      project: project.address,
+      paymentMint: project.paymentMint,
+      escrowVault: project.escrowVault,
+      treasury: args.treasury,
+      treasuryTokenAccount: paymentAccountAddress(
+        args.treasury,
+        project.paymentMint,
+        project.paymentTokenProgram,
+      ),
+      operator: project.operator,
+      operatorTokenAccount: paymentAccountAddress(
+        project.operator,
+        project.paymentMint,
+        project.paymentTokenProgram,
+      ),
+      paymentTokenProgram: project.paymentTokenProgram,
+      ...programs,
+    })
+    .instruction();
+}
+
+/**
+ * A revenue deposit by the operator, which the project's oracle must co-sign in the same
+ * transaction. `periodIndex` is the project's current `periodCount`.
+ */
+export function depositRevenueInstruction(args: {
+  project: ProjectKeys & Pick<ProjectAccount, 'periodCount'>;
+  operator: PublicKey;
+  oracle: PublicKey;
+  treasury: PublicKey;
+  gross: bigint;
+  /** YYYYMMDD. */
+  periodStart: number;
+  periodEnd: number;
+  /** Hex SHA-256 of the period's published P&L report. */
+  reportHash: string;
+  kind: RevenueKind;
+}): Promise<TransactionInstruction> {
+  const { project } = args;
+  return program.methods
+    .depositRevenue({
+      gross: u64(args.gross),
+      periodStart: args.periodStart,
+      periodEnd: args.periodEnd,
+      reportHash: bytes32(args.reportHash),
+      kind: REVENUE_KIND[args.kind],
+    })
+    .accountsStrict({
+      operator: args.operator,
+      oracle: args.oracle,
+      config: configAddress(),
+      project: project.address,
+      period: periodAddress(project.address, project.periodCount),
+      paymentMint: project.paymentMint,
+      operatorPaymentAccount: paymentAccountAddress(
+        args.operator,
+        project.paymentMint,
+        project.paymentTokenProgram,
+      ),
+      revenueVault: project.revenueVault,
+      treasury: args.treasury,
+      treasuryTokenAccount: paymentAccountAddress(
+        args.treasury,
+        project.paymentMint,
+        project.paymentTokenProgram,
+      ),
+      paymentTokenProgram: project.paymentTokenProgram,
+      ...programs,
+    })
+    .instruction();
+}
+
+/* ── KYC ──────────────────────────────────────────────── */
+
+/** Creates or overwrites a wallet's KYC record; signed by the KYC key or the demo KYC key. */
+export function setInvestorInstruction(args: {
+  authority: PublicKey;
+  wallet: PublicKey;
+  status: Exclude<InvestorStatus, 'none'>;
+  expiresAt: number;
+  jurisdiction: number;
+  flags: number;
+  provider: KycProvider;
+}): Promise<TransactionInstruction> {
+  return program.methods
+    .setInvestor(args.wallet, {
+      status: INVESTOR_STATUS[args.status],
+      expiresAt: new BN(args.expiresAt),
+      jurisdiction: args.jurisdiction,
+      flags: args.flags,
+      provider: KYC_PROVIDER[args.provider],
+    })
+    .accountsStrict({
+      authority: args.authority,
+      config: configAddress(),
+      investor: investorAddress(args.wallet),
       systemProgram: SystemProgram.programId,
     })
     .instruction();
 }
 
-/* ── Admin Instructions ────────────────────────────── */
+/* ── Recovery ─────────────────────────────────────────── */
 
-export interface DepositRevenueParams {
-  wallet: any;
-  connection: any;
-  mint: PublicKey;
-  periodIndex: number;
-  amount: number; // lamports
-}
-
-export async function buildDepositRevenueInstruction(
-  params: DepositRevenueParams,
-): Promise<TransactionInstruction> {
-  const program = getProgramWithWallet(params.wallet, params.connection);
-  const admin = params.wallet.publicKey;
-  const [projectStatePda] = deriveProjectState(params.mint);
-  const [revenueVaultPda] = deriveRevenueVault(params.mint);
-  const [revenuePeriodPda] = deriveRevenuePeriod(params.mint, params.periodIndex);
-
-  return await program.methods
-    .depositRevenue(params.periodIndex, new BN(params.amount))
-    .accountsPartial({
-      admin,
-      projectState: projectStatePda,
-      revenueVault: revenueVaultPda,
-      revenuePeriod: revenuePeriodPda,
+/**
+ * The admin proposes moving `shares` of a lost wallet to the same holder's new, verified
+ * wallet. `reasonHash` is the hex SHA-256 of the case file. The old wallet can veto until
+ * the config's recovery delay has passed.
+ */
+export function proposeRecoveryInstruction(args: {
+  project: Pick<ProjectKeys, 'address'>;
+  admin: PublicKey;
+  fromOwner: PublicKey;
+  toOwner: PublicKey;
+  shares: bigint;
+  reasonHash: string;
+}): Promise<TransactionInstruction> {
+  const { project, fromOwner, toOwner } = args;
+  return program.methods
+    .proposeRecovery(u64(args.shares), bytes32(args.reasonHash))
+    .accountsStrict({
+      admin: args.admin,
+      config: configAddress(),
+      project: project.address,
+      fromOwner,
+      fromInvestor: investorAddress(fromOwner),
+      fromPosition: positionAddress(project.address, fromOwner),
+      toOwner,
+      toInvestor: investorAddress(toOwner),
+      request: recoveryAddress(project.address, fromOwner),
       systemProgram: SystemProgram.programId,
     })
     .instruction();
 }
 
-export interface PauseResumeParams {
-  wallet: any;
-  connection: any;
-  mint: PublicKey;
-}
-
-export async function buildPauseProjectInstruction(
-  params: PauseResumeParams,
-): Promise<TransactionInstruction> {
-  const program = getProgramWithWallet(params.wallet, params.connection);
-  const [projectStatePda] = deriveProjectState(params.mint);
-
-  return await program.methods
-    .pauseProject()
-    .accountsPartial({
-      admin: params.wallet.publicKey,
-      projectState: projectStatePda,
+/** A veto by the old wallet before the delay ends, or a withdrawal by the admin at any time. */
+export function cancelRecoveryInstruction(args: {
+  request: Pick<RecoveryRequestAccount, 'address' | 'proposer'>;
+  authority: PublicKey;
+}): Promise<TransactionInstruction> {
+  return program.methods
+    .cancelRecovery()
+    .accountsStrict({
+      authority: args.authority,
+      config: configAddress(),
+      request: args.request.address,
+      proposer: args.request.proposer,
     })
     .instruction();
 }
 
-export async function buildResumeProjectInstruction(
-  params: PauseResumeParams,
-): Promise<TransactionInstruction> {
-  const program = getProgramWithWallet(params.wallet, params.connection);
-  const [projectStatePda] = deriveProjectState(params.mint);
-
-  return await program.methods
-    .resumeProject()
-    .accountsPartial({
-      admin: params.wallet.publicKey,
-      projectState: projectStatePda,
-    })
-    .instruction();
-}
-
-export interface CloseProjectParams {
-  wallet: any;
-  connection: any;
-  mint: PublicKey;
-}
-
-export async function buildCloseProjectInstruction(
-  params: CloseProjectParams,
-): Promise<TransactionInstruction> {
-  const program = getProgramWithWallet(params.wallet, params.connection);
-  const [projectStatePda] = deriveProjectState(params.mint);
-  const [revenueVaultPda] = deriveRevenueVault(params.mint);
-
-  return await program.methods
-    .closeProject()
-    .accountsPartial({
-      admin: params.wallet.publicKey,
-      projectState: projectStatePda,
-      revenueVault: revenueVaultPda,
-      systemProgram: SystemProgram.programId,
-    })
-    .instruction();
-}
-
-export interface UpdatePriceParams {
-  wallet: any;
-  connection: any;
-  mint: PublicKey;
-  newPrice: number; // lamports
-}
-
-export async function buildUpdatePriceInstruction(
-  params: UpdatePriceParams,
-): Promise<TransactionInstruction> {
-  const program = getProgramWithWallet(params.wallet, params.connection);
-  const [projectStatePda] = deriveProjectState(params.mint);
-
-  return await program.methods
-    .updatePrice(new BN(params.newPrice))
-    .accountsPartial({
-      admin: params.wallet.publicKey,
-      projectState: projectStatePda,
-    })
-    .instruction();
-}
-
-/* ── Whitelist Instructions ───────────────────────── */
-
-export interface WhitelistParams {
-  wallet: any;
-  connection: any;
-  targetWallet: PublicKey;
-}
-
-export async function buildAddToWhitelistInstruction(
-  params: WhitelistParams,
-): Promise<TransactionInstruction> {
-  const program = getProgramWithWallet(params.wallet, params.connection);
-  const [whitelistPda] = deriveWhitelistEntry(params.targetWallet);
-
-  return await program.methods
-    .addToWhitelist(params.targetWallet)
-    .accountsPartial({
-      admin: params.wallet.publicKey,
-      whitelistEntry: whitelistPda,
-      systemProgram: SystemProgram.programId,
-    })
-    .instruction();
-}
-
-export async function buildRemoveFromWhitelistInstruction(
-  params: WhitelistParams,
-): Promise<TransactionInstruction> {
-  const program = getProgramWithWallet(params.wallet, params.connection);
-  const [whitelistPda] = deriveWhitelistEntry(params.targetWallet);
-
-  return await program.methods
-    .removeFromWhitelist(params.targetWallet)
-    .accountsPartial({
-      admin: params.wallet.publicKey,
-      whitelistEntry: whitelistPda,
+/**
+ * Runs a recovery whose delay has passed; anyone may send it. The shares are burned from
+ * the old wallet and minted to the new one, whose position and share account are opened
+ * if needed, and the old wallet's unclaimed revenue moves with them.
+ */
+export function executeRecoveryInstruction(args: {
+  request: Pick<RecoveryRequestAccount, 'project' | 'fromOwner' | 'toOwner' | 'proposer'>;
+  shareMint: PublicKey;
+  executor: PublicKey;
+}): Promise<TransactionInstruction> {
+  const { request, shareMint } = args;
+  const project = projectAddress(shareMint);
+  return program.methods
+    .executeRecovery()
+    .accountsStrict({
+      executor: args.executor,
+      config: configAddress(),
+      project,
+      request: recoveryAddress(project, request.fromOwner),
+      proposer: request.proposer,
+      shareMint,
+      fromOwner: request.fromOwner,
+      fromInvestor: investorAddress(request.fromOwner),
+      fromPosition: positionAddress(project, request.fromOwner),
+      fromShareAccount: shareAccountAddress(request.fromOwner, shareMint),
+      toOwner: request.toOwner,
+      toInvestor: investorAddress(request.toOwner),
+      toPosition: positionAddress(project, request.toOwner),
+      toShareAccount: shareAccountAddress(request.toOwner, shareMint),
+      shareTokenProgram: TOKEN_2022_PROGRAM_ID,
+      ...programs,
     })
     .instruction();
 }

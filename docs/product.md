@@ -1,5 +1,7 @@
 # Product
 
+This page describes the v1 product that runs on devnet today. The frontend has already moved to the v2 program ([v2.md](v2.md)), which is not deployed yet: there, buyers pay a stablecoin into escrow and get a refund if the raise fails, KYC is a per-wallet record written by the KYC key, revenue is claimed per car whenever the holder likes, and transfers need no fee. [architecture.md](architecture.md#frontend) lists what each page does on v2.
+
 ## What is AXEL?
 
 AXEL tokenizes taxi cars on Solana. Each car is a project with its own Token-2022 mint. The car's VIN, make, model, year and valuation are stored in on-chain token metadata.
@@ -31,14 +33,13 @@ AXEL tokenizes taxi cars on Solana. Each car is a project with its own Token-202
    - The owner runs `npm run init-project`, which calls `initialize_project`.
    - This creates a Token-2022 mint with 0 decimals and fixes the maximum share count: `car_cost / price_per_share`.
    - No shares exist yet. There is no UI for this step.
-2. **Get whitelisted.** On v1 an investor's wallet gets a `WhitelistEntry` from the admin panel's whitelist manager. The backend's Sumsub flow writes v2 KYC records, which v1 does not read.
+2. **Get whitelisted.** On v1 an investor's wallet gets a `WhitelistEntry` by calling `add_to_whitelist` directly. On v2 the backend's Sumsub flow writes KYC records, and so does the console's KYC tab.
 3. **Buy shares.**
    - On the asset page, the investor picks a number of shares.
    - `buy_tokens` sends `shares × price` in SOL straight to the owner's wallet, then mints the shares into the investor's token account.
    - On a first purchase it also creates that account and unfreezes it.
 4. **Deposit revenue.**
-   - In the admin panel, the owner enters gross revenue, expenses and maintenance reserve for the period, in SOL.
-   - The panel deposits the net amount (gross − expenses − reserve) with `deposit_revenue`.
+   - The owner deposits the period's net amount with `deposit_revenue`, in SOL. (The v1 admin panel had a form for it; the v2 console leaves deposits to the backend, because v2 needs the oracle's co-signature.)
    - The program records the number of shares sold at that moment.
 5. **Claim.** On the dashboard, each holder claims `balance / shares sold at deposit × period amount` from the vault, once per wallet per period. "Claim all" batches several periods into one transaction.
 6. **Transfer.**
@@ -50,6 +51,7 @@ AXEL tokenizes taxi cars on Solana. Each car is a project with its own Token-202
    - It publishes the day as canonical JSON and appends its SHA-256 to the project's on-chain hash chain.
    - Anyone can fetch the published days, recompute the chain and compare it with the program's head.
    - The oracle co-signs a revenue deposit only when its report adds up from those days and the operator's stated expenses. The report's hash is stored with the deposit.
+   - The asset page's "Check the car's data yourself" downloads the published daily records and reports and recomputes the chain and every report hash in the browser; the Proof of solvency page checks every vault against what the program owes.
 
 ## Business Model (as implemented)
 
@@ -80,12 +82,12 @@ What the code does **not** contain:
 ## MVP Limits
 
 - **Devnet only.** Two test projects exist, both created by the seed script with the same test car metadata (Toyota Camry 2023). Nothing is deployed to mainnet, and the programs have not been audited.
-- **One car per project.** The program supports many projects (one per mint), but the admin panel manages only the first project it finds, and projects can only be created from the CLI.
+- **One car per project.** The program supports many projects (one per mint); the v2 console switches between them, and projects can only be created from the CLI.
 - **Centralized oracle.** A single backend keypair and a single data source (Yandex Fleet API). A car can be configured as simulated, and its records say so.
 - **Global whitelist.** One `WhitelistEntry` per wallet covers every project.
 - **Units.**
   - Prices and payouts are in SOL; telemetry revenue is in KZT.
   - No fiat on- or off-ramp.
   - Shares are whole units, and the 1% fee rounds up to at least one share per transfer.
-- **KYC loop not wired in the UI.** The backend's sign-in and Sumsub endpoints exist and write v2 records, but the frontend has no KYC flow and still reads v1. The asset page only reads whether the connected wallet is approved and explains why buying is unavailable.
+- **KYC loop not wired in the UI.** The backend's sign-in and Sumsub endpoints exist and write v2 records, but the frontend has no KYC flow yet. The asset page only reads the wallet's KYC record and explains why buying is unavailable.
 - **Single keys.** Admin and oracle are single keys. On devnet they are the same key. No multisig is configured.

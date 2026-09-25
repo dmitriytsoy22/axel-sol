@@ -1,13 +1,15 @@
+/** GET /telemetry/latest/:projectId of the AXEL backend (docs/api.md). */
 export interface TelemetryData {
-  projectId: string;
-  date: string; // ISO date
-  dailyRevenue: number; // тенге
+  /** "YYYY-MM-DD" (UTC), the day the figures cover; empty when nothing is cached. */
+  date: string;
+  /** Tenge. */
+  dailyRevenue: number;
   mileageKm: number;
   tripsCount: number;
-  carStatus: 'active' | 'maintenance' | 'inactive';
+  /** "active" or "inactive"; empty when nothing is cached. */
+  carStatus: string;
   dataHash: string;
-  oracleSignature: string;
-  solanaTxSignature: string;
+  solanaTxSignature: string | null;
   stale: boolean;
   available: boolean;
 }

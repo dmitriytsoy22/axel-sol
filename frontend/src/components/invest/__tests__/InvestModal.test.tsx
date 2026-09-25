@@ -1,20 +1,13 @@
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { Transaction, type PublicKey } from '@solana/web3.js';
+import { PROGRAM_ID } from '@/lib/solana/connection';
+import { fixture, FixtureNode, fixtureProject, key } from '@/lib/solana/__tests__/fixtures/chain';
+import { instructionDiscriminator } from '@/lib/solana/__tests__/fixtures/idl';
+import { AppProviders, testWallet } from '@/__tests__/helpers/providers';
 import { InvestModal } from '../InvestModal';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { useInvest } from '@/hooks/useInvest';
-import { NextIntlClientProvider } from 'next-intl';
-import messagesEn from '../../../../messages/en.json';
-
-vi.mock('@solana/wallet-adapter-react', () => ({
-  useWallet: vi.fn(),
-  useConnection: vi.fn(),
-}));
-
-vi.mock('@/hooks/useInvest', () => ({
-  useInvest: vi.fn(),
-}));
 
 vi.mock('@/i18n/routing', () => ({
   Link: ({ children, href, className }: any) => (
@@ -24,126 +17,111 @@ vi.mock('@/i18n/routing', () => ({
   ),
 }));
 
+// The raise of the fixture: 12 of 100 shares sold at 10 000 tKZT; its buyer holds 880 000 tKZT.
+const buyer = key(fixture.projects.fundraising.holders[0]);
+
+async function renderModal(wallet: PublicKey, node = new FixtureNode()) {
+  const project = await fixtureProject('fundraising', node);
+  const sent: Transaction[] = [];
+  const onPurchased = vi.fn();
+  render(
+    <AppProviders
+      connection={node}
+      wallet={testWallet(wallet, {
+        sendTransaction: async (transaction) => {
+          if (!(transaction instanceof Transaction))
+            throw new Error('Expected a legacy transaction');
+          sent.push(transaction);
+          return '5igPsignature';
+        },
+      })}
+    >
+      <InvestModal isOpen onClose={vi.fn()} project={project} onPurchased={onPurchased} />
+    </AppProviders>,
+  );
+  return { node, sent, onPurchased };
+}
+
+const sharesInput = () => screen.getByLabelText('Number of shares');
+const confirmButton = () => screen.getByRole('button', { name: 'Confirm purchase' });
+
 describe('InvestModal', () => {
-  const mockInvest = vi.fn();
-  const mockReset = vi.fn();
-  const mockGetBalance = vi.fn();
-  const mockOnClose = vi.fn();
+  it("names the purchase and reads the wallet's payment token balance", async () => {
+    await renderModal(buyer);
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    (useWallet as any).mockReturnValue({
-      publicKey: 'mockPubKey',
-    });
-
-    (useConnection as any).mockReturnValue({
-      connection: {
-        getBalance: mockGetBalance,
-      },
-    });
-
-    (useInvest as any).mockReturnValue({
-      state: 'idle',
-      errorMsg: null,
-      invest: mockInvest,
-      reset: mockReset,
-    });
-
-    mockGetBalance.mockResolvedValue(10 * 10 ** 9); // 10 SOL balance
-  });
-
-  const renderModal = (props = {}) => {
-    return render(
-      <NextIntlClientProvider locale="en" messages={messagesEn}>
-        <InvestModal
-          isOpen={true}
-          onClose={mockOnClose}
-          projectMint="mockMintAddress"
-          adminPubkey="mockAdminPubkey"
-          pricePerToken={100_000_000} // 0.1 SOL
-          tokensRemaining={1000}
-          {...props}
-        />
-      </NextIntlClientProvider>,
-    );
-  };
-
-  it('names the purchase and shows the wallet balance', async () => {
-    renderModal({ carName: 'Toyota Camry 2023' });
     expect(screen.getByRole('dialog', { name: 'Buy shares' })).toBeInTheDocument();
-    expect(screen.getByText('Toyota Camry 2023')).toBeInTheDocument();
-    expect(screen.getByLabelText('Number of shares')).toBeInTheDocument();
-
-    await act(async () => {});
-    expect(screen.getByText('Balance: 10 SOL')).toBeInTheDocument();
+    expect(screen.getByText('Hyundai Accent 2023')).toBeInTheDocument();
+    expect(await screen.findByText('Balance: 880,000 tKZT')).toBeInTheDocument();
+    expect(screen.getByText('88 shares')).toBeInTheDocument();
   });
 
-  it('updates cost calculation based on token input', async () => {
-    renderModal();
-    await act(async () => {});
-    fireEvent.change(screen.getByLabelText('Number of shares'), { target: { value: '10' } });
+  it('prices the shares typed in the payment token', async () => {
+    await renderModal(buyer);
+    await userEvent.type(sharesInput(), '10');
 
-    // 10 shares * 0.1 SOL
-    expect(screen.getByText('You pay').nextSibling).toHaveTextContent('1 SOL');
+    expect(screen.getByText('You pay').nextSibling).toHaveTextContent('100,000 tKZT');
   });
 
-  it('shows validation error if exceeding available tokens', () => {
-    renderModal({ tokensRemaining: 5 });
-    fireEvent.change(screen.getByLabelText('Number of shares'), { target: { value: '10' } });
+  it.each([
+    ['more shares than are left', '89', 'Only 88 shares are left.'],
+    ['a part of a share', '1.5', 'Enter a whole number of shares.'],
+  ])('refuses %s before anything is signed', async (_case, typed, message) => {
+    await renderModal(buyer);
+    await userEvent.type(sharesInput(), typed);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Only 5 shares are left.');
-    expect(screen.getByRole('button', { name: 'Confirm purchase' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(message);
+    expect(confirmButton()).toBeDisabled();
   });
 
-  it('does not report a low balance before the balance is read', () => {
-    mockGetBalance.mockReturnValue(new Promise(() => {}));
-    renderModal();
-    fireEvent.change(screen.getByLabelText('Number of shares'), { target: { value: '10' } });
+  it('refuses a purchase the wallet cannot pay for', async () => {
+    await renderModal(key(fixture.stranger));
+    await screen.findByText('Balance: 0 tKZT');
+    await userEvent.type(sharesInput(), '1');
 
-    expect(screen.getByText('Balance: … SOL')).toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Not enough tKZT in this wallet.');
+    expect(confirmButton()).toBeDisabled();
   });
 
-  it('blocks a purchase the wallet cannot pay for', async () => {
-    mockGetBalance.mockResolvedValue(0.5 * 10 ** 9);
-    renderModal();
-    await act(async () => {});
-    fireEvent.change(screen.getByLabelText('Number of shares'), { target: { value: '10' } });
+  it('sends buy_shares for exactly the shown cost and confirms the purchase', async () => {
+    const { sent, onPurchased } = await renderModal(buyer);
+    await screen.findByText('Balance: 880,000 tKZT');
+    await userEvent.type(sharesInput(), '10');
+    await userEvent.click(confirmButton());
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Not enough SOL in this wallet.');
-    expect(screen.getByRole('button', { name: 'Confirm purchase' })).toBeDisabled();
-  });
-
-  it('calls invest hook method on valid input', async () => {
-    renderModal();
-    fireEvent.change(screen.getByLabelText('Number of shares'), { target: { value: '10' } });
-
-    await act(async () => {});
-
-    const btn = screen.getByRole('button', { name: 'Confirm purchase' });
-    expect(btn).toBeEnabled();
-
-    fireEvent.click(btn);
-    expect(mockInvest).toHaveBeenCalledWith('mockMintAddress', 10, 'mockAdminPubkey');
-  });
-
-  it('shows the confirmation, a way to the portfolio, and reports the purchase', () => {
-    (useInvest as any).mockReturnValue({
-      state: 'success',
-      errorMsg: null,
-      invest: mockInvest,
-      reset: mockReset,
-    });
-    const onPurchased = vi.fn();
-
-    renderModal({ onPurchased });
-    expect(screen.getByText('Confirmed on Solana')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Number of shares')).toBeNull();
+    expect(await screen.findByText('Confirmed on Solana')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open your portfolio' })).toHaveAttribute(
       'href',
       '/dashboard',
     );
     expect(onPurchased).toHaveBeenCalledTimes(1);
+
+    const u64 = (value: bigint) => {
+      const bytes = Buffer.alloc(8);
+      bytes.writeBigUInt64LE(value);
+      return bytes;
+    };
+    const buy = sent[0].instructions.find((instruction) =>
+      instruction.programId.equals(PROGRAM_ID),
+    );
+    expect(buy?.data).toEqual(
+      Buffer.concat([instructionDiscriminator('buy_shares'), u64(10n), u64(100_000_000_000n)]),
+    );
+    expect(buy?.keys[1].pubkey.equals(buyer)).toBe(true);
+  });
+
+  it("explains a purchase the program rejected, in the program's words", async () => {
+    const node = new FixtureNode();
+    node.outcome = { InstructionError: [1, { Custom: 6027 }] };
+    await renderModal(buyer, node);
+    await screen.findByText('Balance: 880,000 tKZT');
+    await userEvent.type(sharesInput(), '10');
+    await userEvent.click(confirmButton());
+
+    const alerts = await screen.findAllByText('The raise deadline has passed.');
+    // Once in the dialog, once in the toast that also links the transaction.
+    expect(alerts).toHaveLength(2);
+    expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent(
+      'The raise deadline has passed.',
+    );
   });
 });

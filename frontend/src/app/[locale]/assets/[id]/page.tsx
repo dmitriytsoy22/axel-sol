@@ -3,20 +3,26 @@
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { RotateCw } from 'lucide-react';
+import { ArrowRight, RotateCw } from 'lucide-react';
 import { Link } from '@/i18n/routing';
-import { useProjectState } from '@/hooks/useProjectState';
-import type { ProjectState } from '@/types/project';
+import { useInvestor } from '@/hooks/useInvestor';
+import { usePosition } from '@/hooks/usePosition';
+import { useProject } from '@/hooks/useProject';
+import { useUnixNow } from '@/hooks/useUnixNow';
+import { carTitle } from '@/lib/solana/tokens';
+import type { Project } from '@/types/project';
 import { AssetHeader } from '@/components/asset/AssetHeader';
 import { AssetPhoto } from '@/components/asset/AssetPhoto';
+import { BlinkLinks } from '@/components/asset/BlinkLinks';
 import { InvestPanel } from '@/components/asset/InvestPanel';
 import { MobileInvestBar } from '@/components/asset/MobileInvestBar';
 import { ProjectTerms } from '@/components/asset/ProjectTerms';
 import { CarPayouts } from '@/components/asset/CarPayouts';
 import { PayoutCalculator } from '@/components/asset/PayoutCalculator';
+import { StateTimeline } from '@/components/asset/StateTimeline';
 import { TelemetryWidget } from '@/components/asset/TelemetryWidget';
-import { approvalOf } from '@/components/asset/saleState';
-import { useWalletApproval } from '@/components/asset/useWalletApproval';
+import { VerifyData } from '@/components/asset/VerifyData';
+import { approvalOf, saleStateOf } from '@/components/asset/saleState';
 import { InvestModal } from '@/components/invest/InvestModal';
 import { Button, buttonClasses } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
@@ -37,13 +43,21 @@ function AssetSkeleton(): JSX.Element {
   );
 }
 
-function AssetDetails({ project, onChanged }: { project: ProjectState; onChanged: () => void }) {
+function AssetDetails({ project, onChanged }: { project: Project; onChanged: () => void }) {
   const tNav = useTranslations('Navigation');
   const tAsset = useTranslations('Asset');
   const [isInvestModalOpen, setIsInvestModalOpen] = useState(false);
-  const approval = approvalOf(useWalletApproval());
-  const carName = `${project.carMake} ${project.carModel} ${project.carYear}`;
+  const now = useUnixNow();
+  const kyc = useInvestor();
+  const { position, refetch: refetchPosition } = usePosition(project);
+  const approval = approvalOf(kyc, project.allowsDemo, now);
+  const saleState = saleStateOf(project, now);
+  const carName = `${carTitle(project.car)} ${project.car.year ?? ''}`.trim();
   const openInvest = () => setIsInvestModalOpen(true);
+  const refresh = () => {
+    onChanged();
+    refetchPosition();
+  };
 
   return (
     <>
@@ -75,28 +89,49 @@ function AssetDetails({ project, onChanged }: { project: ProjectState; onChanged
         </div>
         <div className="md:col-span-5 md:col-start-8 md:row-start-1 lg:row-span-2">
           <div className="lg:sticky lg:top-24">
-            <InvestPanel project={project} approval={approval} onBuy={openInvest} />
+            <InvestPanel
+              project={project}
+              saleState={saleState}
+              approval={approval}
+              position={position}
+              now={now}
+              onBuy={openInvest}
+              onChanged={refresh}
+            />
           </div>
         </div>
         <div className="flex flex-col gap-16 md:col-span-12 lg:col-span-7">
-          <ProjectTerms project={project} />
+          <StateTimeline project={project} saleState={saleState} />
+          <div className="flex flex-col gap-4">
+            <ProjectTerms project={project} />
+            <Link
+              href={`/solvency#${project.shareMint.toBase58()}`}
+              className="inline-flex min-h-11 items-center gap-1 self-start text-small font-medium text-primary underline-offset-4 hover:underline"
+            >
+              {tAsset('solvencyLink')}
+              <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+            </Link>
+            <BlinkLinks project={project} saleState={saleState} />
+          </div>
           <CarPayouts project={project} />
+          <VerifyData project={project} />
+          <TelemetryWidget projectId={project.shareMint.toBase58()} />
           <PayoutCalculator project={project} />
-          <TelemetryWidget projectId={project.mint} />
         </div>
       </div>
 
-      <MobileInvestBar project={project} approval={approval} onBuy={openInvest} />
+      <MobileInvestBar
+        project={project}
+        saleState={saleState}
+        approval={approval}
+        onBuy={openInvest}
+      />
 
       <InvestModal
         isOpen={isInvestModalOpen}
         onClose={() => setIsInvestModalOpen(false)}
-        projectMint={project.mint}
-        adminPubkey={project.admin}
-        pricePerToken={project.pricePerToken}
-        tokensRemaining={project.tokensRemaining}
-        carName={carName}
-        onPurchased={onChanged}
+        project={project}
+        onPurchased={refresh}
       />
     </>
   );
@@ -105,10 +140,8 @@ function AssetDetails({ project, onChanged }: { project: ProjectState; onChanged
 export default function AssetDetailsPage(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const t = useTranslations('Asset');
-  const { projects, isLoading, error, refetch } = useProjectState();
-
-  // A car is addressed by its share-token mint; the catalog index is kept for old links.
-  const project = projects.find((p, index) => p.mint === id || String(index) === id);
+  // A car is addressed by its share mint.
+  const { project, isLoading, error, refetch } = useProject(id);
 
   let content: React.ReactNode;
   if (project) {

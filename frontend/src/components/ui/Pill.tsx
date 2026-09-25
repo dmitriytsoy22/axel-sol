@@ -1,10 +1,11 @@
 import React, { ReactNode } from 'react';
 
-export type PillTone = 'success' | 'warning' | 'info' | 'neutral';
+export type PillTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
 const DOT: Record<PillTone, string> = {
   success: 'bg-success',
   warning: 'bg-warning',
+  danger: 'bg-destructive',
   info: 'bg-primary',
   neutral: 'bg-subtle-foreground',
 };

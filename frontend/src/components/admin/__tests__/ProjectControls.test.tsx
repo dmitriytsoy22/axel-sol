@@ -1,109 +1,142 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { NextIntlClientProvider } from 'next-intl';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Keypair, PublicKey, TransactionInstruction } from '@solana/web3.js';
-import messagesEn from '../../../../messages/en.json';
+import { describe, expect, it, vi } from 'vitest';
+import { PublicKey, Transaction, type TransactionSignature } from '@solana/web3.js';
+import { PROGRAM_ID } from '@/lib/solana/connection';
+import { unixNow } from '@/lib/solana/eligibility';
+import { paymentAccountAddress } from '@/lib/solana/pda';
+import { FixtureNode } from '@/lib/solana/__tests__/fixtures/chain';
+import { instructionDiscriminator } from '@/lib/solana/__tests__/fixtures/idl';
+import { AppProviders, testWallet } from '@/__tests__/helpers/providers';
 import { makeProject } from '@/components/catalog/__tests__/fixtures';
-import {
-  buildCloseProjectInstruction,
-  buildPauseProjectInstruction,
-} from '@/lib/solana/instructions';
+import type { Project } from '@/types/project';
 import { ProjectControls } from '../ProjectControls';
 
-const { sendTransaction, confirmTransaction } = vi.hoisted(() => ({
-  sendTransaction: vi.fn(),
-  confirmTransaction: vi.fn(),
-}));
+const admin = PublicKey.unique();
+const treasury = PublicKey.unique();
+const DAY = 86_400;
 
-const operator = Keypair.generate().publicKey;
-const mint = Keypair.generate().publicKey.toBase58();
-
-vi.mock('@solana/wallet-adapter-react', () => ({
-  useWallet: () => ({ publicKey: operator, sendTransaction }),
-  useConnection: () => ({
-    connection: {
-      getLatestBlockhash: async () => ({ blockhash: 'hash', lastValidBlockHeight: 1 }),
-    },
-  }),
-}));
-vi.mock('@/hooks/useTransactionConfirmation', () => ({
-  useTransactionConfirmation: () => ({ confirmTransaction }),
-}));
-// Anchor encoding is out of scope here (see DepositRevenueForm.test for why).
-vi.mock('@/lib/solana/instructions', () => ({
-  buildPauseProjectInstruction: vi.fn(),
-  buildResumeProjectInstruction: vi.fn(),
-  buildCloseProjectInstruction: vi.fn(),
-}));
-
-const instruction = new TransactionInstruction({
-  keys: [],
-  programId: new PublicKey('DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M'),
-  data: Buffer.from([1]),
-});
-
-function renderControls(status: 'active' | 'paused' | 'closed') {
+function renderControls(project: Project) {
+  const sent: Transaction[] = [];
+  const onChanged = vi.fn();
   render(
-    <NextIntlClientProvider locale="en" messages={messagesEn}>
-      <ProjectControls project={makeProject({ mint, status })} />
-    </NextIntlClientProvider>,
+    <AppProviders
+      connection={new FixtureNode()}
+      wallet={testWallet(admin, {
+        sendTransaction: async (transaction): Promise<TransactionSignature> => {
+          if (!(transaction instanceof Transaction))
+            throw new Error('Expected a legacy transaction');
+          sent.push(transaction);
+          return 'signature';
+        },
+      })}
+    >
+      <ProjectControls project={project} treasury={treasury} onChanged={onChanged} />
+    </AppProviders>,
   );
+  return { sent, onChanged };
 }
 
-describe('ProjectControls', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    sendTransaction.mockResolvedValue('signature');
-    confirmTransaction.mockResolvedValue({ success: true });
-    vi.mocked(buildCloseProjectInstruction).mockResolvedValue(instruction);
-    vi.mocked(buildPauseProjectInstruction).mockResolvedValue(instruction);
-  });
+/** The axel_v2 instruction of the only transaction sent. */
+const sentInstruction = (sent: Transaction[]) => {
+  expect(sent).toHaveLength(1);
+  const instruction = sent[0].instructions.find(({ programId }) => programId.equals(PROGRAM_ID));
+  if (!instruction) throw new Error('The transaction has no axel_v2 instruction');
+  return instruction;
+};
 
-  it('asks before closing a project, and sends nothing until confirmed', async () => {
-    renderControls('active');
+const buttons = () => screen.queryAllByRole('button').map((button) => button.textContent);
+
+describe('ProjectControls', () => {
+  it('asks before closing a car, and sends close_project only once confirmed', async () => {
+    const { sent, onChanged } = renderControls(makeProject({ status: 'operating' }));
 
     await userEvent.click(screen.getByRole('button', { name: 'Close project…' }));
-
     expect(screen.getByRole('alertdialog')).toHaveTextContent(
       "Close Toyota Camry for good? This can't be undone.",
     );
-    expect(sendTransaction).not.toHaveBeenCalled();
+    expect(sent).toHaveLength(0);
 
     await userEvent.click(screen.getByRole('button', { name: 'Close permanently' }));
 
-    await waitFor(() => expect(sendTransaction).toHaveBeenCalledTimes(1));
-    expect(buildCloseProjectInstruction).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Project closed')).toBeInTheDocument();
+    const close = sentInstruction(sent);
+    expect(close.data).toEqual(instructionDiscriminator('close_project'));
+    expect(close.keys[0].pubkey.equals(admin)).toBe(true);
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
   it('backs out of closing without a transaction', async () => {
-    renderControls('active');
+    const { sent } = renderControls(makeProject({ status: 'operating' }));
 
     await userEvent.click(screen.getByRole('button', { name: 'Close project…' }));
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(sendTransaction).not.toHaveBeenCalled();
+    expect(sent).toHaveLength(0);
   });
 
-  it('offers pause for an active car and resume for a paused one', () => {
-    renderControls('active');
-    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument();
+  it.each([
+    ['operating', ['Pause', 'Close project…']],
+    ['paused', ['Resume', 'Close project…']],
+  ] as const)('offers a %s car the actions of its state', (status, expected) => {
+    renderControls(makeProject({ status }));
+
+    expect(buttons()).toEqual(expected);
   });
 
-  it('offers resume, not pause, for a paused car', () => {
-    renderControls('paused');
-    expect(screen.getByRole('button', { name: 'Resume' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument();
+  it('offers a running raise only its cancellation', () => {
+    renderControls(makeProject({ status: 'fundraising', raiseDeadline: unixNow() + DAY }));
+
+    expect(buttons()).toEqual(['Cancel raise…']);
   });
 
-  it('offers no action on a closed project', () => {
-    renderControls('closed');
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  it('offers to settle a raise past its deadline', async () => {
+    const { sent } = renderControls(
+      makeProject({ status: 'fundraising', raiseDeadline: unixNow() - 60 }),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Settle the raise' }));
+
+    expect(await screen.findByText('Raise settled')).toBeInTheDocument();
+    expect(sentInstruction(sent).data).toEqual(instructionDiscriminator('finalize_raise'));
+  });
+
+  it('releases a funded raise only with the hash of the purchase documents', async () => {
+    const project = makeProject({ status: 'funded', activationDeadline: unixNow() + DAY });
+    const { sent } = renderControls(project);
+    const release = screen.getByRole('button', { name: 'Release to the operator' });
+
+    await userEvent.type(screen.getByLabelText('SHA-256 of the purchase documents'), 'abc');
+    expect(release).toBeDisabled();
+
+    const hash = 'c0'.repeat(32);
+    await userEvent.clear(screen.getByLabelText('SHA-256 of the purchase documents'));
+    await userEvent.type(screen.getByLabelText('SHA-256 of the purchase documents'), hash);
+    await userEvent.click(release);
+
+    expect(await screen.findByText('Raise released to the operator')).toBeInTheDocument();
+    const activate = sentInstruction(sent);
+    expect(activate.data).toEqual(
+      Buffer.concat([instructionDiscriminator('activate_project'), Buffer.from(hash, 'hex')]),
+    );
     expect(
-      screen.getByText('This project is closed. No further changes are possible.'),
-    ).toBeInTheDocument();
+      activate.keys.some(({ pubkey }) =>
+        pubkey.equals(
+          paymentAccountAddress(treasury, project.paymentMint, project.paymentTokenProgram),
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    ['failed', 'This raise failed.'],
+    ['closed', 'This project is closed.'],
+  ] as const)('offers no action once the project is %s', (status, note) => {
+    renderControls(makeProject({ status }));
+
+    expect(buttons()).toEqual([]);
+    expect(screen.getByText(new RegExp(note))).toBeInTheDocument();
   });
 });

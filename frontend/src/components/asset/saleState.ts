@@ -1,23 +1,30 @@
-import type { ProjectState } from '@/types/project';
+import type { InvestorAccount } from '@/lib/solana/accounts';
+import { eligibility, type Eligibility } from '@/lib/solana/eligibility';
+import type { Project } from '@/types/project';
 
-/** Whether a car's shares can be bought right now, whoever is asking. */
-export type SaleState = 'open' | 'paused' | 'closed' | 'soldOut';
+/**
+ * Whether a car's shares can be bought right now, whoever is asking. `ended` is a raise past
+ * its deadline that nobody has settled on-chain yet.
+ */
+export type SaleState = 'open' | 'ended' | Exclude<Project['status'], 'fundraising'>;
 
-/** Whether the connected wallet may hold shares (the program's allow-list). */
-export type Approval = 'checking' | 'approved' | 'notApproved' | 'unknown';
-
-export function saleStateOf(project: Pick<ProjectState, 'status' | 'tokensRemaining'>): SaleState {
-  if (project.status === 'paused') return 'paused';
-  if (project.status === 'closed') return 'closed';
-  return project.tokensRemaining > 0 ? 'open' : 'soldOut';
+export function saleStateOf(
+  project: Pick<Project, 'status' | 'raiseDeadline'>,
+  now: number,
+): SaleState {
+  if (project.status !== 'fundraising') return project.status;
+  return now < project.raiseDeadline ? 'open' : 'ended';
 }
 
-export function approvalOf(status: {
-  isWhitelisted: boolean;
-  isLoading: boolean;
-  error: Error | null;
-}): Approval {
-  if (status.isLoading) return 'checking';
-  if (status.error) return 'unknown';
-  return status.isWhitelisted ? 'approved' : 'notApproved';
+/** Whether the connected wallet may buy, or why that is not known yet. */
+export type Approval = Eligibility | 'checking' | 'unknown';
+
+export function approvalOf(
+  kyc: { investor: InvestorAccount | null; isLoading: boolean; error: Error | null },
+  projectAllowsDemo: boolean,
+  now: number,
+): Approval {
+  if (kyc.isLoading) return 'checking';
+  if (kyc.error) return 'unknown';
+  return eligibility(kyc.investor, projectAllowsDemo, now);
 }

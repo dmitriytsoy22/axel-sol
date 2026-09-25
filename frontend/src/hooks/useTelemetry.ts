@@ -1,74 +1,75 @@
-import { useState, useEffect } from 'react';
-import { TelemetryData } from '@/types/telemetry';
+'use client';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+import { useCallback, useEffect, useState } from 'react';
+import { fetchLatestTelemetry } from '@/lib/api/telemetry';
+import type { TelemetryData } from '@/types/telemetry';
 
-export function useTelemetry(projectId: string, staleTimeoutMs = 60 * 60 * 1000): {
+const POLL_MS = 60_000;
+
+/** Figures older than this read as stale even when the backend does not say so. */
+const STALE_AFTER_MS = 36 * 60 * 60 * 1000;
+
+export function isStaleTelemetry(data: TelemetryData, now = Date.now()): boolean {
+  if (data.stale) return true;
+  const day = Date.parse(data.date);
+  return Number.isFinite(day) && now - day > STALE_AFTER_MS;
+}
+
+/**
+ * The latest trip data of one car from the backend, polled every minute. With no API
+ * configured it reads nothing and reports that. A new `projectId` drops the old car's data.
+ */
+export function useTelemetry(
+  projectId: string,
+  apiUrl: string | null,
+): {
   data: TelemetryData | null;
   isLoading: boolean;
   error: Error | null;
   isStale: boolean;
   refetch: () => void;
 } {
-  const [data, setData] = useState<TelemetryData | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [isStale, setIsStale] = useState<boolean>(false);
-  const [toggleTracker, setToggleTracker] = useState(0);
-
-  const refetch = () => {
-    setToggleTracker(prev => prev + 1);
-  };
-
+  const [state, setState] = useState<{
+    projectId: string;
+    data: TelemetryData | null;
+    error: Error | null;
+  } | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let isMounted = true;
+    if (!apiUrl) return;
+    const controller = new AbortController();
 
-    async function fetchTelemetry(): Promise<void> {
-      if (!isMounted) return;
-      setIsLoading(true);
-      setError(null);
+    const load = () =>
+      fetchLatestTelemetry(apiUrl, projectId, controller.signal).then(
+        (data) => setState({ projectId, data, error: null }),
+        (error: unknown) => {
+          if (controller.signal.aborted) return;
+          setState((prev) => ({
+            projectId,
+            data: prev?.projectId === projectId ? prev.data : null,
+            error: error instanceof Error ? error : new Error(String(error)),
+          }));
+        },
+      );
 
-      try {
-        const response = await fetch(`${API_BASE_URL}/telemetry/latest/${projectId}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch telemetry data');
-        }
-
-        const json: TelemetryData = await response.json();
-
-        if (isMounted) {
-          setData(json);
-          // App-level stale logic: fallback if API doesn't provide it directly
-          // We also observe json.stale if provided from the backend.
-          if (json.date) {
-            const updatedTime = new Date(json.date).getTime();
-            const now = Date.now();
-            setIsStale(json.stale || now - updatedTime > staleTimeoutMs);
-          } else {
-            setIsStale(json.stale ?? false);
-          }
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err instanceof Error ? err : new Error('Unknown error'));
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    fetchTelemetry();
-
-    const intervalId = setInterval(fetchTelemetry, 60 * 1000); // Poll every minute
-
+    load();
+    const interval = setInterval(load, POLL_MS);
     return () => {
-      isMounted = false;
-      clearInterval(intervalId);
+      controller.abort();
+      clearInterval(interval);
     };
-  }, [staleTimeoutMs, toggleTracker]);
+  }, [apiUrl, projectId, attempt]);
 
-  return { data, isLoading, error, isStale, refetch };
+  const refetch = useCallback(() => setAttempt((value) => value + 1), []);
+  const current = state?.projectId === projectId ? state : null;
+  const data = current?.data ?? null;
+
+  return {
+    data,
+    isLoading: apiUrl !== null && current === null,
+    error: current?.error ?? null,
+    isStale: data !== null && isStaleTelemetry(data),
+    refetch,
+  };
 }

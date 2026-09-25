@@ -4,9 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { NextIntlClientProvider } from 'next-intl';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../messages/en.json';
-import type { ProjectState } from '@/types/project';
 import { VehicleSection } from '../VehicleSection';
-import { makeProject } from './fixtures';
+import { makeCar, makeProject } from './fixtures';
 
 vi.mock('@/i18n/routing', () => ({
   Link: ({ children, href, className }: any) => (
@@ -33,8 +32,8 @@ describe('VehicleSection', () => {
   it('shows one card per car read from the chain', () => {
     renderSection({
       projects: [
-        makeProject({ carModel: 'Camry' }),
-        makeProject({ carMake: 'Kia', carModel: 'K5' }),
+        makeProject({ car: makeCar({ model: 'Camry' }) }),
+        makeProject({ car: makeCar({ make: 'Kia', model: 'K5' }) }),
       ],
     });
 
@@ -51,8 +50,8 @@ describe('VehicleSection', () => {
     const user = userEvent.setup();
     renderSection({
       projects: [
-        makeProject({ carModel: 'Camry', status: 'active' }),
-        makeProject({ carMake: 'Hyundai', carModel: 'Sonata', status: 'closed' }),
+        makeProject({ car: makeCar({ model: 'Camry' }), status: 'operating' }),
+        makeProject({ car: makeCar({ make: 'Hyundai', model: 'Sonata' }), status: 'closed' }),
       ],
     });
 
@@ -74,7 +73,7 @@ describe('VehicleSection', () => {
   });
 
   it('says so when no car is listed', () => {
-    renderSection({ projects: [] as ProjectState[] });
+    renderSection({ projects: [] });
 
     expect(screen.getByText('No cars listed yet')).toBeInTheDocument();
   });

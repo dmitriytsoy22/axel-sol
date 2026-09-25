@@ -1,25 +1,10 @@
-export type ProjectStatus =
-  | 'active'
-  | 'paused'
-  | 'closed';
+import type { ProjectAccount } from '@/lib/solana/accounts';
+import type { CarMetadata, PaymentToken } from '@/lib/solana/tokens';
 
-export interface ProjectState {
-  admin: string; // pubkey
-  mint: string; // Token-2022 mint pubkey
-  revenueVault: string; // revenue vault PDA
-  status: ProjectStatus;
-  totalTokenSupply: number;
-  tokensSold: number;
-  tokensRemaining: number;
-  pricePerToken: number; // lamports
-  periodCount: number;
-  oraclePubkey: string;
-  bump: number;
-  revenueVaultBump: number;
-  // Token metadata (from Token-2022 extension, populated separately)
-  carMake: string;
-  carModel: string;
-  carYear: number;
-  vin: string;
-  imageUrl: string;
+export type { ProjectStatus } from '@/lib/solana/accounts';
+
+/** A project account with the car its share mint describes and the token it is priced in. */
+export interface Project extends ProjectAccount {
+  car: CarMetadata;
+  payment: PaymentToken;
 }

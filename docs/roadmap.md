@@ -39,6 +39,9 @@ Done:
   - simulated data flagged everywhere and refused on mainnet.
 - [x] Backend event indexer for v2 ([architecture.md](architecture.md#event-indexer-v2)): program history and a live log subscription stored idempotently in SQLite, `GET /events`, `/projects/:mint/history` and `/positions/:owner/claims`, tested against `solana-test-validator`
 - [x] Backend KYC on v2: wallet sign-in (`GET /kyc/nonce`, `POST /kyc/session`), Sumsub sessions bound to the wallet in SQLite, a webhook with a correct HMAC check that signs idempotent `set_investor` calls with a dedicated key, CORS, rate limits, production startup checks, ESLint and Jest ([api.md](api.md#backend-http-endpoints))
+- [x] Moved the frontend to the v2 program: client, hooks, amounts in the payment token, the six project states, KYC records, escrowed buys, refunds, claims, transfers and a role-based console ([architecture.md](architecture.md#frontend))
+- [x] Frontend v2 screens: soft-cap marker, live escrow, state timeline, refund dialog, in-browser verification of telemetry and reports, Proof of solvency, recovery flows (proposal, veto, execution), console split by role, demo data banner
+- [x] Judge demo path (`/demo` and the `/api/demo` routes: signed demo access, shares from the desk, simulated months, limits, optional Turnstile) and Solana Actions for investing and claiming ([api.md](api.md#judge-demo-api))
 
 Next steps. Each one addresses a limitation listed in [architecture.md](architecture.md#known-limitations):
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key (program upgrade)
@@ -46,9 +49,11 @@ Next steps. Each one addresses a limitation listed in [architecture.md](architec
 - [ ] Thaw token accounts without relying on `buy_tokens` creating the ATA (program upgrade)
 - [ ] Create the hook's `ExtraAccountMetaList` during project setup, and add an end-to-end test of a holder-to-holder transfer on a full six-extension mint
 - [ ] Run the Yandex Fleet requests once against a real park's credentials: the orders, driver profiles and transactions shapes, and the rent category
-- [ ] Connect the asset page's telemetry widget to the backend: one env variable (the backend already allows the origins in `CORS_ORIGINS`)
-- [ ] Add the KYC flow to the UI on v2 (sign in with the wallet, then the Sumsub WebSDK with the token from `POST /kyc/session`), and replace the unused `useWhitelistStatus` with a `useInvestor` hook
-- [ ] Public frontend deployment and a documented devnet demo path for judges (a whitelisted test wallet)
+- [ ] Add the KYC flow to the UI on v2 (sign in with the wallet, then the Sumsub WebSDK with the token from `POST /kyc/session`)
+- [ ] Add the operator's attested deposit flow to the console (`POST /reports/draft` → operator signs → `POST /reports/attest` → send), and show the telemetry widget's `dataOrigin`
+- [ ] Serve the indexer API the frontend reads payout history from ([api.md](api.md#indexer-api-read-by-the-frontend)) from the backend's event index
+- [ ] Publish real cars' telemetry, income reports and purchase papers from the backend in the layout the frontend verifies ([api.md](api.md#published-car-data-read-by-verify))
+- [ ] Public frontend deployment on devnet, with the demo keys and a funded faucet ([api.md](api.md#frontend-environment))
 - [ ] Recorded end-to-end devnet run with Explorer links: whitelist → buy → deposit → claim → transfer
 
 ## Before Mainnet
@@ -65,7 +70,7 @@ These items are not scheduled.
 
 These items are not scheduled.
 
-- [ ] Multi-vehicle operations. The program already supports one project per mint; the admin panel manages only the first project, and projects can only be created from the CLI.
+- [ ] Multi-vehicle operations. The program supports one project per mint and the console switches between cars; projects can only be created from the CLI.
 - [ ] Project creation and price management in the admin UI
 - [ ] More than one telemetry source or oracle. The spec lists the single centralized oracle as an MVP constraint.
 - [ ] Show each deposit's report (days, expenses, telemetry head) next to it in the UI, with a "Verify" button that recomputes the chain; the backend already publishes both

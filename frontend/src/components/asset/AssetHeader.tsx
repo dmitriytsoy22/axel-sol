@@ -1,33 +1,34 @@
 import React from 'react';
-import { useTranslations } from 'next-intl';
-import { ProjectState } from '@/types/project';
-import { Badge } from '@/components/ui/Badge';
+import type { Project } from '@/types/project';
+import { ProjectStatusBadge } from '@/components/catalog/ProjectStatusBadge';
+import { carTitle } from '@/lib/solana/tokens';
 
 interface AssetHeaderProps {
-  project: ProjectState;
+  project: Project;
 }
 
-/** The car's name, status and VIN, all from its token metadata and project account. */
+/** The car's name, status and where it works, all from its share mint's metadata. */
 export function AssetHeader({ project }: AssetHeaderProps): JSX.Element {
-  const tCat = useTranslations('Catalog');
-  const tAsset = useTranslations('Asset');
-
-  const statusLabel: Record<ProjectState['status'], string> = {
-    active: tCat('statusActive'),
-    paused: tCat('statusPaused'),
-    closed: tCat('statusClosed'),
-  };
+  const { car } = project;
+  const details = [car.city, car.carClass, car.park].filter(Boolean);
 
   return (
     <header>
-      <Badge status={project.status}>{statusLabel[project.status]}</Badge>
+      <ProjectStatusBadge status={project.status} />
       <h1 className="mt-4 font-heading text-h2 font-medium text-foreground md:text-h1">
-        {project.carMake} {project.carModel}{' '}
-        <span className="tabular-nums text-muted-foreground">{project.carYear}</span>
+        {carTitle(car)}{' '}
+        {car.year !== null && (
+          <span className="tabular-nums text-muted-foreground">{car.year}</span>
+        )}
       </h1>
       <p className="mt-3 flex flex-wrap gap-x-2 text-small text-muted-foreground">
-        {tAsset('vin')}
-        <span className="break-all font-mono text-foreground">{project.vin}</span>
+        <span className="font-mono text-foreground">{car.symbol}</span>
+        {details.map((detail) => (
+          <React.Fragment key={detail}>
+            <span aria-hidden="true">·</span>
+            <span>{detail}</span>
+          </React.Fragment>
+        ))}
       </p>
     </header>
   );
