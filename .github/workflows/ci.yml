@@ -161,6 +161,18 @@ jobs:
         if: failure()
         run: node scripts/ci/junit-annotations.mjs tests-v2/junit.xml tests-v2/test-output.log
 
+      - name: Diagnose a crash of the v2 test run
+        if: failure()
+        working-directory: tests-v2
+        run: |
+          echo "::notice title=axel_v2.so::$(stat -c %s ../target/deploy/axel_v2.so) bytes, sha256 $(sha256sum ../target/deploy/axel_v2.so | cut -c1-64)"
+          echo "::notice title=Memory::$(free -m | tr -s ' ' | tr '\n' ';')"
+          echo "::notice title=Limits::overcommit=$(cat /proc/sys/vm/overcommit_memory) max_map_count=$(cat /proc/sys/vm/max_map_count) ulimit_v=$(ulimit -v) nproc=$(nproc)"
+          new_svm=$(node -e "const { LiteSVM } = require('litesvm'); new LiteSVM(); console.log('ok')" 2>&1 | tail -3 | tr '\n' ' ')
+          echo "::notice title=new LiteSVM()::${new_svm}"
+          add_program=$(node -e "const { LiteSVM } = require('litesvm'); const { Keypair } = require('@solana/web3.js'); const svm = new LiteSVM(); svm.addProgram(Keypair.generate().publicKey, require('fs').readFileSync('../target/deploy/axel_v2.so')); console.log('ok')" 2>&1 | tail -3 | tr '\n' ' ')
+          echo "::notice title=addProgram(axel_v2.so)::${add_program}"
+
       - name: Check the IDL vendored in the frontend and the backend, and the SDK, match the build
         run: |
           npm ci --no-audit --no-fund
