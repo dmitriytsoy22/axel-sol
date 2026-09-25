@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { formatTokenAmount } from '../src/lib/format';
-import { indexedClaimTotals, paymentBalance } from './support/chain';
+import { indexedClaimTotals, indexedPayouts, paymentBalance } from './support/chain';
 import { connectWallet, expect, test } from './support/fixtures';
 
 /** One step of the /demo walkthrough, found by its title. */
@@ -61,6 +61,18 @@ test('a judge gets demo access, buys into a raise, claims a simulated month, the
     const ready = simulate.getByText(/^Ready to claim: \d/);
     await expect(ready).toBeVisible();
     const amount = (await ready.innerText()).replace('Ready to claim: ', '');
+    await expect
+      .poll(
+        async () =>
+          (await indexedPayouts(request, wallet.publicKey)).periods.map((period) => period.project),
+        {
+          message: 'the backend indexes the simulated month as the only deposit the wallet shares',
+        },
+      )
+      .toEqual([stack.fleet.project]);
+    const [, fleetBefore] = (await indexedPayouts(request, wallet.publicKey)).projects;
+    expect(fleetBefore).toMatchObject({ mint: stack.fleet.mint, shares: '5', claimed: '0' });
+    expect(formatTokenAmount(BigInt(fleetBefore.pending), stack.payment, 'en')).toBe(amount);
     const balanceBefore = await paymentBalance(stack, wallet.publicKey);
 
     await claim.getByRole('button', { name: `Claim ${amount}` }).click();
@@ -69,11 +81,34 @@ test('a judge gets demo access, buys into a raise, claims a simulated month, the
     await expect(claim.getByText('Done', { exact: true })).toBeVisible();
     const received = (await paymentBalance(stack, wallet.publicKey)) - balanceBefore;
     expect(formatTokenAmount(received, stack.payment, 'en')).toBe(amount);
+    expect(received.toString(), 'the claim pays what the backend said was pending').toBe(
+      fleetBefore.pending,
+    );
     await expect
       .poll(() => indexedClaimTotals(request, wallet.publicKey), {
         message: 'the backend indexer records the claim',
       })
       .toEqual([{ project: stack.fleet.project, amount: received.toString(), claims: 1 }]);
+    await expect
+      .poll(async () => (await indexedPayouts(request, wallet.publicKey)).projects, {
+        message: "the backend's payouts show the claim and nothing left to claim",
+      })
+      .toEqual([
+        {
+          project: expect.any(String),
+          mint: stack.raise.mint,
+          shares: '1',
+          claimed: '0',
+          pending: '0',
+        },
+        {
+          project: stack.fleet.project,
+          mint: stack.fleet.mint,
+          shares: '5',
+          claimed: received.toString(),
+          pending: '0',
+        },
+      ]);
   });
 
   await test.step("verify the demo fleet car's published data in the browser", async () => {

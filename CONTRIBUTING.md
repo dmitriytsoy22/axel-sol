@@ -56,7 +56,7 @@ cp .env.example .env
 npm run start:dev     # watch mode; GET http://localhost:3001/health
 npm run lint          # ESLint with type-aware typescript-eslint rules
 npm test              # Jest: unit specs and HTTP specs of the whole app
-npm run test:localnet # the event indexer against solana-test-validator (Agave on PATH, anchor build done)
+npm run test:localnet # the event indexer and the operator's deposit flow against solana-test-validator (Agave on PATH, anchor build done)
 npm run build         # compile to dist/
 npm run start:prod    # node dist/main
 ```
@@ -94,7 +94,7 @@ npm run test:e2e                         # about 3 minutes, most of it the seed
 
 The seed installs its own dependencies (`npm run seed:deps`). The tests:
 
-- `judge-path.spec.ts`, the judge path on `/demo`: connect a wallet, get demo access, buy a share in the open raise, receive the desk's shares of the Demo Fleet car, simulate a month and claim it, verify that car's published data in the browser, and open the proof of solvency. The claim is also checked outside the app: the wallet's tKZT balance on the validator grew by exactly the amount the page showed, and the backend's `GET /positions/:owner/claims` recorded that amount.
+- `judge-path.spec.ts`, the judge path on `/demo`: connect a wallet, get demo access, buy a share in the open raise, receive the desk's shares of the Demo Fleet car, simulate a month and claim it, verify that car's published data in the browser, and open the proof of solvency. The claim is also checked outside the app: the wallet's tKZT balance on the validator grew by exactly the amount the page showed, which is also what the backend's `GET /v2/wallets/:wallet/payouts` said was pending, and the backend's `GET /positions/:owner/claims` and payouts recorded that amount.
 - `kyc-required.spec.ts`: a wallet without a KYC record sees a disabled "Wallet not verified" button and no way to buy, and the invest Blink refuses to build a purchase for it.
 
 **Wallet.** A build with `NEXT_PUBLIC_E2E=1` adds "E2E Burner" to the wallet picker, on any cluster but mainnet (`lib/solana/e2eBurnerWallet.ts`). It signs transactions and messages with the secret key stored in `localStorage` under `axel:e2e-burner-secret-key`, or creates one there, so a reload stays the same wallet. Each test stores a new key before the app loads and picks the burner in the wallet dialog, so every test has a wallet of its own. Never set `NEXT_PUBLIC_E2E` on a deployment.

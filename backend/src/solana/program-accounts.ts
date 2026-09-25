@@ -2,9 +2,10 @@ import type { IdlAccounts } from '@coral-xyz/anchor';
 import { Injectable } from '@nestjs/common';
 import { type AccountInfo, PublicKey } from '@solana/web3.js';
 
-import { type AxelV2Idl, periodAddress, projectAddress } from './axel-program';
+import { type AxelV2Idl, configAddress, periodAddress, projectAddress } from './axel-program';
 import { SolanaService } from './solana.service';
 
+export type ConfigAccount = IdlAccounts<AxelV2Idl>['config'];
 export type ProjectAccount = IdlAccounts<AxelV2Idl>['project'];
 export type RevenuePeriodAccount = IdlAccounts<AxelV2Idl>['revenuePeriod'];
 
@@ -25,6 +26,18 @@ export class ProgramAccounts {
 
   projectAddress(shareMint: PublicKey): PublicKey {
     return projectAddress(this.solana.programId, shareMint);
+  }
+
+  configAddress(): PublicKey {
+    return configAddress(this.solana.programId);
+  }
+
+  async config(): Promise<ConfigAccount | null> {
+    const info = await this.solana.connection.getAccountInfo(this.configAddress(), 'confirmed');
+    if (!this.isProgramAccount(info)) {
+      return null;
+    }
+    return this.solana.program.coder.accounts.decode<ConfigAccount>('config', info.data);
   }
 
   async project(shareMint: PublicKey): Promise<ProjectAccount | null> {

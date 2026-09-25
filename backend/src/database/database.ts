@@ -122,6 +122,18 @@ const MIGRATIONS: string[] = [
   CREATE INDEX program_events_project ON program_events (project, id);
   CREATE INDEX program_events_owner ON program_events (owner, type, id);
   `,
+  `
+  CREATE TABLE deposit_drafts (
+    oracle_signature TEXT PRIMARY KEY,
+    report_hash TEXT NOT NULL REFERENCES revenue_reports (report_hash),
+    mint TEXT NOT NULL,
+    operator TEXT NOT NULL,
+    period_index INTEGER NOT NULL,
+    recent_blockhash TEXT NOT NULL,
+    drafted_at INTEGER NOT NULL
+  );
+  CREATE INDEX deposit_drafts_mint ON deposit_drafts (mint);
+  `,
 ];
 
 export function openDatabase(path: string): SqliteDatabase {

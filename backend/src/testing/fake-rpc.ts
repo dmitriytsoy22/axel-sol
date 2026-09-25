@@ -15,6 +15,7 @@ import type { InvestorRecord } from '../kyc/investor-plan';
 import { verifyEd25519Signature } from '../kyc/siws';
 import {
   type AxelProgram,
+  configAddress,
   createAxelProgram,
   investorAddress,
   periodAddress,
@@ -185,6 +186,35 @@ export class FakeRpc {
       expiresAt: account.expiresAt.toNumber(),
       provider: Object.keys(account.provider)[0] as InvestorRecord['provider'],
     };
+  }
+
+  /** The program's `Config`, as `initialize_config` leaves it, with this fake's KYC key. */
+  async seedConfig(seed: { treasury: PublicKey }): Promise<void> {
+    const address = configAddress(this.programId);
+    const data = await this.program.coder.accounts.encode('config', {
+      admin: PublicKey.unique(),
+      pendingAdmin: PublicKey.default,
+      kycAuthority: this.kycAuthority,
+      demoKycAuthority: PublicKey.default,
+      treasury: seed.treasury,
+      raiseFeeBps: 300,
+      revenueFeeBps: 1_500,
+      minRaiseDuration: new BN(86_400),
+      maxActivationWindow: new BN(604_800),
+      allowedPaymentMints: Array.from({ length: 4 }, () => PublicKey.default),
+      paused: false,
+      projectCount: new BN(1),
+      bump: PublicKey.findProgramAddressSync([Buffer.from('config')], this.programId)[1],
+      recoveryDelay: new BN(259_200),
+      reserved: Array<number>(24).fill(0),
+    });
+    this.accounts.set(address.toBase58(), {
+      data,
+      executable: false,
+      lamports: 3_000_000,
+      owner: this.programId,
+      rentEpoch: 0,
+    });
   }
 
   /** An initialized SPL Token mint with `decimals`. */

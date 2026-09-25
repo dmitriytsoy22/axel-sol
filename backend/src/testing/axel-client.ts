@@ -74,7 +74,12 @@ export class AxelClient {
       lastValidBlockHeight,
     }).add(...instructions);
     transaction.sign(...signers);
-    const signature = await this.connection.sendRawTransaction(transaction.serialize());
+    return this.sendSigned(transaction.serialize(), lastValidBlockHeight);
+  }
+
+  /** Sends a transaction someone else signed, such as a co-signed deposit, and waits as `send` does. */
+  async sendSigned(serialized: Uint8Array, lastValidBlockHeight: number): Promise<string> {
+    const signature = await this.connection.sendRawTransaction(serialized);
     for (;;) {
       const {
         value: [status],

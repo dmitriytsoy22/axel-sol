@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   HttpCode,
   HttpStatus,
   Inject,
@@ -14,7 +13,13 @@ import {
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 import { APP_CONFIG, type AppConfig } from '../config/app-config';
-import { type AttestResponse, AttestationService } from './attestation.service';
+import { type CombinedOrigin, combineOrigins } from '../fleet/fleet-config';
+import { reportUrl } from '../published/car-data';
+import {
+  type AttestResponse,
+  AttestationService,
+  type DepositDraftResponse,
+} from './attestation.service';
 import { type DraftResponse, ReportsService } from './reports.service';
 import { ReportsStore } from './reports.store';
 import type { RevenueReport } from './revenue-report';
@@ -31,10 +36,14 @@ interface ReportSummary {
   dataOrigin: RevenueReport['data_origin'];
   url: string;
   attestations: { depositSignature: string; attestedAt: string }[];
+  /** Deposits the oracle built and co-signed for the operator to sign. */
+  drafts: { periodIndex: number; draftedAt: string }[];
 }
 
 interface ReportListResponse {
   mint: string;
+  /** Origin of the listed reports; `null` when there are none. */
+  dataOrigin: CombinedOrigin | null;
   reports: ReportSummary[];
 }
 
@@ -72,40 +81,48 @@ export class ReportsController {
   @Get(':mint')
   list(@Param('mint') mint: string): ReportListResponse {
     this.requireCar(mint);
+    const reports = this.store.reports(mint);
     return {
       mint,
-      reports: this.store.reports(mint).map((report) => ({
+      dataOrigin: combineOrigins(reports.map((report) => report.dataOrigin)),
+      reports: reports.map((report) => ({
         reportHash: report.reportHash,
         kind: report.kind,
         periodStart: report.periodStart,
         periodEnd: report.periodEnd,
         gross: report.gross,
         dataOrigin: report.dataOrigin,
-        url: `/reports/${mint}/${report.reportHash}.json`,
+        url: reportUrl(mint, report.reportHash),
         attestations: report.attestations.map((attestation) => ({
           depositSignature: attestation.depositSignature,
           attestedAt: new Date(attestation.attestedAt).toISOString(),
         })),
+        drafts: report.drafts.map((draft) => ({
+          periodIndex: draft.periodIndex,
+          draftedAt: new Date(draft.draftedAt).toISOString(),
+        })),
       })),
     };
-  }
-
-  /** The exact published text of a report; its SHA-256 is the deposit's `report_hash`. */
-  @Get(':mint/:reportHash.json')
-  @Header('Content-Type', 'application/json; charset=utf-8')
-  @Header('Cache-Control', 'public, max-age=31536000, immutable')
-  report(@Param('mint') mint: string, @Param('reportHash') reportHash: string): string {
-    this.requireCar(mint);
-    const report = this.store.report(mint, reportHash);
-    if (report === null) {
-      throw new NotFoundException(`No attested report ${reportHash} for ${mint}`);
-    }
-    return report.canonical;
   }
 
   private requireCar(mint: string): void {
     if (!this.mints.has(mint)) {
       throw new NotFoundException(`${mint} is not a car of this fleet`);
     }
+  }
+}
+
+/** The operator's deposit flow: its monthly report in, a deposit co-signed by the oracle out. */
+@Controller('v2/deposits')
+@UseGuards(ThrottlerGuard)
+export class DepositsController {
+  constructor(private readonly attestations: AttestationService) {}
+
+  /** Checks the report against the published telemetry and builds the deposit that pays it. */
+  @Post('draft')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: REPORT_LIMIT_PER_MINUTE, ttl: 60_000 } })
+  draft(@Body() body: unknown): Promise<DepositDraftResponse> {
+    return this.attestations.draft(body);
   }
 }

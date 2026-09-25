@@ -11,20 +11,16 @@ import {
   type AddressLookupTableAccount,
 } from '@solana/web3.js';
 
-import { createAxelProgram, periodAddress, projectAddress } from '../solana/axel-program';
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  associatedTokenAddress,
+  configAddress,
+  createAxelProgram,
+  periodAddress,
+  projectAddress,
+} from '../solana/axel-program';
 import { TOKEN_PROGRAM_ID } from '../solana/program-accounts';
 import type { FakeRpc } from './fake-rpc';
-
-export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
-  'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
-);
-
-export function associatedTokenAddress(owner: PublicKey, mint: PublicKey): PublicKey {
-  return PublicKey.findProgramAddressSync(
-    [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-  )[0];
-}
 
 export interface DepositArgs {
   gross: string;
@@ -42,6 +38,8 @@ export interface DepositOptions {
   args: DepositArgs;
   /** Pays the fee; default: the operator. */
   feePayer?: PublicKey;
+  /** The `RevenuePeriod` the deposit creates; default: the project's next. */
+  periodIndex?: number;
   /** Placed after the compute budget and before the deposit. */
   extraInstructions?: TransactionInstruction[];
   lookupTables?: AddressLookupTableAccount[];
@@ -68,14 +66,22 @@ export async function depositInstruction(
     .accountsStrict({
       operator: options.operator,
       oracle: options.oracle,
-      config: PublicKey.findProgramAddressSync([Buffer.from('config')], rpc.programId)[0],
+      config: configAddress(rpc.programId),
       project,
-      period: periodAddress(rpc.programId, project, account.periodCount),
+      period: periodAddress(rpc.programId, project, options.periodIndex ?? account.periodCount),
       paymentMint: account.paymentMint,
-      operatorPaymentAccount: associatedTokenAddress(options.operator, account.paymentMint),
+      operatorPaymentAccount: associatedTokenAddress(
+        options.operator,
+        account.paymentMint,
+        TOKEN_PROGRAM_ID,
+      ),
       revenueVault: account.revenueVault,
       treasury: options.treasury,
-      treasuryTokenAccount: associatedTokenAddress(options.treasury, account.paymentMint),
+      treasuryTokenAccount: associatedTokenAddress(
+        options.treasury,
+        account.paymentMint,
+        TOKEN_PROGRAM_ID,
+      ),
       paymentTokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,

@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Controller,
   Get,
-  Header,
   Inject,
   NotFoundException,
   Param,
@@ -12,7 +11,12 @@ import {
 import { CLOCK, type Clock } from '../common/clock';
 import { addDays, isIsoDate, localDate } from '../common/dates';
 import { APP_CONFIG, type AppConfig } from '../config/app-config';
-import type { DataOrigin, FleetCar } from '../fleet/fleet-config';
+import {
+  type CombinedOrigin,
+  combineOrigins,
+  type DataOrigin,
+  type FleetCar,
+} from '../fleet/fleet-config';
 import { ProgramAccounts } from '../solana/program-accounts';
 import type { DayRecord, VehicleStatus } from './day-record';
 import { type StoredDay, TelemetryStore } from './telemetry.store';
@@ -52,7 +56,6 @@ interface DayProofResponse {
   /** The published text; its SHA-256 is `dataHash`. */
   raw: string;
   record: DayRecord;
-  rawUrl: string;
   dataHash: string;
   /** `null` until the day's batch is confirmed on-chain. */
   chain: ChainLinkResponse | null;
@@ -71,6 +74,8 @@ interface ChainEntryResponse {
 interface ChainResponse {
   mint: string;
   project: string;
+  /** Origin of the listed entries; `null` when there are none. */
+  dataOrigin: CombinedOrigin | null;
   entries: ChainEntryResponse[];
   /** More confirmed days exist in the range than one response lists. */
   truncated: boolean;
@@ -164,7 +169,6 @@ export class TelemetryController {
       dataOrigin: day.dataOrigin,
       raw: day.canonical,
       record: JSON.parse(day.canonical) as DayRecord,
-      rawUrl: `/telemetry/${mint}/${day.date}.json`,
       dataHash: day.dataHash,
       chain: confirmedLink(day),
       headFormula: HEAD_FORMULA,
@@ -200,19 +204,11 @@ export class TelemetryController {
     return {
       mint,
       project: this.accounts.projectAddress(car.mint).toBase58(),
+      dataOrigin: combineOrigins(entries.map((entry) => entry.dataOrigin)),
       entries,
       truncated: days.length > MAX_CHAIN_ENTRIES,
       headFormula: HEAD_FORMULA,
     };
-  }
-
-  /** The exact published text of a day; its SHA-256 is the `data_hash` in the chain. */
-  @Get(':mint/:date.json')
-  @Header('Content-Type', 'application/json; charset=utf-8')
-  // A collected day's text never changes: its hash may already be on-chain.
-  @Header('Cache-Control', 'public, max-age=31536000, immutable')
-  raw(@Param('mint') mint: string, @Param('date') date: string): string {
-    return this.requireDay(this.requireCar(mint), requireDate(date, 'date')).canonical;
   }
 
   private requireCar(mint: string): FleetCar {

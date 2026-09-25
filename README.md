@@ -139,9 +139,10 @@ Open issues are listed under [Security](#security) and in [docs/architecture.md]
 - **Oracle for several cars:**
   - it collects each day from Yandex Fleet or a deterministic simulator. Simulated days are marked `data_origin: "simulated"` inside the hashed text and are refused on mainnet;
   - it publishes each day and appends it to the chain, 20 days per transaction, and reconciles a crash between sending and confirming on the next run.
-- **Revenue reports:** rent − park fee − maintenance − insurance (plus the sale proceeds in a final report). The oracle's signature is added only to a `deposit_revenue` the operator already signed that matches the rebuilt report and overlaps no earlier deposit.
+- **Revenue reports:** rent − park fee − maintenance − insurance (plus the sale proceeds in a final report). The operator sends its monthly report and gets back a `deposit_revenue` the oracle already co-signed, for its wallet to sign; or it signs one itself and sends it for attestation. The oracle signs only a deposit that matches the report rebuilt from the published days and overlaps no earlier deposit.
+- **Published car data:** each car's confirmed days and attested reports, in the layout the app's "Check the car's data yourself" reads. Every telemetry and report response says whether the figures are real or simulated.
 - **KYC:** Sign-In With Solana with a single-use nonce, then a Sumsub applicant bound to the wallet. The webhook checks the HMAC over the raw body in constant time, confirms approvals with the Sumsub API, and writes `set_investor` with a dedicated key. It never sends a transaction that would change nothing.
-- **Event indexer:** the program's history plus a live `logsSubscribe` feed, stored idempotently in SQLite. It keeps the events the transfer hook emits inside Token-2022, and serves `/events`, project histories and claim totals.
+- **Event indexer:** the program's history plus a live `logsSubscribe` feed, stored idempotently in SQLite. It keeps the events the transfer hook emits inside Token-2022, and serves `/events`, project histories, claim totals and each wallet's payouts. What a wallet can claim is replayed from the events with the program's own math, to the base unit.
 - **Fails closed:** it refuses to start in production without its secrets and keys, CORS allows only the configured origins, and the sign-in endpoints are rate-limited.
 
 **Demo seed** ([scripts/seed-devnet](scripts/seed-devnet/README.md))
@@ -159,7 +160,7 @@ Open issues are listed under [Security](#security) and in [docs/architecture.md]
 | `axel_v2` Rust unit and property tests | 35 |
 | Generated SDK against the IDL | 73 |
 | Frontend unit tests (Vitest) | 522 |
-| Backend (Jest) | 366, plus the indexer against a real `solana-test-validator` |
+| Backend (Jest) | 397, plus the indexer and the operator's deposit flow against a real `solana-test-validator` |
 | Demo seed | 90 |
 | Playwright end to end | the judge path and the KYC refusal, run against the real app, backend and program on a freshly seeded local validator |
 
@@ -433,7 +434,7 @@ npm run start:dev                   # watch mode; or: npm run build && npm run s
 curl http://localhost:3001/health   # {"status":"ok","rpc":"connected","kyc":"not_configured","oracle":"not_configured","indexer":"live"}
 ```
 
-Checks (as in CI): `npm run lint`, `npm test`, `npm run build`. With the Agave CLI on PATH, `npm run test:localnet` also runs the event indexer against a local validator. Cars, keys and production settings: [docs/api.md](docs/api.md#backend-configuration).
+Checks (as in CI): `npm run lint`, `npm test`, `npm run build`. With the Agave CLI on PATH, `npm run test:localnet` also runs the event indexer and the operator's deposit flow against a local validator. Cars, keys and production settings: [docs/api.md](docs/api.md#backend-configuration).
 
 **Program**
 
@@ -524,7 +525,8 @@ Done:
   - KYC with wallet sign-in, Sumsub sessions bound to the wallet, and a hardened webhook that writes `set_investor`;
   - the oracle for several cars: published RFC 8785 days, `record_telemetry` batches, attested revenue reports;
   - an event indexer with live logs, history backfill and event endpoints;
-  - 366 Jest tests and a local-validator test of the indexer.
+  - the payouts API with exact pending amounts, each car's data published for "Verify", and the operator's deposit drafts co-signed by the oracle;
+  - 397 Jest tests and local-validator tests of the indexer and the operator's deposit flow.
 - **Frontend on v2:**
   - the `axel_v2` client and hooks, with amounts in the payment token;
   - the six project states, escrowed buys, refunds, claims and hooked transfers;

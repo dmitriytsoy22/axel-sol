@@ -7,6 +7,7 @@ import { DatabaseModule } from './database/database.module';
 import { HealthController } from './health/health.controller';
 import { IndexerModule } from './indexer/indexer.module';
 import { KycModule } from './kyc/kyc.module';
+import { PublishedModule } from './published/published.module';
 import { ReportsModule } from './reports/reports.module';
 import { SolanaModule } from './solana/solana.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
@@ -23,6 +24,7 @@ import { TelemetryModule } from './telemetry/telemetry.module';
     ReportsModule,
     KycModule,
     IndexerModule,
+    PublishedModule,
   ],
   controllers: [HealthController],
 })
