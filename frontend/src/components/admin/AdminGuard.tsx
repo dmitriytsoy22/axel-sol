@@ -7,22 +7,26 @@ import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { buttonClasses } from '@/components/ui/Button';
+import { Button, buttonClasses } from '@/components/ui/Button';
+import { RotateCw } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { shortAddress } from '@/lib/format';
 
 interface AdminGuardProps {
-  /** From useAdminAccess, read once by the page. */
-  isAdmin: boolean;
+  /** Whether the wallet holds any role: admin, KYC key, demo KYC key or a car's operator. */
+  allowed: boolean;
   isLoading: boolean;
+  /** Reading the roles failed; the console cannot tell who the wallet is. */
+  error: Error | null;
+  onRetry: () => void;
   children: React.ReactNode;
 }
 
 /*
- * The console opens only for the car's operator. Anyone else stays on the page and is told
- * why, so they can switch wallets here instead of being bounced to the home page.
+ * The console opens only for a wallet with a role in the program. Anyone else stays on the
+ * page and is told why, so they can switch wallets here instead of being bounced away.
  */
-export function AdminGuard({ isAdmin, isLoading, children }: AdminGuardProps) {
+export function AdminGuard({ allowed, isLoading, error, onRetry, children }: AdminGuardProps) {
   const { connected, connecting, publicKey } = useWallet();
   const t = useTranslations('Admin');
   const tCommon = useTranslations('Common');
@@ -38,7 +42,9 @@ export function AdminGuard({ isAdmin, isLoading, children }: AdminGuardProps) {
   }
 
   // Same opening as Portfolio and Payouts, so a visitor sees which page this is first.
-  const header = <PageHeader overline={t('overline')} title={t('guardTitle')} lead={t('guardLead')} />;
+  const header = (
+    <PageHeader overline={t('overline')} title={t('guardTitle')} lead={t('guardLead')} />
+  );
 
   if (!connected) {
     return (
@@ -54,7 +60,26 @@ export function AdminGuard({ isAdmin, isLoading, children }: AdminGuardProps) {
     );
   }
 
-  if (!isAdmin) {
+  if (error) {
+    return (
+      <div className="page-container flex flex-col gap-10 pb-24 pt-10 md:gap-12 md:pt-14">
+        {header}
+        <Notice
+          as="h2"
+          title={t('errorTitle')}
+          body={t('errorBody')}
+          action={
+            <Button variant="secondary" onClick={onRetry}>
+              <RotateCw aria-hidden="true" strokeWidth={1.75} />
+              {t('retry')}
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (!allowed) {
     return (
       <div className="page-container flex flex-col gap-10 pb-24 pt-10 md:gap-12 md:pt-14">
         {header}

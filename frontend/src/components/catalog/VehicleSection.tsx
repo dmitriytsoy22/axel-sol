@@ -3,18 +3,17 @@
 import React, { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Camera, RotateCw } from 'lucide-react';
-import type { ProjectStatus } from '@/types/project';
+import { PROJECT_STATUSES, type ProjectStatus } from '@/lib/solana/accounts';
 import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatNumber } from '@/lib/format';
 import { NETWORK_NAME } from '@/lib/network';
 import { AssetCard } from './AssetCard';
+import { statusLabelKey } from './ProjectStatusBadge';
 import type { CatalogFeed } from './types';
 
 type Filter = ProjectStatus | 'all';
-
-const STATUS_ORDER: ProjectStatus[] = ['active', 'paused', 'closed'];
 
 function CardSkeleton(): JSX.Element {
   return (
@@ -35,13 +34,7 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
   const locale = useLocale();
   const [filter, setFilter] = useState<Filter>('all');
 
-  const statusLabel: Record<ProjectStatus, string> = {
-    active: t('statusActive'),
-    paused: t('statusPaused'),
-    closed: t('statusClosed'),
-  };
-
-  const presentStatuses = STATUS_ORDER.filter((status) =>
+  const presentStatuses = PROJECT_STATUSES.filter((status) =>
     projects.some((p) => p.status === status),
   );
   // A filter only helps once the cars differ in status.
@@ -53,7 +46,7 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
     { value: 'all', label: t('filterAll'), count: projects.length },
     ...presentStatuses.map((status) => ({
       value: status,
-      label: statusLabel[status],
+      label: t(statusLabelKey(status)),
       count: projects.filter((p) => p.status === status).length,
     })),
   ];
@@ -85,7 +78,7 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
     body = (
       <ul className="grid gap-6 sm:grid-cols-2">
         {visible.map((project) => (
-          <li key={project.mint} className="flex">
+          <li key={project.address.toBase58()} className="flex">
             <AssetCard project={project} />
           </li>
         ))}

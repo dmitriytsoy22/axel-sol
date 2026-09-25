@@ -2,13 +2,48 @@ import createNextIntlPlugin from 'next-intl/plugin';
 
 const withNextIntl = createNextIntlPlugin();
 
+/*
+ * The browser talks to the Solana RPC node (HTTP and its websocket) and, when configured, to
+ * the AXEL backend's telemetry and indexer APIs, so every configured origin is allowed.
+ */
+function configuredOrigins() {
+  const origins = [];
+  const rpc = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
+  if (rpc) {
+    const url = new URL(rpc);
+    origins.push(url.origin, `${url.protocol === 'https:' ? 'wss:' : 'ws:'}//${url.host}`);
+  }
+  for (const api of [process.env.NEXT_PUBLIC_TELEMETRY_API_URL, process.env.NEXT_PUBLIC_INDEXER_URL]) {
+    if (api) origins.push(new URL(api).origin);
+  }
+  return origins;
+}
+
+const connectSources = [
+  "'self'",
+  'https://*.helius-rpc.com',
+  'wss://*.helius-rpc.com',
+  'https://api.devnet.solana.com',
+  'wss://api.devnet.solana.com',
+  'https://api.testnet.solana.com',
+  'wss://api.testnet.solana.com',
+  'https://api.mainnet-beta.solana.com',
+  'wss://api.mainnet-beta.solana.com',
+  // A local solana-test-validator: RPC on 8899, websocket on 8900.
+  'http://localhost:*',
+  'ws://localhost:*',
+  'http://127.0.0.1:*',
+  'ws://127.0.0.1:*',
+  ...configuredOrigins(),
+];
+
 const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-eval' 'unsafe-inline';
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data: https://images.unsplash.com;
     font-src 'self';
-    connect-src 'self' https://*.helius-rpc.com wss://*.helius-rpc.com https://api.devnet.solana.com wss://api.devnet.solana.com https://api.mainnet-beta.solana.com wss://api.mainnet-beta.solana.com http://localhost:*;
+    connect-src ${[...new Set(connectSources)].join(' ')};
     object-src 'none';
     base-uri 'self';
     form-action 'self';

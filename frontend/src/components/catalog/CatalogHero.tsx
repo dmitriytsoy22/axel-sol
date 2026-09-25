@@ -3,7 +3,7 @@ import { getImageProps } from 'next/image';
 import { useTranslations } from 'next-intl';
 import { ArrowDown, Info } from 'lucide-react';
 import { buttonClasses } from '@/components/ui/Button';
-import { ON_TEST_NETWORK } from '@/lib/network';
+import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
 import { ChainStats } from './ChainStats';
 import type { CatalogFeed } from './types';
 
@@ -63,7 +63,7 @@ export function CatalogHero(feed: CatalogFeed): JSX.Element {
           {ON_TEST_NETWORK && (
             <p className="mt-6 flex items-start gap-2 text-small text-muted-foreground">
               <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
-              {t('devnetNote')}
+              {t('devnetNote', { network: NETWORK_NAME })}
             </p>
           )}
         </div>

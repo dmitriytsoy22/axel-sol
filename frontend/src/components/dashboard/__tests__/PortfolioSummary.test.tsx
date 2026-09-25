@@ -1,28 +1,44 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { PortfolioSummary } from '../PortfolioSummary';
 import { NextIntlClientProvider } from 'next-intl';
-import messagesEn from '../../../../messages/en.json';
 import { describe, it, expect } from 'vitest';
+import { PublicKey } from '@solana/web3.js';
+import messagesEn from '../../../../messages/en.json';
+import { TKZT } from '@/components/catalog/__tests__/fixtures';
+import { PortfolioSummary } from '../PortfolioSummary';
 
+const USDC = { ...TKZT, mint: PublicKey.unique(), symbol: 'USDC' };
 const figure = (label: string) => screen.getByText(label).closest('div');
 
-describe('PortfolioSummary', () => {
-  it('shows value, shares and unclaimed payouts in SOL from lamports', () => {
-    render(
-      <NextIntlClientProvider locale="en" messages={messagesEn}>
-        <PortfolioSummary
-          totalValue={450 * 1_000_000_000}
-          tokensHeld={250}
-          carCount={2}
-          unclaimedRevenue={44 * 1_000_000_000}
-        />
-      </NextIntlClientProvider>,
-    );
+function renderSummary(summary: React.ComponentProps<typeof PortfolioSummary>['summary']) {
+  render(
+    <NextIntlClientProvider locale="en" messages={messagesEn}>
+      <PortfolioSummary summary={summary} carCount={2} />
+    </NextIntlClientProvider>,
+  );
+}
 
-    expect(figure('Value at current price')).toHaveTextContent('450 SOL');
+describe('PortfolioSummary', () => {
+  it('shows value, shares and what a claim pays, per payment token', () => {
+    renderSummary({
+      value: [
+        { amount: 450_000_000_000n, unit: TKZT },
+        { amount: 25_000_000n, unit: USDC },
+      ],
+      shares: 250n,
+      pending: [{ amount: 44_120_000n, unit: TKZT }],
+      claimed: [],
+    });
+
+    expect(figure('Value at current price')).toHaveTextContent('450,000 tKZT · 25 USDC');
     expect(figure('Shares held')).toHaveTextContent('250');
     expect(figure('Shares held')).toHaveTextContent('in 2 cars');
-    expect(figure('Not claimed yet')).toHaveTextContent('44 SOL');
+    expect(figure('Ready to claim')).toHaveTextContent('44.12 tKZT');
+  });
+
+  it('shows a plain zero where no token has anything to total', () => {
+    renderSummary({ value: [], shares: 0n, pending: [], claimed: [] });
+
+    expect(figure('Ready to claim')).toHaveTextContent(/^Ready to claim0/);
   });
 });

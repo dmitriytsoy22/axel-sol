@@ -4,21 +4,27 @@ import React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { TriangleAlert } from 'lucide-react';
 import { useTelemetry } from '@/hooks/useTelemetry';
+import { TELEMETRY_API_URL } from '@/lib/api/telemetry';
 import { Pill, type PillTone } from '@/components/ui/Pill';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { formatNumber, formatTenge, intlLocale } from '@/lib/format';
-import type { TelemetryData } from '@/types/telemetry';
+import { formatDate, formatNumber, formatTenge } from '@/lib/format';
 
-const STATUS: Record<TelemetryData['carStatus'], { tone: PillTone; key: string }> = {
+const STATUS: Record<string, { tone: PillTone; key: string }> = {
   active: { tone: 'success', key: 'statusInService' },
   maintenance: { tone: 'warning', key: 'statusMaintenance' },
   inactive: { tone: 'neutral', key: 'statusInactive' },
 };
 
-function TelemetryFigures({ projectId }: { projectId: string }): JSX.Element {
+function TelemetryFigures({
+  projectId,
+  apiUrl,
+}: {
+  projectId: string;
+  apiUrl: string | null;
+}): JSX.Element {
   const t = useTranslations('Telemetry');
   const locale = useLocale();
-  const { data, isLoading, isStale } = useTelemetry(projectId);
+  const { data, isLoading, error, isStale } = useTelemetry(projectId, apiUrl);
 
   if (isLoading) {
     return (
@@ -30,6 +36,17 @@ function TelemetryFigures({ projectId }: { projectId: string }): JSX.Element {
         {[0, 1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-24 rounded-card" />
         ))}
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div
+        data-testid="telemetry-error"
+        className="rounded-card border border-dashed border-border px-6 py-8"
+      >
+        <p className="max-w-[60ch] text-body text-muted-foreground">{t('error')}</p>
       </div>
     );
   }
@@ -46,12 +63,8 @@ function TelemetryFigures({ projectId }: { projectId: string }): JSX.Element {
   }
 
   const status = STATUS[data.carStatus] ?? STATUS.inactive;
-  const updatedAt = data.date
-    ? new Date(data.date).toLocaleTimeString(intlLocale(locale), {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : '';
+  // The backend dates figures by UTC day; noon keeps that day in every time zone.
+  const day = data.date ? formatDate(Date.parse(`${data.date}T12:00:00Z`) / 1000, locale) : '';
 
   const figures = [
     { label: t('dailyRevenue'), value: formatTenge(data.dailyRevenue, locale) },
@@ -67,7 +80,7 @@ function TelemetryFigures({ projectId }: { projectId: string }): JSX.Element {
           className="mb-4 inline-flex items-center gap-2 rounded-control bg-warning-muted px-3 py-1.5 text-small text-foreground"
         >
           <TriangleAlert aria-hidden="true" className="h-4 w-4 text-warning" strokeWidth={1.75} />
-          {t('staleData', { time: updatedAt })}
+          {t('staleData', { date: day })}
         </p>
       )}
       <dl className="grid grid-cols-2 overflow-hidden rounded-card border border-border bg-card md:grid-cols-4">
@@ -91,8 +104,17 @@ function TelemetryFigures({ projectId }: { projectId: string }): JSX.Element {
   );
 }
 
-/** Daily figures from the car's tracker, served by the AXEL backend, not by the chain. */
-export function TelemetryWidget({ projectId }: { projectId: string }): JSX.Element {
+/**
+ * Daily figures from the car's tracker, served by the AXEL backend, not by the chain. Without
+ * NEXT_PUBLIC_TELEMETRY_API_URL it says the car's trip data is not connected.
+ */
+export function TelemetryWidget({
+  projectId,
+  apiUrl = TELEMETRY_API_URL,
+}: {
+  projectId: string;
+  apiUrl?: string | null;
+}): JSX.Element {
   const t = useTranslations('Telemetry');
 
   return (
@@ -102,7 +124,7 @@ export function TelemetryWidget({ projectId }: { projectId: string }): JSX.Eleme
       </h2>
       <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">{t('lead')}</p>
       <div className="mt-6">
-        <TelemetryFigures projectId={projectId} />
+        <TelemetryFigures projectId={projectId} apiUrl={apiUrl} />
       </div>
     </section>
   );

@@ -2,12 +2,12 @@
 
 import React, { useId, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ProjectState } from '@/types/project';
-import { formatNumber, formatPercent, formatSolAmount } from '@/lib/format';
+import type { Project } from '@/types/project';
+import { formatNumber, formatPercent, formatTokenAmount } from '@/lib/format';
 import { estimatePayout, parseAmount } from './payoutMath';
 
 interface PayoutCalculatorProps {
-  project: ProjectState;
+  project: Project;
 }
 
 const inputClass =
@@ -25,29 +25,31 @@ export function PayoutCalculator({ project }: PayoutCalculatorProps): JSX.Elemen
   const [shares, setShares] = useState('1');
   const [income, setIncome] = useState('');
 
-  const total = project.totalTokenSupply;
+  const total = Number(project.totalShares);
+  const { symbol, decimals } = project.payment;
+  const price = Number(project.pricePerShare) / 10 ** decimals;
+  const inToken = (value: number) => `${formatNumber(value, locale, 2)} ${symbol}`;
   const estimate = estimatePayout({
     shares: parseAmount(shares),
-    monthlyPayoutSol: parseAmount(income),
+    monthlyPayout: parseAmount(income),
     totalShares: total,
-    pricePerShareSol: project.pricePerToken / 1_000_000_000,
+    pricePerShare: price,
   });
 
-  const sharesInvalid =
-    shares.trim() !== '' && !(parseAmount(shares) >= 1 && parseAmount(shares) <= total);
+  const sharesCount = parseAmount(shares);
+  const sharesValid = Number.isInteger(sharesCount) && sharesCount >= 1 && sharesCount <= total;
+  const sharesInvalid = shares.trim() !== '' && !sharesValid;
 
   const results = [
     { label: t('calcPart'), value: estimate && formatPercent(estimate.part, 1, locale) },
-    { label: t('calcPerMonth'), value: estimate && formatSolAmount(estimate.perMonthSol, locale) },
-    { label: t('calcPerYear'), value: estimate && formatSolAmount(estimate.perYearSol, locale) },
+    { label: t('calcPerMonth'), value: estimate && inToken(estimate.perMonth) },
+    { label: t('calcPerYear'), value: estimate && inToken(estimate.perYear) },
     { label: t('calcYield'), value: estimate && formatPercent(estimate.yearlyOnPrice, 1, locale) },
   ];
-  const sharesCount = parseAmount(shares);
+  const cost = (sharesValid ? BigInt(sharesCount) : 0n) * project.pricePerShare;
   const sharesHint = sharesInvalid
     ? t('calcSharesHint', { max: formatNumber(total, locale) })
-    : t('calcCostHint', {
-        cost: formatSolAmount((sharesCount || 0) * (project.pricePerToken / 1_000_000_000), locale),
-      });
+    : t('calcCostHint', { cost: formatTokenAmount(cost, project.payment, locale) });
 
   return (
     <section aria-labelledby="calc-title">
@@ -82,7 +84,7 @@ export function PayoutCalculator({ project }: PayoutCalculatorProps): JSX.Elemen
           </div>
           <div>
             <label htmlFor={incomeId} className="text-small font-medium text-foreground">
-              {t('calcIncome')}
+              {t('calcIncome', { symbol })}
             </label>
             <input
               id={incomeId}

@@ -1,50 +1,34 @@
-import React, { useEffect } from 'react';
+'use client';
+
+import React from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2 } from 'lucide-react';
-import { EnrichedRevenuePeriod } from '@/hooks/useDashboard';
 import { useClaim } from '@/hooks/useClaim';
-import { useToast } from '@/components/ui/toast/ToastProvider';
 import { Button } from '@/components/ui/Button';
+import type { Project } from '@/types/project';
 
 interface ClaimAllButtonProps {
-  periods: EnrichedRevenuePeriod[];
-  onSuccess?: () => void;
+  /** Cars with something to claim. */
+  projects: Project[];
+  onClaimed: () => void;
 }
 
-export function ClaimAllButton({ periods, onSuccess }: ClaimAllButtonProps): JSX.Element {
+/** Claims every car at once: up to four per transaction, one wallet prompt per transaction. */
+export function ClaimAllButton({ projects, onClaimed }: ClaimAllButtonProps): JSX.Element {
   const t = useTranslations('Dashboard');
-  const { state, errorMsg, claimAll, reset } = useClaim();
-  const { addToast } = useToast();
+  const { status, claimAll } = useClaim();
+  const busy = status !== 'idle' && status !== 'success' && status !== 'error';
 
-  const claimablePeriods = periods.filter((p) => p.status === 'claimable');
-
-  const isProcessing = state !== 'idle' && state !== 'error' && state !== 'success';
-  const isDisabled = isProcessing || claimablePeriods.length === 0;
-
-  useEffect(() => {
-    // Success is reported by the confirmation hook with an Explorer link.
-    if (state === 'success') {
-      reset();
-      onSuccess?.();
-    } else if (state === 'error') {
-      addToast({ variant: 'error', title: t('claimFailed'), message: errorMsg || t('txFailed') });
-      reset();
-    }
-  }, [state, errorMsg, addToast, reset, onSuccess, t]);
-
-  const handleClaimAll = () => {
-    claimAll(
-      claimablePeriods.map((p) => ({
-        projectId: p.period.project,
-        periodIndex: p.period.index,
-      })),
-    );
+  const handleClick = async () => {
+    await claimAll(projects);
+    // Some groups may have gone through before one failed; show what the chain holds now.
+    onClaimed();
   };
 
   return (
-    <Button onClick={handleClaimAll} disabled={isDisabled} data-testid="claim-all-button">
-      {isProcessing && <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />}
-      {isProcessing ? t('claiming') : t('claimAll')}
+    <Button onClick={handleClick} disabled={busy || projects.length === 0}>
+      {busy && <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />}
+      {busy ? t('claiming') : t('claimAll')}
     </Button>
   );
 }

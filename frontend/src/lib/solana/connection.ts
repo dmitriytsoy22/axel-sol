@@ -1,24 +1,36 @@
-/**
- * Solana RPC Connection & Utilities
- *
- * Provides a singleton Connection instance, Explorer URL builder,
- * and RPC error wrapping helpers.
- */
+import { PublicKey } from '@solana/web3.js';
+import IDL from './idl-v2/axel_v2.json';
 
-import { Connection, PublicKey } from '@solana/web3.js';
-import { AnchorProvider, Program } from '@coral-xyz/anchor';
-import type { Axel } from './idl/axel';
-import IDL from './idl/axel.json';
+/** Clusters the app can read from; `localnet` is a `solana-test-validator` on this machine. */
+export const SOLANA_NETWORKS = ['mainnet-beta', 'devnet', 'testnet', 'localnet'] as const;
+export type SolanaNetwork = (typeof SOLANA_NETWORKS)[number];
 
-const SOLANA_RPC_URL =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
+const DEFAULT_RPC_URL: Record<SolanaNetwork, string> = {
+  'mainnet-beta': 'https://api.mainnet-beta.solana.com',
+  devnet: 'https://api.devnet.solana.com',
+  testnet: 'https://api.testnet.solana.com',
+  localnet: 'http://127.0.0.1:8899',
+};
 
-const SOLANA_NETWORK =
-  process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
+/** Reads NEXT_PUBLIC_SOLANA_NETWORK; a typo fails the build instead of reading the wrong cluster. */
+export function parseNetwork(value: string | undefined): SolanaNetwork {
+  if (!value) return 'devnet';
+  const network = SOLANA_NETWORKS.find((name) => name === value);
+  if (!network) {
+    throw new Error(
+      `NEXT_PUBLIC_SOLANA_NETWORK must be one of ${SOLANA_NETWORKS.join(', ')}, got "${value}"`,
+    );
+  }
+  return network;
+}
 
-export const PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_PROGRAM_ID || 'DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M',
-);
+export const SOLANA_NETWORK = parseNetwork(process.env.NEXT_PUBLIC_SOLANA_NETWORK);
+
+export const SOLANA_RPC_URL =
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL || DEFAULT_RPC_URL[SOLANA_NETWORK];
+
+/** axel_v2. The IDL carries the address it was built for; a deployment elsewhere sets the env. */
+export const PROGRAM_ID = new PublicKey(process.env.NEXT_PUBLIC_PROGRAM_ID || IDL.address);
 
 export const connectionConfig = {
   endpoint: SOLANA_RPC_URL,
@@ -27,99 +39,24 @@ export const connectionConfig = {
   programId: PROGRAM_ID.toBase58(),
 };
 
-/** Singleton connection for read-only RPC calls */
-let _connection: Connection | null = null;
-export function getConnection(): Connection {
-  if (!_connection) {
-    _connection = new Connection(SOLANA_RPC_URL, 'confirmed');
+/** Solana Explorer link on `network`; a local validator is opened through Explorer's custom RPC. */
+export function explorerUrl(
+  network: SolanaNetwork,
+  rpcUrl: string,
+  addressOrSignature: string,
+  type: 'address' | 'tx',
+): string {
+  const path = `https://explorer.solana.com/${type}/${addressOrSignature}`;
+  if (network === 'mainnet-beta') return path;
+  if (network === 'localnet') {
+    return `${path}?cluster=custom&customUrl=${encodeURIComponent(rpcUrl)}`;
   }
-  return _connection;
+  return `${path}?cluster=${network}`;
 }
 
-/**
- * Create a read-only Anchor program instance (no wallet signing).
- * Used for fetching/deserializing on-chain accounts.
- */
-export function getReadonlyProgram(): Program<Axel> {
-  const connection = getConnection();
-  const provider = new AnchorProvider(
-    connection,
-    {
-      publicKey: PublicKey.default,
-      signTransaction: async () => { throw new Error('readonly'); },
-      signAllTransactions: async () => { throw new Error('readonly'); },
-    } as any,
-    { preflightCommitment: 'confirmed' },
-  );
-  return new Program(IDL as Axel, provider);
-}
-
-/**
- * Solana Explorer URL builder
- */
 export function getExplorerUrl(
   addressOrSignature: string,
   type: 'address' | 'tx' = 'address',
 ): string {
-  const base = 'https://explorer.solana.com';
-  const cluster = SOLANA_NETWORK === 'mainnet-beta' ? '' : `?cluster=${SOLANA_NETWORK}`;
-
-  if (type === 'tx') {
-    return `${base}/tx/${addressOrSignature}${cluster}`;
-  }
-  return `${base}/address/${addressOrSignature}${cluster}`;
-}
-
-/* ── RPC Error Handling ──────────────────────────────── */
-
-const RPC_ERROR_MAP: Record<string, string> = {
-  'failed to get recent blockhash': 'Network is congested. Please try again in a moment.',
-  'blockhash not found': 'Transaction expired. Please try again.',
-  'insufficient funds': 'Insufficient SOL balance for this transaction.',
-  'account not found': 'Account does not exist on-chain.',
-  'transaction simulation failed': 'Transaction simulation failed. Check your inputs.',
-  'node is behind': 'Solana network is experiencing delays. Please try again.',
-  'too many requests': 'Rate limited by RPC. Please wait a moment and retry.',
-  'connection refused': 'Unable to connect to Solana network. Check your connection.',
-  'timeout': 'Request timed out. The network may be slow.',
-  'transaction was not confirmed': 'Transaction was not confirmed within the timeout period.',
-};
-
-export function wrapRpcError(error: unknown): {
-  message: string;
-  code?: string;
-  original: unknown;
-} {
-  const errorMessage =
-    error instanceof Error ? error.message : String(error);
-
-  const lowerMessage = errorMessage.toLowerCase();
-  for (const [pattern, friendlyMessage] of Object.entries(RPC_ERROR_MAP)) {
-    if (lowerMessage.includes(pattern)) {
-      return {
-        message: friendlyMessage,
-        code: pattern.replace(/\s+/g, '_').toUpperCase(),
-        original: error,
-      };
-    }
-  }
-
-  return {
-    message: 'Something went wrong. Please try again.',
-    code: 'UNKNOWN_RPC_ERROR',
-    original: error,
-  };
-}
-
-export async function safeRpcCall<T>(
-  fn: () => Promise<T>,
-): Promise<{ data: T; error: null } | { data: null; error: ReturnType<typeof wrapRpcError> }> {
-  try {
-    const data = await fn();
-    return { data, error: null };
-  } catch (err) {
-    const wrappedError = wrapRpcError(err);
-    console.error('[AXEL RPC Error]', wrappedError.code, wrappedError.original);
-    return { data: null, error: wrappedError };
-  }
+  return explorerUrl(SOLANA_NETWORK, SOLANA_RPC_URL, addressOrSignature, type);
 }

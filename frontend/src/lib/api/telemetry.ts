@@ -1,78 +1,34 @@
-/**
- * Telemetry API Client
- *
- * The ONLY backend call in the entire AXEL frontend.
- * Fetches latest telemetry data from Yandex Pro via our backend proxy.
- *
- * Endpoint: GET /telemetry/latest/:project_id
- */
+import { z } from 'zod';
+import type { TelemetryData } from '@/types/telemetry';
 
-const TELEMETRY_API_URL =
-  process.env.NEXT_PUBLIC_TELEMETRY_API_URL || 'http://localhost:3001';
+/** Base URL of the AXEL backend's telemetry API; null when this deployment has none. */
+export const TELEMETRY_API_URL =
+  process.env.NEXT_PUBLIC_TELEMETRY_API_URL?.replace(/\/+$/, '') || null;
 
-export interface TelemetryResponse {
-  projectId: string;
-  date: string;
-  dailyRevenue: number;
-  mileageKm: number;
-  tripsCount: number;
-  carStatus: 'active' | 'maintenance' | 'inactive';
-  dataHash: string;
-  oracleSignature: string;
-  solanaTxSignature: string;
-  stale: boolean;
-  available: boolean;
-}
+const TelemetrySchema = z.object({
+  date: z.string(),
+  dailyRevenue: z.number(),
+  mileageKm: z.number(),
+  tripsCount: z.number(),
+  carStatus: z.string(),
+  dataHash: z.string(),
+  solanaTxSignature: z.string().nullable(),
+  stale: z.boolean(),
+  available: z.boolean(),
+});
 
-/**
- * Fetch latest telemetry for a project.
- * On any error → returns fallback { available: false }.
- */
+/** The newest day of trip data the backend holds for a project, by its share mint. */
 export async function fetchLatestTelemetry(
+  baseUrl: string,
   projectId: string,
-): Promise<TelemetryResponse> {
-  const fallback: TelemetryResponse = {
-    projectId,
-    date: new Date().toISOString().split('T')[0],
-    dailyRevenue: 0,
-    mileageKm: 0,
-    tripsCount: 0,
-    carStatus: 'inactive',
-    dataHash: '',
-    oracleSignature: '',
-    solanaTxSignature: '',
-    stale: false,
-    available: false,
-  };
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10_000);
-
-    const response = await fetch(
-      `${TELEMETRY_API_URL}/telemetry/latest/${projectId}`,
-      {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-      },
-    );
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.warn(`[AXEL Telemetry] HTTP ${response.status} for project ${projectId}`);
-      return fallback;
-    }
-
-    const data: TelemetryResponse = await response.json();
-    return { ...data, available: true };
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      console.warn(`[AXEL Telemetry] Timeout fetching project ${projectId}`);
-    } else {
-      console.warn(`[AXEL Telemetry] Network error for project ${projectId}:`, error);
-    }
-    return fallback;
+  signal?: AbortSignal,
+): Promise<TelemetryData> {
+  const response = await fetch(`${baseUrl}/telemetry/latest/${encodeURIComponent(projectId)}`, {
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Telemetry API answered ${response.status}`);
   }
+  return TelemetrySchema.parse(await response.json());
 }

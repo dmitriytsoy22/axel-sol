@@ -3,7 +3,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { formatNumber, formatSol } from '@/lib/format';
+import { formatCount, formatNumber, formatTokenTotals } from '@/lib/format';
 import { NETWORK_NAME } from '@/lib/network';
 import { catalogStats } from './catalogStats';
 import type { CatalogFeed } from './types';
@@ -19,11 +19,18 @@ export function ChainStats({ projects, isLoading, error, onRetry }: CatalogFeed)
     {
       label: t('statShares'),
       value: t('ofTotal', {
-        part: formatNumber(stats.sharesSold, locale),
-        whole: formatNumber(stats.sharesTotal, locale),
+        part: formatCount(stats.sharesSold, locale),
+        whole: formatCount(stats.sharesTotal, locale),
       }),
     },
-    { label: t('statSoldValue'), value: formatSol(stats.soldValueLamports, locale) },
+    {
+      label: t('statSoldValue'),
+      // No car yet means no payment token to name, so the sum is a plain zero.
+      value:
+        stats.soldValue.length > 0
+          ? formatTokenTotals(stats.soldValue, locale)
+          : formatNumber(0, locale),
+    },
     { label: t('statPayouts'), value: formatNumber(stats.deposits, locale) },
   ];
 

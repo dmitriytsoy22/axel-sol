@@ -1,35 +1,73 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  formatBps,
+  formatCount,
   formatDate,
+  formatDay,
   formatNumber,
   formatPercent,
-  formatSol,
-  formatSolAmount,
   formatTenge,
+  formatTokenAmount,
+  formatTokenTotals,
   shortAddress,
 } from '../format';
 
 const NBSP = ' ';
 
-describe('formatSol', () => {
+const TKZT = { decimals: 6, symbol: 'tKZT' };
+const USDC = { decimals: 6, symbol: 'USDC' };
+
+describe('formatTokenAmount', () => {
   it.each([
-    ['en', '1,250.5 SOL'],
-    ['ru', `1${NBSP}250,5 SOL`],
-    ['kk', `1${NBSP}250,5 SOL`],
-  ])('writes lamports as SOL in the %s number format', (locale, expected) => {
-    expect(formatSol(1_250_500_000_000, locale)).toBe(expected);
+    ['en', '1,250.5 tKZT'],
+    ['ru', `1${NBSP}250,5 tKZT`],
+    ['kk', `1${NBSP}250,5 tKZT`],
+  ])("writes base units with the mint's symbol in the %s number format", (locale, expected) => {
+    expect(formatTokenAmount(1_250_500_000n, TKZT, locale)).toBe(expected);
   });
 
-  it('keeps up to four decimals so small prices stay exact', () => {
-    expect(formatSol(100_000_000, 'en')).toBe('0.1 SOL');
-    expect(formatSol(123_400_000, 'en')).toBe('0.1234 SOL');
+  it('cuts digits past the limit instead of rounding a payout up', () => {
+    expect(formatTokenAmount(1_999_999n, TKZT, 'en')).toBe('1.99 tKZT');
+    expect(formatTokenAmount(1_999_999n, TKZT, 'en', 6)).toBe('1.999999 tKZT');
+  });
+
+  it('writes whole amounts without a decimal part', () => {
+    expect(formatTokenAmount(10_000_000_000n, TKZT, 'en')).toBe('10,000 tKZT');
+    expect(formatTokenAmount(0n, USDC, 'en')).toBe('0 USDC');
+  });
+
+  it('stays exact beyond the precision of a JavaScript number', () => {
+    expect(formatTokenAmount(18_446_744_073_709_551_615n, { decimals: 0, symbol: 'X' }, 'en')).toBe(
+      '18,446,744,073,709,551,615 X',
+    );
   });
 });
 
-describe('formatSolAmount', () => {
-  it('writes an amount already in SOL the same way as lamports', () => {
-    expect(formatSolAmount(0.35, 'en')).toBe('0.35 SOL');
-    expect(formatSolAmount(0.35, 'ru')).toBe('0,35 SOL');
+describe('formatTokenTotals', () => {
+  it('lists one amount per token', () => {
+    expect(
+      formatTokenTotals(
+        [
+          { amount: 1_250_000_000n, unit: TKZT },
+          { amount: 10_000_000n, unit: USDC },
+        ],
+        'en',
+      ),
+    ).toBe('1,250 tKZT · 10 USDC');
+  });
+});
+
+describe('formatBps', () => {
+  it('writes a fee in basis points without rounding it to whole percent', () => {
+    expect(formatBps(250, 'en')).toBe('2.5%');
+    expect(formatBps(1_500, 'kk')).toBe('15%');
+    expect(formatBps(1_525, 'ru')).toBe(`15,25${NBSP}%`);
+  });
+});
+
+describe('formatCount', () => {
+  it('groups a count kept as a BigInt', () => {
+    expect(formatCount(1_250_000n, 'ru')).toBe(`1${NBSP}250${NBSP}000`);
   });
 });
 
@@ -61,7 +99,9 @@ describe('formatDate', () => {
 
   it('spells every Kazakh month the CLDR way', () => {
     const months = Array.from({ length: 12 }, (_, month) =>
-      formatDate(Date.UTC(2026, month, 15, 12) / 1000, 'kk').split(' ').pop(),
+      formatDate(Date.UTC(2026, month, 15, 12) / 1000, 'kk')
+        .split(' ')
+        .pop(),
     );
 
     expect(months).toEqual([
@@ -78,6 +118,13 @@ describe('formatDate', () => {
       'қар.',
       'жел.',
     ]);
+  });
+});
+
+describe('formatDay', () => {
+  it('writes a YYYYMMDD day from the chain as a calendar date', () => {
+    expect(formatDay(20261031, 'en')).toBe('Oct 31, 2026');
+    expect(formatDay(20260107, 'kk')).toBe('2026 ж. 7 қаң.');
   });
 });
 
@@ -106,7 +153,7 @@ describe('Kazakh formatting', () => {
   });
 
   it('keeps Kazakhstan number marks in a browser without Kazakh locale data', () => {
-    expect(formatSol(1_250_500_000_000, 'kk')).toBe(`1${NBSP}250,5 SOL`);
+    expect(formatTokenAmount(1_250_500_000n, TKZT, 'kk')).toBe(`1${NBSP}250,5 tKZT`);
     expect(formatPercent(13, 100, 'kk')).toBe('13%');
     expect(formatDate(Date.UTC(2026, 3, 7, 12) / 1000, 'kk')).toBe('2026 ж. 7 сәу.');
   });

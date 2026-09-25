@@ -1,286 +1,159 @@
-import { Connection, PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID, getTokenMetadata } from '@solana/spl-token';
-import type {
-  ProjectState,
-  WhitelistEntry,
-  RevenuePeriod,
-  ClaimRecord,
-  InvestorHolding,
-} from '@/types';
-import { getReadonlyProgram, getConnection } from './connection';
-import { deriveProjectState, deriveWhitelistEntry, deriveRevenuePeriod, deriveClaimRecord } from './pda';
+import type { AccountInfo, Connection, GetProgramAccountsFilter } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
+import { utils } from '@coral-xyz/anchor';
+import type { Project } from '@/types/project';
+import {
+  ACCOUNT_SIZE,
+  decodeConfig,
+  decodeInvestor,
+  decodePosition,
+  decodeProject,
+  decodeRevenuePeriod,
+  discriminator,
+  OFFSETS,
+  type AccountName,
+  type ConfigAccount,
+  type InvestorAccount,
+  type PositionAccount,
+  type ProjectAccount,
+  type RevenuePeriodAccount,
+} from './accounts';
+import { PROGRAM_ID } from './connection';
+import { configAddress, investorAddress, positionAddress, projectAddress } from './pda';
+import { carMetadata, paymentToken, readTokenMetadata, tokenAccountBalance } from './tokens';
 
-/**
- * Fetches and deserializes ProjectState from on-chain.
- * Also reads Token-2022 metadata for car details.
- */
-export async function fetchProjectState(
+/** getMultipleAccounts takes at most 100 addresses per call. */
+const MAX_MULTIPLE_ACCOUNTS = 100;
+
+function memcmp(offset: number, bytes: Buffer): GetProgramAccountsFilter {
+  return { memcmp: { offset, bytes: utils.bytes.bs58.encode(bytes) } };
+}
+
+/** Program accounts of one type: its discriminator and size, plus any field filters. */
+function programAccounts(
   connection: Connection,
-  mint: PublicKey,
-): Promise<ProjectState | null> {
-  try {
-    const program = getReadonlyProgram();
-    const [projectStatePda] = deriveProjectState(mint);
-
-    const data = await program.account.projectState.fetch(projectStatePda);
-
-    // Map on-chain status enum to string
-    let status: ProjectState['status'] = 'active';
-    if ('paused' in data.status) status = 'paused';
-    else if ('closed' in data.status) status = 'closed';
-
-    const tokensSold = data.tokensSold.toNumber();
-    const totalTokenSupply = data.tokenSupply.toNumber();
-
-    // Read Token-2022 metadata for car details
-    let carMake = '';
-    let carModel = '';
-    let carYear = 0;
-    let vin = '';
-    let imageUrl = '';
-
-    try {
-      const metadata = await getTokenMetadata(
-        connection,
-        mint,
-        'confirmed',
-        TOKEN_2022_PROGRAM_ID,
-      );
-      if (metadata) {
-        carMake = findMetadataField(metadata, 'make');
-        carModel = findMetadataField(metadata, 'model');
-        carYear = parseInt(findMetadataField(metadata, 'year') || '0', 10);
-        vin = findMetadataField(metadata, 'vin');
-        const uri = metadata.uri || '';
-        imageUrl = uri.includes('test-metadata') ? '' : uri;
-      }
-    } catch (e) {
-      console.warn('Failed to read token metadata:', e);
-    }
-
-    return {
-      admin: data.admin.toBase58(),
-      mint: data.mint.toBase58(),
-      revenueVault: data.revenueVault.toBase58(),
-      status,
-      totalTokenSupply,
-      tokensSold,
-      tokensRemaining: totalTokenSupply - tokensSold,
-      pricePerToken: data.pricePerShare.toNumber(),
-      periodCount: data.periodCount,
-      oraclePubkey: data.oraclePubkey.toBase58(),
-      bump: data.bump,
-      revenueVaultBump: data.revenueVaultBump,
-      carMake,
-      carModel,
-      carYear,
-      vin,
-      imageUrl,
-    };
-  } catch (error) {
-    console.error('Error fetching ProjectState:', error);
-    return null;
-  }
+  name: AccountName & keyof typeof ACCOUNT_SIZE,
+  filters: GetProgramAccountsFilter[] = [],
+) {
+  return connection.getProgramAccounts(PROGRAM_ID, {
+    commitment: 'confirmed',
+    filters: [{ dataSize: ACCOUNT_SIZE[name] }, memcmp(0, discriminator(name)), ...filters],
+  });
 }
 
-/**
- * Fetches ALL ProjectState accounts from on-chain via getProgramAccounts.
- * Enriches each with Token-2022 metadata for car details.
- */
-export async function fetchAllProjects(
+async function multipleAccounts(
   connection: Connection,
-): Promise<ProjectState[]> {
-  const program = getReadonlyProgram();
-
-  // Fetch all ProjectState accounts in one RPC call
-  const allAccounts = await program.account.projectState.all();
-
-  const projects: ProjectState[] = [];
-
-  for (const { account: data } of allAccounts) {
-    let status: ProjectState['status'] = 'active';
-    if ('paused' in data.status) status = 'paused';
-    else if ('closed' in data.status) status = 'closed';
-
-    const mint = data.mint;
-    const tokensSold = data.tokensSold.toNumber();
-    const totalTokenSupply = data.tokenSupply.toNumber();
-
-    // Read Token-2022 metadata
-    let carMake = '';
-    let carModel = '';
-    let carYear = 0;
-    let vin = '';
-    let imageUrl = '';
-
-    try {
-      const metadata = await getTokenMetadata(
-        connection,
-        mint,
-        'confirmed',
-        TOKEN_2022_PROGRAM_ID,
-      );
-      if (metadata) {
-        carMake = findMetadataField(metadata, 'make');
-        carModel = findMetadataField(metadata, 'model');
-        carYear = parseInt(findMetadataField(metadata, 'year') || '0', 10);
-        vin = findMetadataField(metadata, 'vin');
-        const uri = metadata.uri || '';
-        imageUrl = uri.includes('test-metadata') ? '' : uri;
-      }
-    } catch (e) {
-      console.warn(`Failed to read token metadata for mint ${mint.toBase58()}:`, e);
-    }
-
-    projects.push({
-      admin: data.admin.toBase58(),
-      mint: mint.toBase58(),
-      revenueVault: data.revenueVault.toBase58(),
-      status,
-      totalTokenSupply,
-      tokensSold,
-      tokensRemaining: totalTokenSupply - tokensSold,
-      pricePerToken: data.pricePerShare.toNumber(),
-      periodCount: data.periodCount,
-      oraclePubkey: data.oraclePubkey.toBase58(),
-      bump: data.bump,
-      revenueVaultBump: data.revenueVaultBump,
-      carMake,
-      carModel,
-      carYear,
-      vin,
-      imageUrl,
-    });
+  addresses: PublicKey[],
+): Promise<(AccountInfo<Buffer> | null)[]> {
+  const chunks: PublicKey[][] = [];
+  for (let i = 0; i < addresses.length; i += MAX_MULTIPLE_ACCOUNTS) {
+    chunks.push(addresses.slice(i, i + MAX_MULTIPLE_ACCOUNTS));
   }
-
-  return projects;
-}
-
-/**
- * Fetches whitelist status for a wallet.
- * Returns null if the wallet is not whitelisted.
- */
-export async function fetchWhitelistEntry(
-  _connection: Connection,
-  wallet: PublicKey,
-): Promise<WhitelistEntry | null> {
-  try {
-    const program = getReadonlyProgram();
-    const [whitelistPda] = deriveWhitelistEntry(wallet);
-
-    const data = await program.account.whitelistEntry.fetch(whitelistPda);
-
-    return {
-      wallet: wallet.toBase58(),
-      approved: data.approved,
-    };
-  } catch {
-    // Account doesn't exist = not whitelisted
-    return null;
-  }
-}
-
-/**
- * Fetches investor's token balance from their Token-2022 ATA.
- */
-export async function fetchInvestorHolding(
-  connection: Connection,
-  wallet: PublicKey,
-  mint: PublicKey,
-  totalTokenSupply: number,
-): Promise<InvestorHolding | null> {
-  try {
-    const ata = getAssociatedTokenAddressSync(
-      mint,
-      wallet,
-      false,
-      TOKEN_2022_PROGRAM_ID,
-    );
-
-    const balance = await connection.getTokenAccountBalance(ata);
-    const tokenBalance = Number(balance.value.amount);
-
-    if (tokenBalance === 0) return null;
-
-    return {
-      wallet: wallet.toBase58(),
-      mint: mint.toBase58(),
-      tokenBalance,
-      ownershipPercentage:
-        totalTokenSupply > 0 ? (tokenBalance / totalTokenSupply) * 100 : 0,
-    };
-  } catch {
-    // ATA doesn't exist = no holdings
-    return null;
-  }
-}
-
-/**
- * Fetches all revenue periods for a project by iterating from index 0.
- */
-export async function fetchAllRevenuePeriods(
-  _connection: Connection,
-  mint: PublicKey,
-  periodCount: number,
-): Promise<RevenuePeriod[]> {
-  const program = getReadonlyProgram();
-  const periods: RevenuePeriod[] = [];
-
-  for (let i = 0; i < periodCount; i++) {
-    try {
-      const [periodPda] = deriveRevenuePeriod(mint, i);
-      const data = await program.account.revenuePeriod.fetch(periodPda);
-
-      periods.push({
-        index: data.periodIndex,
-        project: data.project.toBase58(),
-        totalDeposited: data.totalDeposited.toNumber(),
-        tokenSupplySnapshot: data.tokenSupplySnapshot.toNumber(),
-        depositedAt: data.depositedAt.toNumber(),
-        bump: data.bump,
-        pda: periodPda.toBase58(),
-      });
-    } catch (e) {
-      console.warn(`Failed to fetch revenue period ${i}:`, e);
-    }
-  }
-
-  return periods;
-}
-
-/**
- * Checks if a claim record exists for a wallet + period.
- * Returns the ClaimRecord or null if unclaimed.
- */
-export async function fetchClaimRecord(
-  _connection: Connection,
-  revenuePeriodPda: PublicKey,
-  wallet: PublicKey,
-): Promise<ClaimRecord | null> {
-  try {
-    const program = getReadonlyProgram();
-    const [claimPda] = deriveClaimRecord(revenuePeriodPda, wallet);
-
-    const data = await program.account.claimRecord.fetch(claimPda);
-
-    return {
-      claimed: data.claimed,
-      bump: data.bump,
-    };
-  } catch {
-    // Account doesn't exist = not claimed
-    return null;
-  }
-}
-
-/** Helper to find a field in Token-2022 additional metadata */
-function findMetadataField(
-  metadata: any,
-  key: string,
-): string {
-  if (!metadata.additionalMetadata) return '';
-  const entry = metadata.additionalMetadata.find(
-    ([k]: [string, string]) => k === key,
+  const results = await Promise.all(
+    chunks.map((chunk) => connection.getMultipleAccountsInfo(chunk, 'confirmed')),
   );
-  return entry ? entry[1] : '';
+  return results.flat();
+}
+
+function uniqueKeys(keys: PublicKey[]): PublicKey[] {
+  return [...new Map(keys.map((key) => [key.toBase58(), key])).values()];
+}
+
+/** Adds the car from the share mint's metadata and the payment token's decimals and symbol. */
+async function withTokens(connection: Connection, accounts: ProjectAccount[]): Promise<Project[]> {
+  const mints = uniqueKeys(accounts.flatMap((a) => [a.shareMint, a.paymentMint]));
+  const infos = await multipleAccounts(connection, mints);
+  const byMint = new Map(mints.map((mint, i) => [mint.toBase58(), infos[i]]));
+  const mintAccount = (mint: PublicKey): AccountInfo<Buffer> => {
+    const info = byMint.get(mint.toBase58());
+    if (!info) throw new Error(`Mint ${mint.toBase58()} does not exist`);
+    return info;
+  };
+
+  return accounts.map((account) => ({
+    ...account,
+    car: carMetadata(readTokenMetadata(account.shareMint, mintAccount(account.shareMint))),
+    payment: paymentToken(account.paymentMint, mintAccount(account.paymentMint)),
+  }));
+}
+
+export async function fetchConfig(connection: Connection): Promise<ConfigAccount | null> {
+  const info = await connection.getAccountInfo(configAddress(), 'confirmed');
+  return info ? decodeConfig(info.data) : null;
+}
+
+/** The wallet's KYC record; null when it never had one. */
+export async function fetchInvestor(
+  connection: Connection,
+  wallet: PublicKey,
+): Promise<InvestorAccount | null> {
+  const info = await connection.getAccountInfo(investorAddress(wallet), 'confirmed');
+  return info ? decodeInvestor(info.data) : null;
+}
+
+/** Every project of the program, oldest first. */
+export async function fetchProjects(connection: Connection): Promise<Project[]> {
+  const accounts = await programAccounts(connection, 'project');
+  const projects = accounts.map(({ pubkey, account }) => decodeProject(pubkey, account.data));
+  projects.sort(
+    (a, b) => a.createdAt - b.createdAt || a.address.toBase58().localeCompare(b.address.toBase58()),
+  );
+  return withTokens(connection, projects);
+}
+
+/** The project of a share mint; null when the mint is not an AXEL car. */
+export async function fetchProject(
+  connection: Connection,
+  shareMint: PublicKey,
+): Promise<Project | null> {
+  const address = projectAddress(shareMint);
+  const info = await connection.getAccountInfo(address, 'confirmed');
+  if (!info) return null;
+  const [project] = await withTokens(connection, [decodeProject(address, info.data)]);
+  return project;
+}
+
+/** Every position of `owner`, across all projects. */
+export async function fetchPositions(
+  connection: Connection,
+  owner: PublicKey,
+): Promise<PositionAccount[]> {
+  const accounts = await programAccounts(connection, 'position', [
+    memcmp(OFFSETS.positionOwner, owner.toBuffer()),
+  ]);
+  return accounts.map(({ pubkey, account }) => decodePosition(pubkey, account.data));
+}
+
+export async function fetchPosition(
+  connection: Connection,
+  project: PublicKey,
+  owner: PublicKey,
+): Promise<PositionAccount | null> {
+  const address = positionAddress(project, owner);
+  const info = await connection.getAccountInfo(address, 'confirmed');
+  return info ? decodePosition(address, info.data) : null;
+}
+
+/** Every revenue deposit of a project, in deposit order. */
+export async function fetchRevenuePeriods(
+  connection: Connection,
+  project: PublicKey,
+): Promise<RevenuePeriodAccount[]> {
+  const accounts = await programAccounts(connection, 'revenuePeriod', [
+    memcmp(OFFSETS.periodProject, project.toBuffer()),
+  ]);
+  return accounts
+    .map(({ pubkey, account }) => decodeRevenuePeriod(pubkey, account.data))
+    .sort((a, b) => a.index - b.index);
+}
+
+/** Balance of a token account of either token program; zero when it does not exist. */
+export async function fetchTokenBalance(
+  connection: Connection,
+  tokenAccount: PublicKey,
+): Promise<bigint> {
+  return tokenAccountBalance(
+    tokenAccount,
+    await connection.getAccountInfo(tokenAccount, 'confirmed'),
+  );
 }

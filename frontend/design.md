@@ -338,10 +338,10 @@ product rule, never a placeholder.
 9. **Status is never color alone.** Status badges pair a dot with a text label; positive
    payouts carry a sign. ← color "Status is never conveyed by color alone".
 10. **Only figures the chain returns.** The hero stats and the ledger are computed from the
-    same `useProjectState` read the cards use (`src/components/catalog/catalogStats.ts`).
+    same `useProjects` read the cards use (`src/components/catalog/catalogStats.ts`).
     While the read is running they show placeholders, never zeros; on failure they say so and
-    offer a retry. "Raised" became "value of shares sold" because v1 stores no raised total and
-    a price change would make a sum of past sales at today's price untrue. ← landing "Social
+    offer a retry. "Value of shares sold" is summed per payment token (v2 prices are immutable,
+    so sold × price is exactly what buyers paid). ← landing "Social
     proof: quality and provability of numbers", anti-slop "fake and pressure".
 11. **Trust section states only what the code enforces.** Each claim maps to program code
     (Token-2022 mint per car, transfer hook allow-list, program-owned revenue vault with a claim
@@ -403,15 +403,15 @@ product rule, never a placeholder.
 - Presentation only. `src/hooks/` and `src/lib/solana/` belong to the v2 integration and are
   not changed by design work.
 - Brand: the name AXEL, near-black and the cyan `#06B6D4` stay.
-- Live data: the catalog reads two v1 devnet projects, both with test metadata (Toyota Camry
-  2023, no image). The UI never shows made-up figures as real.
+- Live data: the frontend reads `axel_v2`, which is not on devnet yet; locally it reads the
+  fixture market (`npm --prefix tests-v2 run fixture-validator`). The UI never shows made-up
+  figures as real. Amounts are the payment token's (tKZT, USDC), never SOL.
 - No legacy aliases or default Tailwind palettes are left: every screen uses semantic tokens.
   `brand-primary` was removed in stage 3.
-- The asset page reads a car's payout periods through `components/asset/useCarPayouts.ts`,
-  which calls `fetchAllRevenuePeriods` from `lib/solana/readers`. The v2 integration must keep
-  that reader or update this hook.
-- The operator console manages `projects[0]` because `useAdminAccess` picks it; v2 replaces the
-  hook with roles, and the console header already names the car it manages.
+- The asset page reads a car's deposits through `hooks/useRevenuePeriods.ts`
+  (`fetchRevenuePeriods`, a memcmp scan by project).
+- The console takes its access from the roles on-chain (`hooks/useAdminRoles.ts`) and switches
+  between the cars the wallet may manage; its header names the car.
 - `src/app/opengraph-image.tsx` draws the social card with static TTF instances of the site
   fonts (`src/fonts/og/`), since Satori cannot read WOFF2. `src/middleware.ts` excludes
   `/opengraph-image` so the i18n rewrite does not turn it into a 404.

@@ -24,25 +24,20 @@ describe('ChainStats', () => {
   it('shows totals computed from the cars on the chain', () => {
     renderStats({
       projects: [
-        makeProject({
-          tokensSold: 13,
-          totalTokenSupply: 100,
-          pricePerToken: 100_000_000,
-          periodCount: 2,
-        }),
-        makeProject({ tokensSold: 7, totalTokenSupply: 100, pricePerToken: 100_000_000 }),
+        makeProject({ sharesSold: 13n, pricePerShare: 100_000_000n, periodCount: 2 }),
+        makeProject({ sharesSold: 7n, pricePerShare: 100_000_000n }),
       ],
     });
 
     expect(screen.getByText('Live from Solana devnet')).toBeInTheDocument();
     expect(statValue('Cars listed')).toBe('2');
     expect(statValue('Shares sold')).toBe('20 of 200');
-    expect(statValue('Value of shares sold')).toBe('2 SOL');
+    expect(statValue('Value of shares sold')).toBe('2,000 tKZT');
     expect(statValue('Payout periods')).toBe('2');
   });
 
   it('shows no figures until the chain has been read', () => {
-    renderStats({ isLoading: true, projects: [makeProject({ tokensSold: 13 })] });
+    renderStats({ isLoading: true, projects: [makeProject({ sharesSold: 13n })] });
 
     expect(screen.getByText('Reading Solana devnet…')).toBeInTheDocument();
     expect(statValue('Shares sold')).toBe('');

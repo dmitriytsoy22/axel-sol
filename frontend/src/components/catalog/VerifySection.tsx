@@ -6,7 +6,8 @@ import { ExplorerLink } from '@/components/ui/ExplorerLink';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { REPO_URL } from '@/components/layout/constants';
 import { connectionConfig } from '@/lib/solana/connection';
-import { formatNumber } from '@/lib/format';
+import { formatCount, formatNumber } from '@/lib/format';
+import { carTitle } from '@/lib/solana/tokens';
 import { NETWORK_NAME } from '@/lib/network';
 import type { CatalogFeed } from './types';
 
@@ -50,22 +51,22 @@ export function VerifySection({ projects, isLoading, error }: CatalogFeed): JSX.
     cars = (
       <ul>
         {projects.map((project) => (
-          <li key={project.mint} className="border-t border-border px-5 py-5 md:px-6">
+          <li key={project.address.toBase58()} className="border-t border-border px-5 py-5 md:px-6">
             <p className="text-body font-semibold text-foreground">
-              {project.carMake} {project.carModel}{' '}
-              <span className="font-normal text-muted-foreground">{project.carYear}</span>
+              {carTitle(project.car)}{' '}
+              <span className="font-normal text-muted-foreground">{project.car.year}</span>
             </p>
             <dl className="mt-2">
               <LedgerRow label={t('shareToken')}>
-                <ExplorerLink address={project.mint} srLabel={explorer} />
+                <ExplorerLink address={project.shareMint.toBase58()} srLabel={explorer} />
               </LedgerRow>
               <LedgerRow label={t('vault')}>
-                <ExplorerLink address={project.revenueVault} srLabel={explorer} />
+                <ExplorerLink address={project.revenueVault.toBase58()} srLabel={explorer} />
               </LedgerRow>
               <LedgerRow label={t('sharesSold')}>
                 {t('ofTotal', {
-                  part: formatNumber(project.tokensSold, locale),
-                  whole: formatNumber(project.totalTokenSupply, locale),
+                  part: formatCount(project.sharesSold, locale),
+                  whole: formatCount(project.totalShares, locale),
                 })}
               </LedgerRow>
               <LedgerRow label={tCatalog('payoutPeriods')}>

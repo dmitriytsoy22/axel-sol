@@ -1,11 +1,12 @@
 import React, { ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ProjectState } from '@/types/project';
+import type { PublicKey } from '@solana/web3.js';
+import type { Project } from '@/types/project';
 import { ExplorerLink } from '@/components/ui/ExplorerLink';
-import { formatNumber, formatSol } from '@/lib/format';
+import { formatBps, formatCount, formatDate, formatNumber, formatTokenAmount } from '@/lib/format';
 
 interface ProjectTermsProps {
-  project: ProjectState;
+  project: Project;
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
@@ -22,6 +23,9 @@ export function ProjectTerms({ project }: ProjectTermsProps): JSX.Element {
   const t = useTranslations('Asset');
   const locale = useLocale();
   const srLabel = t('openInExplorer');
+  const link = (address: PublicKey) => (
+    <ExplorerLink address={address.toBase58()} srLabel={srLabel} />
+  );
 
   return (
     <section aria-labelledby="terms-title">
@@ -32,24 +36,29 @@ export function ProjectTerms({ project }: ProjectTermsProps): JSX.Element {
 
       <div className="mt-6 grid overflow-hidden rounded-card border border-border bg-card md:grid-cols-2">
         <dl className="divide-y divide-border">
-          <Row label={t('pricePerShare')}>{formatSol(project.pricePerToken, locale)}</Row>
-          <Row label={t('totalShares')}>{formatNumber(project.totalTokenSupply, locale)}</Row>
+          <Row label={t('pricePerShare')}>
+            {formatTokenAmount(project.pricePerShare, project.payment, locale)}
+          </Row>
+          <Row label={t('totalShares')}>{formatCount(project.totalShares, locale)}</Row>
+          <Row label={t('softCap')}>{formatCount(project.softCapShares, locale)}</Row>
+          <Row label={t('raiseDeadline')}>{formatDate(project.raiseDeadline, locale)}</Row>
+          <Row label={t('raiseFee')}>{formatBps(project.raiseFeeBps, locale)}</Row>
+          <Row label={t('revenueFee')}>{formatBps(project.revenueFeeBps, locale)}</Row>
           <Row label={t('payoutsMade')}>{formatNumber(project.periodCount, locale)}</Row>
-          <Row label={t('payoutSplit')}>{t('payoutSplitValue')}</Row>
         </dl>
         <dl className="divide-y divide-border border-t border-border md:border-l md:border-t-0">
-          <Row label={t('shareToken')}>
-            <ExplorerLink address={project.mint} srLabel={srLabel} />
-          </Row>
-          <Row label={t('incomeVault')}>
-            <ExplorerLink address={project.revenueVault} srLabel={srLabel} />
-          </Row>
-          <Row label={t('operator')}>
-            <ExplorerLink address={project.admin} srLabel={srLabel} />
-          </Row>
-          <Row label={t('oracle')}>
-            <ExplorerLink address={project.oraclePubkey} srLabel={srLabel} />
-          </Row>
+          <Row label={t('shareToken')}>{link(project.shareMint)}</Row>
+          <Row label={t('paymentToken')}>{link(project.paymentMint)}</Row>
+          {/* Activation closes the escrow; before that, and after a failed raise, it holds the money. */}
+          {(project.status === 'fundraising' ||
+            project.status === 'funded' ||
+            project.status === 'failed') && (
+            <Row label={t('escrowVault')}>{link(project.escrowVault)}</Row>
+          )}
+          <Row label={t('incomeVault')}>{link(project.revenueVault)}</Row>
+          <Row label={t('operator')}>{link(project.operator)}</Row>
+          <Row label={t('oracle')}>{link(project.oracle)}</Row>
+          <Row label={t('payoutSplit')}>{t('payoutSplitValue')}</Row>
         </dl>
       </div>
     </section>

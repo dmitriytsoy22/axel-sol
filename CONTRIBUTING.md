@@ -40,7 +40,11 @@ npm run build                       # production build
 
 UI changes follow [`frontend/design.md`](frontend/design.md): tokens, type, photos and their credits, motion, and the layout and accessibility rules.
 
-The program IDLs are vendored in `frontend/src/lib/solana/idl/` (v1: `axel.json`, `axel.ts`) and `frontend/src/lib/solana/idl-v2/` (v2: `axel_v2.json`, `axel_v2.ts`), so the frontend builds without an Anchor toolchain. If you change the v1 interface, run `anchor build` and copy `target/idl/axel.json` and `target/types/axel.ts` there. For v2, run `anchor build` and `npm run export-idl`; CI checks that the committed copy matches the build.
+The frontend runs on `axel_v2`. Its IDL is vendored in `frontend/src/lib/solana/idl-v2/` (`axel_v2.json`, `axel_v2.ts`), so the frontend builds without an Anchor toolchain. After changing the program, run `anchor build` and `npm run export-idl`; CI checks that the committed copy matches the build.
+
+The client tests in `frontend/src/lib/solana/__tests__` read accounts the real program wrote (`fixtures/chain.json`). After a change to the program's accounts or math, regenerate them from the repository root with `npm run build && npm --prefix tests-v2 run export-frontend-fixture`. `npm --prefix tests-v2 run fixture-validator` loads the same accounts into a local validator for the app (see the README's Quick Start).
+
+Transactions go through `hooks/useTransactionSender.ts`, which shows every outcome in a toast; a new program error needs a message in `ProgramErrors` in all three `messages/*.json` files, which `errors.test.ts` checks.
 
 ## Backend
 

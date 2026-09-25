@@ -1,81 +1,55 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { NextIntlClientProvider } from 'next-intl';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import messagesEn from '../../../../messages/en.json';
-import type { RevenuePeriod } from '@/types/revenue';
-import { fetchAllRevenuePeriods } from '@/lib/solana/readers';
+import { describe, expect, it } from 'vitest';
+import { FixtureConnection, fixtureProject } from '@/lib/solana/__tests__/fixtures/chain';
+import { AppProviders, testWallet } from '@/__tests__/helpers/providers';
 import { makeProject } from '@/components/catalog/__tests__/fixtures';
+import type { Project } from '@/types/project';
 import { CarPayouts } from '../CarPayouts';
 
-// One connection object, as the real provider gives: the hook re-reads when it changes.
-const { connection } = vi.hoisted(() => ({ connection: {} }));
-vi.mock('@solana/wallet-adapter-react', () => ({
-  useConnection: () => ({ connection }),
-}));
-vi.mock('@/lib/solana/readers', () => ({ fetchAllRevenuePeriods: vi.fn() }));
-
-const MINT = 'Aj9qpbVQexrpp6HZojWuyq3s4W7ymTRpQ7uudZgz37YU';
-
-function period(index: number, overrides: Partial<RevenuePeriod> = {}): RevenuePeriod {
-  return {
-    index,
-    project: MINT,
-    totalDeposited: 1_000_000_000,
-    tokenSupplySnapshot: 20,
-    depositedAt: 1_775_530_000 + index * 2_592_000,
-    bump: 255,
-    pda: `Period${index}PdaAddress`,
-    ...overrides,
-  };
-}
-
-function renderPayouts(periodCount: number) {
+function renderPayouts(connection: FixtureConnection, project: Project) {
   render(
-    <NextIntlClientProvider locale="en" messages={messagesEn}>
-      <CarPayouts project={makeProject({ mint: MINT, periodCount })} />
-    </NextIntlClientProvider>,
+    <AppProviders connection={connection} wallet={testWallet(null)}>
+      <CarPayouts project={project} />
+    </AppProviders>,
   );
 }
 
 describe('CarPayouts', () => {
-  beforeEach(() => {
-    vi.mocked(fetchAllRevenuePeriods).mockReset();
-  });
-
   it('says there are no payouts yet without reading the chain', () => {
-    renderPayouts(0);
+    const connection = new FixtureConnection();
+    renderPayouts(connection, makeProject({ periodCount: 0 }));
 
     expect(screen.getByText('No payouts yet')).toBeInTheDocument();
-    expect(fetchAllRevenuePeriods).not.toHaveBeenCalled();
+    expect(connection.scans).toBe(0);
   });
 
-  it('lists every payout newest first with what each share received', async () => {
-    vi.mocked(fetchAllRevenuePeriods).mockResolvedValue([
-      period(0, { totalDeposited: 350_000_000, tokenSupplySnapshot: 13 }),
-      period(1, { totalDeposited: 1_000_000_000, tokenSupplySnapshot: 20 }),
-    ]);
-    renderPayouts(2);
+  it('lists every deposit of the car newest first, with what each share received', async () => {
+    const connection = new FixtureConnection();
+    renderPayouts(connection, await fixtureProject('operating', connection));
 
     const table = await screen.findByRole('table');
-    const [, newest, oldest] = within(table).getAllByRole('row');
-    expect(within(newest).getByText('#1')).toBeInTheDocument();
-    expect(within(newest).getByText('0.05 SOL')).toBeInTheDocument();
+    const [, newest, , oldest] = within(table).getAllByRole('row');
+    // 555 555 557 gross, 15% fee, over 100 shares.
+    expect(within(newest).getByText('#2')).toBeInTheDocument();
+    expect(within(newest).getByText('472.22 tKZT')).toBeInTheDocument();
+    expect(within(newest).getByText('4.72 tKZT')).toBeInTheDocument();
+    expect(within(newest).getByText(/Dec 1, 2026 – Dec 31, 2026/)).toBeInTheDocument();
     expect(within(oldest).getByText('#0')).toBeInTheDocument();
-    expect(within(oldest).getByText('0.0269 SOL')).toBeInTheDocument();
+    expect(within(oldest).getByText('1,049.38 tKZT')).toBeInTheDocument();
   });
 
   it('offers a retry when the payouts cannot be read', async () => {
-    vi.mocked(fetchAllRevenuePeriods)
-      .mockRejectedValueOnce(new Error('429'))
-      .mockResolvedValueOnce([period(0)]);
-    renderPayouts(1);
+    const connection = new FixtureConnection();
+    const project = await fixtureProject('operating', connection);
+    connection.failingScans = 1;
+    renderPayouts(connection, project);
 
     await screen.findByText("Couldn't read this car's payouts from Solana.");
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(await screen.findByRole('table')).toBeInTheDocument();
-    expect(fetchAllRevenuePeriods).toHaveBeenCalledTimes(2);
+    expect(connection.scans).toBe(2);
   });
 });

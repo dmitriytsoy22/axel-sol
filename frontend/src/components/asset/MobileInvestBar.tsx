@@ -2,19 +2,25 @@
 
 import React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ProjectState } from '@/types/project';
-import { formatSol } from '@/lib/format';
+import type { Project } from '@/types/project';
+import { formatTokenAmount } from '@/lib/format';
 import { InvestButton } from './InvestButton';
-import { saleStateOf, type Approval } from './saleState';
+import type { Approval, SaleState } from './saleState';
 
 interface MobileInvestBarProps {
-  project: ProjectState;
+  project: Project;
+  saleState: SaleState;
   approval: Approval;
   onBuy: () => void;
 }
 
 /** Below md the purchase action stays in thumb reach at the bottom of the screen. */
-export function MobileInvestBar({ project, approval, onBuy }: MobileInvestBarProps): JSX.Element {
+export function MobileInvestBar({
+  project,
+  saleState,
+  approval,
+  onBuy,
+}: MobileInvestBarProps): JSX.Element {
   const t = useTranslations('Asset');
   const locale = useLocale();
 
@@ -27,12 +33,12 @@ export function MobileInvestBar({ project, approval, onBuy }: MobileInvestBarPro
         {/* Below 360px the button needs the whole row; the price is in the panel above. */}
         <p className="hidden shrink-0 min-[360px]:block">
           <span className="block text-title font-semibold tabular-nums text-foreground">
-            {formatSol(project.pricePerToken, locale)}
+            {formatTokenAmount(project.pricePerShare, project.payment, locale)}
           </span>
           <span className="block text-small text-muted-foreground">{t('perShare')}</span>
         </p>
         <InvestButton
-          saleState={saleStateOf(project)}
+          saleState={saleState}
           approval={approval}
           onInvestClick={onBuy}
           className="min-w-0 flex-1"

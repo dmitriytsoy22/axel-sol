@@ -31,6 +31,7 @@ Done:
 - [x] Vendored the program IDL into `frontend/src/lib/solana/idl/` so a fresh clone builds without `anchor build`, and fixed the local dev CSP
 - [x] English documentation: [product](product.md), [architecture](architecture.md), [API](api.md), this roadmap. The Russian overview moved to [ru/](ru/) and the planning documents to [planning/](planning/).
 - [x] Replaced the stale v1 Codama output with a client generated for the v2 program in `sdk/axel-v2` ([v2.md](v2.md))
+- [x] Moved the frontend to the v2 program: client, hooks, amounts in the payment token, the six project states, KYC records, escrowed buys, refunds, claims, transfers and a role-based console ([architecture.md](architecture.md#frontend))
 
 Next steps. Each one addresses a limitation listed in [architecture.md](architecture.md#known-limitations):
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key (program upgrade)
@@ -38,8 +39,10 @@ Next steps. Each one addresses a limitation listed in [architecture.md](architec
 - [ ] Thaw token accounts without relying on `buy_tokens` creating the ATA (program upgrade)
 - [ ] Create the hook's `ExtraAccountMetaList` during project setup, and add an end-to-end test of a holder-to-holder transfer on a full six-extension mint
 - [ ] Fix the account list in the backend's `record_telemetry` transaction, and mark simulated telemetry as simulated in the API
-- [ ] Connect the asset page's telemetry widget to the backend: one env variable, CORS enabled
-- [ ] Add a KYC flow to the UI (Sumsub with `externalUserId` = wallet), and fix or remove the unused `useWhitelistStatus`
+- [ ] Enable CORS on the backend for the telemetry widget (the frontend side reads `NEXT_PUBLIC_TELEMETRY_API_URL`)
+- [ ] Add a KYC flow to the UI (Sumsub with `externalUserId` = wallet)
+- [ ] Serve the indexer API the frontend reads payout history from ([api.md](api.md#indexer-api-read-by-the-frontend)), and prepare oracle-co-signed deposits in the backend
+- [ ] Recovery flows in the frontend: the admin's proposal, the owner's veto alert, execution
 - [ ] Public frontend deployment and a documented devnet demo path for judges (a whitelisted test wallet)
 - [ ] Recorded end-to-end devnet run with Explorer links: whitelist → buy → deposit → claim → transfer
 
@@ -57,7 +60,7 @@ These items are not scheduled.
 
 These items are not scheduled.
 
-- [ ] Multi-vehicle operations. The program already supports one project per mint; the admin panel manages only the first project, and projects can only be created from the CLI.
+- [ ] Multi-vehicle operations. The program supports one project per mint and the console switches between cars; projects can only be created from the CLI.
 - [ ] Project creation and price management in the admin UI
 - [ ] More than one telemetry source or oracle. The spec lists the single centralized oracle as an MVP constraint.
 - [ ] Show each period's telemetry hashes next to its revenue deposit, so holders can compare them

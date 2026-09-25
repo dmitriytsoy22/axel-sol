@@ -5,7 +5,7 @@
 [![Solana](https://img.shields.io/badge/Solana-devnet-9945FF)](https://explorer.solana.com/address/DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M?cluster=devnet)
 [![Colosseum](https://img.shields.io/badge/Colosseum-Crypto%20World%27s%20Fair%202026-14F195)](https://colosseum.com/arena/projects/axel-1)
 
-> Fractional ownership of taxi cars on Solana: each car is a Token-2022 mint, shares are sold only to whitelisted wallets, and the car's revenue is paid out pro-rata by an Anchor program.
+> Fractional ownership of taxi cars on Solana: each car is a Token-2022 mint, shares are sold only to KYC-verified wallets, and the car's revenue is paid out pro-rata by an Anchor program.
 
 [Docs](docs/) · [Architecture](docs/architecture.md) · [Colosseum Project](https://colosseum.com/arena/projects/axel-1) · [Devnet Program](https://explorer.solana.com/address/DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M?cluster=devnet)
 
@@ -65,17 +65,20 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 
 ## Summary of Features
 
-**Investor**
-- Landing page and catalog of every project read from the `axel` program: live figures from the chain (cars listed, shares sold, payout periods), Token-2022 metadata, and a status filter once cars differ in status
-- Asset page: VIN, sale progress, price, remaining shares, Solana Explorer links for the mint, the revenue vault, the operator and the oracle, and a buy flow (`buy_tokens`). The buy button reads the wallet's `WhitelistEntry` first and says why it is disabled.
-- Per-car payout history, a payout calculator that works only on the reader's own numbers, and the trip-data (telemetry) widget
-- Dashboard: holdings, revenue periods with claimed / claimable status, per-period claim and "Claim all" (several `claim_revenue` instructions in one transaction)
-- Payout history across all holdings
+The frontend runs on the v2 program, `axel_v2`, which is not deployed yet (see [Quick Start](#quick-start) for a local chain); the v1 `axel` program below is what devnet runs.
 
-**Admin**
-- `/admin` panel, shown only to the admin wallet of the first project: metrics, whitelist manager (add / remove), revenue deposit form (gross − expenses − reserve, in SOL), pause / resume / close
-- `npm run init-project` creates a project: a Token-2022 mint with six extensions and metadata, plus its `ProjectState`
-- `update_price` and `revoke_mint_authority` are available on-chain; they have no UI yet
+**Investor** (frontend, `axel_v2`)
+- Landing page and catalog of every project: live figures from the chain (cars listed, shares sold, value sold per payment token, deposits), the car from its share mint's metadata, and a filter over the six project states
+- Asset page: state, price in the payment token (tKZT, USDC), raise progress with the soft cap and a countdown, fees, deadline and Explorer links (share mint, payment mint, escrow, revenue vault, operator, oracle), and a buy flow (`buy_shares` into escrow). The buy button reads the wallet's KYC record and says why it is disabled; a holder of a failed raise gets a refund button.
+- Per-car deposit history with the amount per share, a payout calculator on the reader's own numbers, and the trip-data (telemetry) widget
+- Portfolio: value, shares, and exactly what a claim pays now (the program's accumulator math on BigInt); claim per car or "Claim all" (four cars per transaction), refunds, and sending shares to another verified wallet (the transfer lists the hook's accounts itself and onboards a first-time recipient)
+- Payout history: deposits of the wallet's cars from the chain, or its part of each deposit and its claims from an indexer
+- Every transaction outcome in a toast with an Explorer link; every program error explained in EN / RU / KK
+
+**Admin** (frontend console, roles read from the chain)
+- The admin (`Config.admin`) manages every car: settle a raise, release it to the operator with the purchase documents' hash, cancel it, pause, resume, close
+- The KYC key and the devnet demo KYC key approve or revoke wallets (`set_investor`); an operator sees the cars it runs
+- v1: `npm run init-project` creates a project (a Token-2022 mint with six extensions and metadata, plus its `ProjectState`)
 
 **Oracle and KYC backend (NestJS, no database)**
 - `GET /health`, `GET /telemetry/latest/:projectId`, `POST /kyc/webhook`
@@ -83,11 +86,11 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 - KYC webhook: verifies the Sumsub HMAC-SHA256 signature (skipped if `SUMSUB_WEBHOOK_SECRET` is unset), and on `applicantReviewed` + `GREEN` signs `add_to_whitelist` for the wallet in `externalUserId`
 
 **Frontend**
-- Next.js 14 App Router; transactions are built from the vendored IDL (`frontend/src/lib/solana/idl/`)
+- Next.js 14 App Router; transactions are built from the vendored v2 IDL (`frontend/src/lib/solana/idl-v2/`); cluster, RPC, program ID, telemetry API and indexer come from the environment
 - English (default), Russian and Kazakh via `next-intl`: `/`, `/ru/…`, `/kk/…`
 - Security headers: Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy, Permissions-Policy
 - Self-hosted fonts and a credited, licensed photo set; design rules in [`frontend/design.md`](frontend/design.md)
-- Vitest unit suite: 45 files, 206 tests, run in CI
+- Vitest unit suite: 49 files, 330 tests, run in CI. The client is tested without mocks against the IDL, `@solana/spl-token`'s hook resolver, and accounts the real program wrote in LiteSVM
 
 ---
 
@@ -217,18 +220,23 @@ cd axel-sol
 
 Each block below starts from the repository root.
 
-**Frontend** (reads the live devnet programs; the IDL is vendored, so no Anchor toolchain is needed)
+**Frontend** (runs on `axel_v2`; the IDL is vendored, so building needs no Anchor toolchain)
+
+v2 is not on devnet yet, so on devnet the catalog is empty. To see cars, start a local validator with the program and a small market (three cars, deposits, holders) that the program itself produced in LiteSVM, then point the app at it:
 
 ```bash
+npm ci && npm run build                        # anchor build: target/deploy/axel_v2.so
+npm --prefix tests-v2 ci
+npm --prefix tests-v2 run fixture-validator    # solana-test-validator on 127.0.0.1:8899
+
 cd frontend
-cp .env.local.example .env.local   # devnet RPC and program ID are prefilled
+cp .env.local.example .env.local
+# in .env.local: NEXT_PUBLIC_SOLANA_NETWORK=localnet and NEXT_PUBLIC_SOLANA_RPC_URL=http://127.0.0.1:8899
 npm ci
-npm run dev                         # http://localhost:3000
+npm run dev                                    # http://localhost:3000
 ```
 
-Checks, as run in CI: `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`.
-
-Buying shares requires a wallet with an approved `WhitelistEntry` on devnet. A public demo path for judges is planned (see below).
+That chain is for reading: its wallets have no saved keys. Every variable is described in [docs/api.md](docs/api.md#frontend-environment). Checks, as run in CI: `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`.
 
 **Backend** (optional: telemetry oracle and KYC webhook)
 
@@ -275,7 +283,7 @@ axel-sol/
 │   ├── transfer-hook/src/lib.rs    # execute, fallback, initialize_extra_account_meta_list
 │   └── axel-v2/src/                # v2: escrowed raise, KYC registry, transfer hook, attested revenue, recovery (docs/v2.md)
 ├── tests/                          # 12 node:test files for both programs (local validator)
-├── tests-v2/                       # v2 program tests on LiteSVM
+├── tests-v2/                       # v2 program tests on LiteSVM; scripts/ exports the frontend fixture and runs it on a local validator
 ├── scripts/                        # init-project.ts, generate-clients.ts, last-project.json
 ├── sdk/axel-v2/                    # Codama TypeScript client of the v2 program (docs/v2.md)
 ├── migrations/deploy.ts            # Anchor scaffold, unused
@@ -284,7 +292,7 @@ axel-sol/
 │   ├── src/app/[locale]/           # /, /assets/[id], /dashboard, /payouts, /admin
 │   ├── src/components/             # admin, asset, catalog, dashboard, invest, layout, payouts, shared, ui, wallet
 │   ├── src/hooks/                  # chain reads and transaction hooks
-│   ├── src/lib/solana/             # connection, PDAs, readers, instruction builders, idl/ and idl-v2/ (vendored)
+│   ├── src/lib/solana/             # axel_v2 client: config, PDAs, readers, math, instructions, errors, idl-v2/ (vendored)
 │   ├── src/fonts/, public/images/  # self-hosted fonts; car and city photos with credits
 │   ├── messages/                   # en.json, ru.json, kk.json
 │   └── design.md                   # design direction, tokens and page rules
@@ -325,12 +333,13 @@ Done so far:
 - Rewrote this README to match the code.
 - Wrote the AXEL v2 program (`programs/axel-v2`, 24 instructions): escrowed fundraising with refunds, a KYC registry with restricted signers, a transfer hook inside the program, attested revenue deposits with claims that are safe against transfers and late buys, a telemetry hash chain and time-locked share recovery. It has 35 Rust tests and 530 LiteSVM tests, a generated client in `sdk/axel-v2`, and CI. Design: [docs/v2.md](docs/v2.md). It is not deployed yet.
 - Redesigned the frontend ([`frontend/design.md`](frontend/design.md)): new landing page, asset, portfolio, payouts and operator pages, self-hosted fonts, licensed photos, and pages checked for layout, contrast and accessibility at five widths in EN / RU / KK. The asset page no longer shows made-up specs or income projections.
+- Moved the frontend to v2: a client for `axel_v2` (PDAs, readers, the revenue math on BigInt, instruction builders including hooked transfers, error messages for every program code), hooks for the raise, refunds, claims, transfers, positions, payout history and roles, amounts in the payment token, and the admin console on the program's roles. The v1 client was removed from the UI.
 
 In progress during the hackathon (**planned, not done yet**):
 - [ ] Public frontend deployment with a judge demo path (a whitelisted devnet test wallet)
 - [ ] End-to-end devnet demo with Explorer links: whitelist → buy → deposit → claim → transfer
 - [ ] Deploy AXEL v2 under its new program ID (written and tested locally, see above)
-- [ ] Move the frontend and backend to v2: stablecoin prices, the new project states, KYC records and recovery alerts
+- [ ] Move the backend to v2, and add the recovery flows (proposal, owner's veto alert, execution) to the frontend
 
 ---
 
@@ -347,6 +356,7 @@ In progress during the hackathon (**planned, not done yet**):
 - [x] AXEL v2 program with its tests and TypeScript client (not deployed)
 - [x] Frontend redesign
 - [x] Program build and v2 tests in CI (the v1 tests run locally only)
+- [x] Frontend on the v2 program: stablecoin amounts, the six project states, KYC records, escrowed buys, refunds, claims, transfers
 - [ ] Public deployment and judge demo path
 - [ ] End-to-end devnet demo, including a holder-to-holder transfer
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key

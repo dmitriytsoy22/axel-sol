@@ -1,27 +1,32 @@
 import React from 'react';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
-import { ChevronRight } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
-import { Notice } from '@/components/ui/Notice';
-import { buttonClasses } from '@/components/ui/Button';
-import { Holding } from '@/hooks/useDashboard';
+import { ProjectStatusBadge } from '@/components/catalog/ProjectStatusBadge';
 import { vehiclePhoto } from '@/components/catalog/vehiclePhoto';
+import { Notice } from '@/components/ui/Notice';
+import { Button, buttonClasses } from '@/components/ui/Button';
+import type { Holding } from '@/hooks/usePositions';
 import { Link } from '@/i18n/routing';
-import { ProjectState } from '@/types/project';
-import { formatNumber, formatPercent, formatSol } from '@/lib/format';
+import { formatCount, formatPercent, formatTokenAmount } from '@/lib/format';
+import { canClaim, canRefund, canTransfer } from '@/lib/solana/lifecycle';
+import { sharesValue } from '@/lib/solana/math';
+import { carTitle } from '@/lib/solana/tokens';
+import { ClaimButton } from './ClaimButton';
+import { RefundButton } from './RefundButton';
 
 interface HoldingsTableProps {
   holdings: Holding[];
+  /** Runs after a claim or refund, to read the positions again. */
+  onChanged: () => void;
+  onTransfer: (holding: Holding) => void;
 }
 
-function CarThumb({ project }: { project: ProjectState }): JSX.Element {
+function CarThumb({ holding }: { holding: Holding }): JSX.Element {
+  const { car } = holding.project;
   return (
-    <span
-      className="relative h-9 w-12 shrink-0 overflow-hidden rounded-control bg-muted"
-    >
+    <span className="relative h-9 w-12 shrink-0 overflow-hidden rounded-control bg-muted">
       <Image
-        src={project.imageUrl || vehiclePhoto(project.carMake, project.carModel).src}
+        src={vehiclePhoto(car.make, car.model).src}
         alt=""
         fill
         sizes="64px"
@@ -31,16 +36,38 @@ function CarThumb({ project }: { project: ProjectState }): JSX.Element {
   );
 }
 
-export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
+/** What a holder can do with one car right now: claim, get a refund, or send shares. */
+function Actions({
+  holding,
+  onChanged,
+  onTransfer,
+}: { holding: Holding } & Omit<HoldingsTableProps, 'holdings'>) {
   const t = useTranslations('Dashboard');
-  const tCat = useTranslations('Catalog');
-  const locale = useLocale();
+  const { project, position, pending } = holding;
+  return (
+    <span className="flex flex-wrap justify-end gap-2">
+      {pending > 0n && canClaim(project.status) && (
+        <ClaimButton project={project} onClaimed={onChanged} />
+      )}
+      {position.shares > 0n && canRefund(project.status) && (
+        <RefundButton project={project} shares={position.shares} onRefunded={onChanged} />
+      )}
+      {position.shares > 0n && canTransfer(project.status) && (
+        <Button variant="ghost" size="sm" onClick={() => onTransfer(holding)}>
+          {t('transfer')}
+        </Button>
+      )}
+    </span>
+  );
+}
 
-  const statusLabel: Record<ProjectState['status'], string> = {
-    active: tCat('statusActive'),
-    paused: tCat('statusPaused'),
-    closed: tCat('statusClosed'),
-  };
+export function HoldingsTable({
+  holdings,
+  onChanged,
+  onTransfer,
+}: HoldingsTableProps): JSX.Element {
+  const t = useTranslations('Dashboard');
+  const locale = useLocale();
 
   if (holdings.length === 0) {
     return (
@@ -59,15 +86,26 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
     );
   }
 
-  const rows = holdings.map((holding) => ({
-    holding,
-    name: `${holding.project.carMake} ${holding.project.carModel}`,
-    value: formatSol(holding.tokenBalance * holding.project.pricePerToken, locale),
-    shares: formatNumber(holding.tokenBalance, locale),
-    part: t('ofCar', {
-      percent: formatPercent(holding.tokenBalance, holding.project.totalTokenSupply, locale),
-    }),
-  }));
+  const rows = holdings.map((holding) => {
+    const { project, position, pending } = holding;
+    return {
+      holding,
+      key: project.address.toBase58(),
+      href: `/assets/${project.shareMint.toBase58()}`,
+      name: carTitle(project.car),
+      detail: [project.car.year, project.car.symbol].filter(Boolean).join(' · '),
+      shares: formatCount(position.shares, locale),
+      part: t('ofCar', {
+        percent: formatPercent(Number(position.shares), Number(project.totalShares), locale),
+      }),
+      value: formatTokenAmount(
+        sharesValue(position.shares, project.pricePerShare),
+        project.payment,
+        locale,
+      ),
+      pending: formatTokenAmount(pending, project.payment, locale),
+    };
+  });
 
   return (
     <section aria-labelledby="holdings-title" data-testid="holdings-table">
@@ -76,7 +114,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
       </h2>
 
       <div className="mt-6 overflow-hidden rounded-card border border-border bg-card shadow-sm">
-        <table className="hidden w-full text-left text-small sm:table">
+        <table className="hidden w-full text-left text-small md:table">
           <thead className="border-b border-border bg-muted text-muted-foreground">
             <tr>
               <th scope="col" className="py-3 pl-6 pr-4 font-medium">
@@ -88,74 +126,85 @@ export function HoldingsTable({ holdings }: HoldingsTableProps): JSX.Element {
               <th scope="col" className="px-4 py-3 text-right font-medium">
                 {t('value')}
               </th>
-              <th scope="col" className="py-3 pl-4 pr-6 font-medium">
+              <th scope="col" className="px-4 py-3 text-right font-medium">
+                {t('toClaim')}
+              </th>
+              <th scope="col" className="px-4 py-3 font-medium">
                 {t('status')}
+              </th>
+              <th scope="col" className="py-3 pl-4 pr-6 text-right font-medium">
+                <span className="sr-only">{t('actions')}</span>
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.map(({ holding, name, value, shares, part }) => (
-              <tr key={holding.project.mint}>
+            {rows.map((row) => (
+              <tr key={row.key}>
                 <td className="py-3 pl-6 pr-4">
                   <Link
-                    href={`/assets/${holding.project.mint}`}
+                    href={row.href}
                     className="group inline-flex items-center gap-3 text-foreground"
                   >
-                    <CarThumb project={holding.project} />
+                    <CarThumb holding={row.holding} />
                     <span>
                       <span className="block font-medium underline-offset-4 group-hover:underline">
-                        {name}
+                        {row.name}
                       </span>
-                      <span className="block tabular-nums text-muted-foreground">
-                        {holding.project.carYear} ·{' '}
-                        <span className="font-mono">VIN …{holding.project.vin.slice(-4)}</span>
+                      <span className="block font-mono tabular-nums text-muted-foreground">
+                        {row.detail}
                       </span>
                     </span>
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
-                  <span className="block font-medium text-foreground">{shares}</span>
-                  <span className="block text-muted-foreground">{part}</span>
+                  <span className="block font-medium text-foreground">{row.shares}</span>
+                  <span className="block text-muted-foreground">{row.part}</span>
                 </td>
                 <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">
-                  {value}
+                  {row.value}
+                </td>
+                <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">
+                  {row.pending}
+                </td>
+                <td className="px-4 py-3">
+                  <ProjectStatusBadge status={row.holding.project.status} />
                 </td>
                 <td className="py-3 pl-4 pr-6">
-                  <Badge status={holding.project.status}>
-                    {statusLabel[holding.project.status]}
-                  </Badge>
+                  <Actions holding={row.holding} onChanged={onChanged} onTransfer={onTransfer} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        <ul className="divide-y divide-border sm:hidden">
-          {rows.map(({ holding, name, value, shares, part }) => (
-            <li key={holding.project.mint}>
-              <Link
-                href={`/assets/${holding.project.mint}`}
-                className="flex items-center gap-3 px-5 py-4 text-foreground"
-              >
+        <ul className="divide-y divide-border md:hidden">
+          {rows.map((row) => (
+            <li key={row.key} className="flex flex-col gap-3 px-5 py-4">
+              <Link href={row.href} className="flex items-center gap-3 text-foreground">
+                <CarThumb holding={row.holding} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{name}</span>
-                  <span className="mt-0.5 block text-small tabular-nums text-muted-foreground">
-                    {shares} · {part}
-                  </span>
+                  <span className="block truncate font-medium">{row.name}</span>
                   <span className="block font-mono text-small text-muted-foreground">
-                    VIN …{holding.project.vin.slice(-4)}
+                    {row.detail}
                   </span>
                 </span>
-                <span className="flex shrink-0 flex-col items-end gap-1.5">
-                  <span className="font-semibold tabular-nums">{value}</span>
-                  <Badge status={holding.project.status}>{statusLabel[holding.project.status]}</Badge>
-                </span>
-                <ChevronRight
-                  aria-hidden="true"
-                  className="h-4 w-4 shrink-0 text-muted-foreground"
-                  strokeWidth={1.75}
-                />
+                <ProjectStatusBadge status={row.holding.project.status} />
               </Link>
+              <dl className="grid grid-cols-3 gap-2 text-small tabular-nums">
+                <div>
+                  <dt className="text-muted-foreground">{t('tokens')}</dt>
+                  <dd className="font-medium text-foreground">{row.shares}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">{t('value')}</dt>
+                  <dd className="font-medium text-foreground">{row.value}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">{t('toClaim')}</dt>
+                  <dd className="font-medium text-foreground">{row.pending}</dd>
+                </div>
+              </dl>
+              <Actions holding={row.holding} onChanged={onChanged} onTransfer={onTransfer} />
             </li>
           ))}
         </ul>

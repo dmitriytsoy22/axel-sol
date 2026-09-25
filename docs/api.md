@@ -1,11 +1,12 @@
 # API Reference
 
-AXEL exposes two interfaces:
+AXEL exposes these interfaces:
 
 1. **A small HTTP backend** with three endpoints, in `backend/`.
-2. **The `axel` and `transfer_hook` Solana programs.** Clients call them directly.
+2. **The Solana programs.** Clients call them directly. The frontend uses `axel_v2` ([v2.md](v2.md)); the v1 `axel` and `transfer_hook` programs below are what runs on devnet today.
+3. **The indexer API** that the frontend reads payout history from when one is configured. The backend does not serve it yet; its contract is fixed [below](#indexer-api-read-by-the-frontend).
 
-All business actions (buy, deposit, claim, whitelist, pause and so on) are Solana transactions. The backend is not in that path.
+All business actions (buy, deposit, claim, KYC, pause and so on) are Solana transactions. The backend is not in that path.
 
 ## Backend HTTP Endpoints
 
@@ -124,23 +125,56 @@ The `axel` program ID is hardcoded in `kyc.service.ts` and `telemetry-cron.servi
 
 ## Frontend Environment
 
-`frontend/.env.local.example` lists these variables:
+`frontend/.env.local.example` lists these variables, all read at build time:
 
-| Variable | Read in | Notes |
+| Variable | Read in | Default and notes |
 |---|---|---|
-| `NEXT_PUBLIC_SOLANA_RPC_URL` | `lib/solana/connection.ts`, `providers/WalletProvider.tsx` | Defaults to devnet |
-| `NEXT_PUBLIC_SOLANA_NETWORK` | `lib/solana/connection.ts`, `app/opengraph-image.tsx` | Used for Explorer links and the social card; default `devnet` |
-| `NEXT_PUBLIC_PROGRAM_ID` | `lib/solana/connection.ts` | Defaults to `DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M` |
-| `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts` | That client is not used by any component |
-| `NEXT_PUBLIC_KYC_URL` | — | Not read anywhere |
+| `NEXT_PUBLIC_SOLANA_NETWORK` | `lib/solana/connection.ts`, `app/opengraph-image.tsx` | `devnet`. One of `devnet`, `testnet`, `mainnet-beta`, `localnet`; any other value fails the build. Explorer links follow it; `localnet` opens Explorer on the local RPC. |
+| `NEXT_PUBLIC_SOLANA_RPC_URL` | `lib/solana/connection.ts`, `providers/WalletProvider.tsx`, `next.config.mjs` | The cluster's public RPC (`http://127.0.0.1:8899` for `localnet`). Its origin and websocket are added to the CSP. |
+| `NEXT_PUBLIC_PROGRAM_ID` | `lib/solana/connection.ts` | The `address` in `idl-v2/axel_v2.json` (`AXLcoEH3vJXUSL7nEr1T4d77NarThcbVrnbBzBR8XPZi`). |
+| `NEXT_PUBLIC_PAYMENT_MINT_SYMBOLS` | `lib/solana/tokens.ts` | Unset. `<mint>:<symbol>,<mint>:<symbol>` names payment mints without on-chain metadata. A Token-2022 mint's own metadata symbol wins, Circle's USDC is known by address, anything else shows its short address. |
+| `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts`, `next.config.mjs` | Unset: the car page says trip data is not connected and makes no request. Set: the backend's base URL; the widget asks `/telemetry/latest/<share mint>` every minute. The backend does not enable CORS yet, so it must share the frontend's origin or add CORS. |
+| `NEXT_PUBLIC_INDEXER_URL` | `lib/api/indexer.ts`, `next.config.mjs` | Unset: payout history comes from the chain. Set: from the [indexer API](#indexer-api-read-by-the-frontend). |
 
-The asset page's telemetry widget (`hooks/useTelemetry.ts`) reads `NEXT_PUBLIC_API_URL`, which is not in the example file.
+## Indexer API (read by the frontend)
+
+The chain records every revenue deposit (`RevenuePeriod`) and every position, but not how many shares a wallet held when a deposit arrived, nor its past claims (those are `Claimed` events in transaction logs). A wallet's part of each deposit therefore needs an indexer. The frontend reads it from this endpoint when `NEXT_PUBLIC_INDEXER_URL` is set, and validates the answer with Zod (`lib/api/indexer.ts`); without it, `/payouts` lists each deposit with its amount per share, and the totals come from the positions.
+
+```
+GET /v2/wallets/:wallet/payouts
+```
+
+**Response `200`:**
+```ts
+interface PayoutHistory {
+  periods: Array<{
+    project: string;      // project PDA, base58
+    index: number;        // RevenuePeriod.index
+    periodStart: number;  // YYYYMMDD
+    periodEnd: number;    // YYYYMMDD
+    kind: 'regular' | 'final';
+    net: string;          // u64 as a decimal string: paid in for holders, after the fee
+    supply: string;       // u64: shares the deposit was split across
+    depositedAt: number;  // unix seconds, RevenuePeriod.deposited_at
+    signature: string;    // deposit transaction
+    earned: string;       // u64: what this deposit added to the wallet's position,
+                          // floor(shares held × (acc_after − acc_before) / 2^64)
+  }>;
+  claims: Array<{
+    project: string;      // project PDA
+    amount: string;       // u64, from the Claimed event
+    claimedAt: number;    // unix seconds, block time
+    signature: string;
+  }>;
+}
+```
+
+`periods` holds the deposits of every project in which the wallet held shares when the deposit was made. Amounts are strings because they can exceed 2^53. Projects the chain does not know are left out; any other answer is shown as a failed read with a retry.
 
 ## Program Reference: `axel`
 
 - Program ID: `DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M`
-- IDL: [`frontend/src/lib/solana/idl/axel.json`](../frontend/src/lib/solana/idl/axel.json), fetched from devnet
-- TypeScript type: `idl/axel.ts`
+- IDL: `target/idl/axel.json` and `target/types/axel.ts`, produced by `anchor build`. The frontend no longer vendors it: it runs on `axel_v2`.
 
 Anchor instruction discriminators are the first 8 bytes of `sha256("global:<instruction_name>")`.
 
@@ -271,78 +305,31 @@ Errors: `6000 SourceNotWhitelisted`, `6001 DestinationNotWhitelisted`.
 
 To send shares from a client, build the transfer with `createTransferCheckedWithTransferHookInstruction` or `transferCheckedWithTransferHook` from `@solana/spl-token`, using `TOKEN_2022_PROGRAM_ID`. These helpers resolve the extra accounts from the on-chain list, as `tests/transfer-hook-execute.test.ts` does.
 
-## TypeScript Client
+## TypeScript Client (frontend, `axel_v2`)
 
-The frontend talks to the program through `@coral-xyz/anchor` and the vendored IDL. The helpers live in `frontend/src/lib/solana/`:
+The frontend talks to `axel_v2` through `@coral-xyz/anchor` and the IDL vendored in `frontend/src/lib/solana/idl-v2/`. `lib/solana/program.ts` builds the `Program` at the configured address; it only builds instructions and decodes accounts, and every read goes through the `Connection` the caller passes.
 
-- **`pda.ts`:**
-  - `deriveProjectState(mint)`
-  - `deriveRevenueVault(mint)`
-  - `deriveWhitelistEntry(wallet)`
-  - `deriveRevenuePeriod(mint, index)`
-  - `deriveClaimRecord(periodPda, wallet)`
-  - `deriveTelemetryRecord(mint, date)`
-- **`readers.ts`:**
-  - `fetchAllProjects(connection)`, which uses `program.account.projectState.all()` plus Token-2022 metadata
-  - `fetchProjectState`
-  - `fetchWhitelistEntry`
-  - `fetchInvestorHolding`
-  - `fetchAllRevenuePeriods`
-  - `fetchClaimRecord`
-- **`instructions.ts`** builds a `TransactionInstruction` for each of these:
-  - `buy_tokens` and `claim_revenue`
-  - `deposit_revenue`
-  - `pause_project`, `resume_project` and `close_project`
-  - `update_price`
-  - `add_to_whitelist` and `remove_from_whitelist`
+| Module | What it has |
+|---|---|
+| `connection.ts` | Cluster, RPC URL and program ID from the environment; Explorer links |
+| `pda.ts` | `configAddress`, `investorAddress(wallet)`, `projectAddress(shareMint)`, `positionAddress(project, owner)`, `periodAddress(project, index)`, `escrowAddress(project)`, `revenueAddress(project)`, `extraAccountMetasAddress(shareMint)`; `shareAccountAddress` and `paymentAccountAddress` for the owners' canonical token accounts |
+| `accounts.ts` | Decoders from account bytes to plain types with `bigint` amounts; account sizes and the memcmp offsets readers filter by |
+| `readers.ts` | `fetchConfig`, `fetchInvestor(wallet)`, `fetchProjects` (one `getProgramAccounts` plus one `getMultipleAccounts` for the share and payment mints), `fetchProject(shareMint)`, `fetchPositions(owner)` (memcmp on the owner at offset 40), `fetchPosition`, `fetchRevenuePeriods(project)` (memcmp at offset 8), `fetchTokenBalance` |
+| `tokens.ts` | The car from the share mint's Token-2022 metadata (`make`, `model`, `year`, `city`, `class`, `park`); the payment token's decimals and symbol; sums per payment token |
+| `math.ts` | The program's `math.rs` on BigInt: `splitFee`, `sharesValue`, `proRata`, `accIncrement`, `owed`, `deposit`, and `pendingRevenue(position, accPerShare)` = `accrued + (shares × (acc − checkpoint)) >> 64`, which is exactly what a claim pays |
+| `instructions.ts` | `buySharesInstruction`, `refundInstruction`, `claimInstruction`, `openPositionInstruction`, `closePositionInstruction`, `transferSharesInstruction`; `finalizeRaiseInstruction`; admin `manageProjectInstruction` (cancel raise, pause, resume, close), `setProjectRolesInstruction`, `activateProjectInstruction`, `depositRevenueInstruction` (the oracle co-signs), `setInvestorInstruction` |
+| `transaction.ts` | Compute unit limits per action, `buildTransaction` (limit first), `MAX_CLAIMS_PER_TRANSACTION` = 4, `confirmSignature` |
+| `errors.ts` | `describeTxError`: the i18n message of a failed transaction, from Anchor's log line, a program's custom error in the logs or in a signature status (by instruction index), a wallet refusal, missing SOL, an expired blockhash or an unreachable node |
+| `eligibility.ts`, `lifecycle.ts`, `kyc.ts` | The program's KYC eligibility rule, what each project state allows, and the records the console's KYC form writes |
 
-Minimal example, a whitelisted wallet buying shares. `wallet` comes from `useAnchorWallet()` in `@solana/wallet-adapter-react`:
+`transferSharesInstruction` is a Token-2022 `transfer_checked` with the hook's accounts appended in the order wallets resolve them (config, project, both investors, both positions, the hook program, the validation account), so it needs no RPC call and works in wallets that do not resolve transfer hooks. A recipient without a position is onboarded with `openPositionInstruction` in the same transaction.
 
-```ts
-import { AnchorProvider, BN, Program } from '@coral-xyz/anchor';
-import type { AnchorWallet } from '@solana/wallet-adapter-react';
-import { Connection, PublicKey, SystemProgram } from '@solana/web3.js';
-import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  TOKEN_2022_PROGRAM_ID,
-  getAssociatedTokenAddressSync,
-} from '@solana/spl-token';
-import type { Axel } from '@/lib/solana/idl/axel';
-import IDL from '@/lib/solana/idl/axel.json';
+Every send goes through `hooks/useTransactionSender.ts`: it sets the compute unit limit, has the wallet sign, polls the signature until confirmed, and shows the outcome in a toast with the Explorer link.
 
-const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+The client is tested in `frontend/src/lib/solana/__tests__` without mocks: builders against the IDL's account lists, flags, fixed addresses and PDA seeds, and exact bytes; the transfer against `@solana/spl-token`'s own hook resolver; readers, math and PDAs against accounts the real program wrote in LiteSVM (`tests-v2/scripts/export-frontend-fixture.ts` exports them, with what each holder's claim paid).
 
-export async function buyShares(wallet: AnchorWallet, mint: PublicKey, shares: number): Promise<string> {
-  const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
-  const program = new Program(IDL as Axel, provider);
-
-  const [projectState] = PublicKey.findProgramAddressSync(
-    [Buffer.from('project'), mint.toBuffer()],
-    program.programId,
-  );
-  const [whitelistEntry] = PublicKey.findProgramAddressSync(
-    [Buffer.from('whitelist'), wallet.publicKey.toBuffer()],
-    program.programId,
-  );
-  const project = await program.account.projectState.fetch(projectState);
-
-  return program.methods
-    .buyTokens(new BN(shares))
-    .accountsPartial({
-      investor: wallet.publicKey,
-      admin: project.admin,
-      projectState,
-      mint,
-      investorTokenAccount: getAssociatedTokenAddressSync(mint, wallet.publicKey, false, TOKEN_2022_PROGRAM_ID),
-      whitelistEntry,
-      tokenExtensionsProgram: TOKEN_2022_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc();
-}
-```
+v1 clients build instructions from `target/idl/axel.json` after `anchor build`, as `tests/` and `scripts/init-project.ts` do.
 
 ## Codama SDK (`sdk/axel-v2`)
 
-The Codama client covers the v2 program only. `npm run generate` runs `scripts/generate-clients.ts`, which reads `target/idl/axel_v2.json` and renders a `@solana/kit` client into `sdk/axel-v2/src/generated`. See [v2.md](v2.md#idl-and-typescript-client). The stale v1 output that used to live in `sdk/generated` was removed; v1 clients use the vendored IDL in `frontend/src/lib/solana/idl/` with Anchor.
+The Codama client covers the v2 program only. `npm run generate` runs `scripts/generate-clients.ts`, which reads `target/idl/axel_v2.json` and renders a `@solana/kit` client into `sdk/axel-v2/src/generated`. See [v2.md](v2.md#idl-and-typescript-client). The stale v1 output that used to live in `sdk/generated` was removed. The frontend keeps using Anchor with the vendored IDL, because the wallet adapter and the existing hooks are built on `@solana/web3.js` 1.
