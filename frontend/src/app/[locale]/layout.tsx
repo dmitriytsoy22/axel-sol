@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import '@/styles/globals.css';
 import WalletProvider from '@/providers/WalletProvider';
 import { Navbar } from '@/components/layout';
@@ -11,18 +11,38 @@ import { getMessages, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
 
-const inter = Inter({
-  subsets: ['latin', 'cyrillic'],
+// Self-hosted subsets (see src/fonts/README.md): the build never calls Google Fonts.
+const sans = localFont({
+  src: '../../fonts/Onest-Variable.woff2',
+  weight: '400 700',
   display: 'swap',
-  variable: '--font-inter',
+  variable: '--font-sans',
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
+const serif = localFont({
+  src: '../../fonts/AxelSerif-Variable.woff2',
+  weight: '400 600',
   display: 'swap',
-  variable: '--font-jetbrains-mono',
-  weight: ['400', '500'],
+  variable: '--font-serif',
+  fallback: ['Georgia', 'Times New Roman', 'serif'],
+  adjustFontFallback: 'Times New Roman',
 });
+
+const mono = localFont({
+  src: '../../fonts/JetBrainsMono-Variable.woff2',
+  weight: '400 600',
+  display: 'swap',
+  variable: '--font-mono',
+  preload: false,
+});
+
+// The reveal may delay content but must never withhold it. The flag goes up only while
+// the document is actually painting (a hidden tab or offscreen webview would otherwise
+// freeze sections at opacity 0) and comes down once the reveal window has passed.
+const REVEAL_GATE =
+  '(function(){if(document.visibilityState!=="visible")return;' +
+  'var r=document.documentElement;r.dataset.reveal="1";' +
+  'setTimeout(function(){delete r.dataset.reveal},1500)})()';
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'Metadata' });
@@ -62,8 +82,9 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className="font-sans bg-white text-text-primary min-h-screen flex flex-col">
+    <html lang={locale} className={`${sans.variable} ${serif.variable} ${mono.variable}`}>
+      <body className="font-sans bg-background text-foreground min-h-screen flex flex-col">
+        <script dangerouslySetInnerHTML={{ __html: REVEAL_GATE }} />
         <NextIntlClientProvider messages={messages}>
           <WalletProvider>
             <ToastProvider>

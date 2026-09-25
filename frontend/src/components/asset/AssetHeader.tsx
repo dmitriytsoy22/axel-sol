@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { ProjectState } from '@/types/project';
 import { Badge } from '@/components/ui/Badge';
 import { useTranslations } from 'next-intl';
+import { vehiclePhoto } from '@/components/catalog/vehiclePhoto';
 
 interface AssetHeaderProps {
   project: ProjectState;
@@ -22,17 +23,26 @@ export function AssetHeader({ project }: AssetHeaderProps): React.JSX.Element {
     }
   };
 
+  const stockPhoto = vehiclePhoto(project.carMake, project.carModel);
+  const isStockPhoto = !project.imageUrl;
+  const photoAlt = isStockPhoto && !stockPhoto.showsModel ? '' : `${project.carMake} ${project.carModel}`;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100 border border-gray-200">
-        <Image 
-          src={project.imageUrl || '/model1.png'}
-          alt={`${project.carMake} ${project.carModel}`}
+        <Image
+          src={project.imageUrl || stockPhoto.src}
+          alt={photoAlt}
           fill
           className="object-cover"
           sizes="(max-width: 768px) 100vw, 50vw"
           priority
         />
+        {isStockPhoto && (
+          <span className="absolute bottom-3 left-3 rounded-control bg-ink-950/60 px-2 py-0.5 text-caption text-ink-25">
+            {tCat('illustrativePhoto')}
+          </span>
+        )}
       </div>
       
       <div className="flex flex-col gap-2 relative">

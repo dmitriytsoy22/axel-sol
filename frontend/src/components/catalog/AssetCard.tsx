@@ -6,6 +6,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { Link } from '@/i18n/routing';
+import { vehiclePhoto } from './vehiclePhoto';
 
 interface AssetCardProps {
   project: ProjectState;
@@ -31,17 +32,26 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
   const totalFormatted = (totalValue / 1_000_000_000).toLocaleString();
   const priceFormatted = (project.pricePerToken / 1_000_000_000).toLocaleString();
 
+  const stockPhoto = vehiclePhoto(project.carMake, project.carModel);
+  const isStockPhoto = !project.imageUrl;
+  const photoAlt = isStockPhoto && !stockPhoto.showsModel ? '' : `${project.carMake} ${project.carModel}`;
+
   return (
     <Link href={`/assets/${project.mint}`} className="w-full flex">
       <Card className="flex flex-col group cursor-pointer w-full">
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
           <Image
-            src={project.imageUrl || '/model1.png'}
-            alt={`${project.carMake} ${project.carModel}`}
+            src={project.imageUrl || stockPhoto.src}
+            alt={photoAlt}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
           />
+          {isStockPhoto && (
+            <span className="absolute bottom-3 left-3 rounded-control bg-ink-950/60 px-2 py-0.5 text-caption text-ink-25">
+              {t('illustrativePhoto')}
+            </span>
+          )}
           <div className="absolute top-4 left-4">
             <Badge status={project.status}>
               {getStatusText(project.status)}

@@ -40,7 +40,8 @@
     "raised": "Raised",
     "pricePerToken": "Price per token",
     "investBtn": "Invest Now",
-    "viewBtn": "View Details"
+    "viewBtn": "View Details",
+    "illustrativePhoto": "Illustrative photo"
   },
   "Asset": {
     "fundingProgress": "Funding Progress",

@@ -40,7 +40,8 @@
     "raised": "Жиналды",
     "pricePerToken": "Токен бағасы",
     "investBtn": "Инвестициялау",
-    "viewBtn": "Толығырақ"
+    "viewBtn": "Толығырақ",
+    "illustrativePhoto": "Иллюстрациялық фото"
   },
   "Asset": {
     "fundingProgress": "Қаражат жинау барысы",

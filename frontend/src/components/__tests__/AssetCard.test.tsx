@@ -57,4 +57,34 @@ describe('AssetCard', () => {
     // Check price per token
     expect(screen.getByText(/1 SOL/)).toBeInTheDocument();
   });
+
+  it('shows the stock photo of the model and marks it as illustrative when the vehicle has no photo', () => {
+    render(<AssetCard project={{ ...mockProject, carMake: 'Toyota', carModel: 'Camry', imageUrl: '' }} />);
+
+    expect(screen.getByRole('img', { name: 'Toyota Camry' })).toHaveAttribute(
+      'src',
+      expect.stringContaining(encodeURIComponent('/images/cars/toyota-camry.webp')),
+    );
+    expect(screen.getByText('mock_t_illustrativePhoto')).toBeInTheDocument();
+  });
+
+  it('does not present the Almaty fallback image as the model', () => {
+    const { container } = render(
+      <AssetCard project={{ ...mockProject, carMake: 'Chevrolet', carModel: 'Cobalt', imageUrl: '' }} />,
+    );
+
+    expect(screen.queryByRole('img', { name: /Chevrolet Cobalt/ })).not.toBeInTheDocument();
+    expect(container.querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining(encodeURIComponent('/images/places/almaty-taxi-mountains.webp')),
+    );
+    expect(screen.getByText('mock_t_illustrativePhoto')).toBeInTheDocument();
+  });
+
+  it('does not mark the vehicle\'s own photo as illustrative', () => {
+    render(<AssetCard project={mockProject} />);
+
+    expect(screen.getByRole('img', { name: 'Tesla Model 3' })).toBeInTheDocument();
+    expect(screen.queryByText('mock_t_illustrativePhoto')).not.toBeInTheDocument();
+  });
 });

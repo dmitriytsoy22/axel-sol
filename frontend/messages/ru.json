@@ -40,7 +40,8 @@
     "raised": "Собрано",
     "pricePerToken": "Цена токена",
     "investBtn": "Инвестировать",
-    "viewBtn": "Детали"
+    "viewBtn": "Детали",
+    "illustrativePhoto": "Фото для иллюстрации"
   },
   "Asset": {
     "fundingProgress": "Прогресс сбора средств",
