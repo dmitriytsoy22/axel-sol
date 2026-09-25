@@ -27,6 +27,21 @@ describe("HKDF key derivation", () => {
     assert.ok(!tiny.run("investor:investor-01").publicKey.equals(small.run("investor:investor-01").publicKey));
   });
 
+  test("derives the demo route keys that frontend/scripts/demo-env.mjs prints", () => {
+    // frontend/src/lib/demo/__tests__/demo-env-script.test.ts pins the same addresses.
+    const ring = new KeyRing(SECRET, "devnet", "seed|tiny");
+    const addresses = ["faucet", "demo-kyc", "desk", "demo-operator", "demo-oracle"].map((role) =>
+      ring.role(role).publicKey.toBase58(),
+    );
+    assert.deepEqual(addresses, [
+      "9fj1et17MdpXyrcGuksfN6FTFg941WbkKitViTCvgseY",
+      "4891QVw5qSqv83Hea1W8fvr7sY4obcmWzetQxiHnpgTr",
+      "FPNeqLcvfTjyZJ77B7xZYFi1Lht63Fk8eZecvE5H17E7",
+      "6whwxruTZizoku4e9brzA5yYsjCWDpT7TDk8APgRKWfx",
+      "J986i9p5Vcy3baHbdoK7AwRfftAEUzjUd8QHeq9WtTMn",
+    ]);
+  });
+
   test("refuses a missing or short secret", () => {
     assert.throws(() => readSecret({}), new RegExp(SECRET_ENV));
     assert.throws(() => readSecret({ [SECRET_ENV]: "short" }), /at least 32 characters/);

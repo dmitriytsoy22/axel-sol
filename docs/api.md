@@ -75,6 +75,7 @@ Every car in `FLEET_CONFIG` gets one record per calendar day of the fleet's zone
   | 1 | `active` |
   | 2 | `idle` |
   | 3 | `maintenance` |
+  | 4 | `repair`: off the road after an accident. Only the demo seed writes it |
 
 - **Chain.** `head = sha256(head_before ‖ u32 LE(YYYYMMDD) ‖ data_hash)`, starting from 32 zero bytes. The oracle key appends up to 20 days per transaction. The program stores only the head, the count and the last date in `Project`.
 - **Where the figures come from.**

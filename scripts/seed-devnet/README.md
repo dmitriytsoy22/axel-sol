@@ -126,7 +126,7 @@ Before each deposit, the executor checks that the on-chain telemetry head equals
 
   Only data whose transactions are confirmed is published.
 
-Hashes are SHA-256 of the RFC 8785 canonical JSON ([`lib/jcs.ts`](lib/jcs.ts)). The telemetry chain is the program's `head' = sha256(head ‖ date as u32 LE ‖ data_hash)`, starting from 32 zero bytes. Telemetry status codes: 0 rented out, 1 no driver, 2 scheduled service, 3 accident repair.
+Hashes are SHA-256 of the RFC 8785 canonical JSON ([`lib/jcs.ts`](lib/jcs.ts)). The telemetry chain is the program's `head' = sha256(head ‖ date as u32 LE ‖ data_hash)`, starting from 32 zero bytes. Telemetry status codes are the backend oracle's ([docs/api.md](../../docs/api.md#telemetry-what-is-published)): 1 rented out, 2 no driver, 3 scheduled service, 4 accident repair.
 
 On localnet, the outputs are git-ignored. On devnet they are meant to be committed.
 

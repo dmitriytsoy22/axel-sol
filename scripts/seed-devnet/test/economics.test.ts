@@ -7,6 +7,7 @@ import {
   carEconomics,
   salePriceKzt,
   simulateMonth,
+  STATUS_CODE,
   type CarEconomics,
   type MonthReport,
 } from "../economics";
@@ -101,5 +102,10 @@ describe("economics generator", () => {
     assert.equal(salePriceKzt(economics, 30), 7_000_000);
     assert.equal(salePriceKzt(economics, 60), 4_000_000);
     assert.equal(salePriceKzt(economics, 90), 4_000_000);
+  });
+
+  test("writes the on-chain status codes the backend oracle writes, and never 0", () => {
+    // backend/src/telemetry/day-record.ts: active 1, idle 2, maintenance 3; docs/api.md adds repair 4.
+    assert.deepEqual(STATUS_CODE, { active: 1, idle: 2, maintenance: 3, repair: 4 });
   });
 });

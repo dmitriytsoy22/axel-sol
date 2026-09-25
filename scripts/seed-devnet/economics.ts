@@ -132,8 +132,11 @@ const WINTER_MONTHS = new Set([12, 1, 2]);
 export const DAY_STATUSES = ["active", "idle", "maintenance", "repair"] as const;
 export type DayStatus = (typeof DAY_STATUSES)[number];
 
-/** Published status codes: 0 rented out, 1 no driver, 2 scheduled service, 3 accident repair. */
-export const STATUS_CODE: Record<DayStatus, number> = { active: 0, idle: 1, maintenance: 2, repair: 3 };
+/**
+ * On-chain status codes, shared with the backend oracle (docs/api.md): 1 rented out, 2 no driver,
+ * 3 scheduled service, 4 accident repair. 0 is never written, so an unset byte is not a status.
+ */
+export const STATUS_CODE: Record<DayStatus, number> = { active: 1, idle: 2, maintenance: 3, repair: 4 };
 
 /** Constants of one car, drawn once. */
 export interface CarEconomics {
