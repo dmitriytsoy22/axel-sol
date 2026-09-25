@@ -30,7 +30,8 @@ const escapeProperty = (text) => escapeData(text).replace(/:/g, "%3A").replace(/
 
 if (outputPath && existsSync(outputPath)) {
   const lines = readFileSync(outputPath, "utf8").split("\n");
-  const crashPattern = /panicked at|fatal runtime error|SIGABRT|memory allocation|thread '/;
+  const crashPattern =
+    /panicked at|fatal|abort|terminat|heap|out of memory|double free|segmentation|illegal instruction|core dumped|thread '/i;
   // Since Rust 1.73 the panic message itself is on the line after "panicked at <location>:".
   const crashLines = [
     ...new Set(
