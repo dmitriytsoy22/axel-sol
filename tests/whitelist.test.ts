@@ -46,7 +46,7 @@ describe("whitelist management", () => {
 
     await program.methods
       .addToWhitelist(investor.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: whitelistPda,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -65,7 +65,7 @@ describe("whitelist management", () => {
     // First add
     await program.methods
       .addToWhitelist(investor.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: whitelistPda,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -76,7 +76,7 @@ describe("whitelist management", () => {
     // Then remove
     await program.methods
       .removeFromWhitelist(investor.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: whitelistPda,
       })
@@ -93,7 +93,7 @@ describe("whitelist management", () => {
 
     await program.methods
       .addToWhitelist(investor.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: whitelistPda,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -104,7 +104,7 @@ describe("whitelist management", () => {
     // Second add succeeds (init_if_needed) — still approved
     await program.methods
       .addToWhitelist(investor.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: whitelistPda,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -123,7 +123,7 @@ describe("whitelist management", () => {
     try {
       await program.methods
         .removeFromWhitelist(unknownWallet.publicKey)
-        .accounts({
+        .accountsPartial({
           admin: admin.publicKey,
           whitelistEntry: whitelistPda,
         })

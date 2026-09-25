@@ -86,7 +86,7 @@ describe("transfer-hook", () => {
         year: 2023,
         valuationSol: new BN(10 * LAMPORTS_PER_SOL),
       })
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         mint: mint.publicKey,
         projectState: projectStatePda,
@@ -105,7 +105,7 @@ describe("transfer-hook", () => {
 
     await hookProgram.methods
       .initializeExtraAccountMetaList()
-      .accounts({
+      .accountsPartial({
         payer: admin.publicKey,
         mint: mint.publicKey,
         extraAccountMetaList: extraAccountMetaListPda,
@@ -140,7 +140,7 @@ describe("transfer-hook", () => {
     try {
       await hookProgram.methods
         .initializeExtraAccountMetaList()
-        .accounts({
+        .accountsPartial({
           payer: admin.publicKey,
           mint: mint.publicKey,
           extraAccountMetaList: extraAccountMetaListPda,

@@ -100,7 +100,7 @@ describe("pause_project / resume_project", () => {
         year: 2023,
         valuationSol: new BN(10 * LAMPORTS_PER_SOL),
       })
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         mint: mint.publicKey,
         projectState: projectStatePda,
@@ -166,7 +166,7 @@ describe("pause_project / resume_project", () => {
     const [whitelistPda] = findWhitelistPda(investor.publicKey);
     await program.methods
       .addToWhitelist(investor.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: whitelistPda,
         systemProgram: SystemProgram.programId,
@@ -191,7 +191,7 @@ describe("pause_project / resume_project", () => {
     try {
       await investorProgram.methods
         .buyTokens(new BN(1))
-        .accounts({
+        .accountsPartial({
           investor: investor.publicKey,
           admin: admin.publicKey,
           projectState: projectStatePda,

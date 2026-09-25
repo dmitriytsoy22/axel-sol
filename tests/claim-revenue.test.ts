@@ -128,7 +128,7 @@ describe("claim_revenue", () => {
         year: 2023,
         valuationSol: new BN(CAR_COST),
       })
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         mint: mint.publicKey,
         projectState: projectStatePda,
@@ -158,7 +158,7 @@ describe("claim_revenue", () => {
 
     await program.methods
       .addToWhitelist(investorA.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: whitelistA,
         systemProgram: SystemProgram.programId,
@@ -168,7 +168,7 @@ describe("claim_revenue", () => {
 
     await program.methods
       .addToWhitelist(investorB.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: whitelistB,
         systemProgram: SystemProgram.programId,
@@ -191,7 +191,7 @@ describe("claim_revenue", () => {
 
     await investorAProgram.methods
       .buyTokens(new BN(20))
-      .accounts({
+      .accountsPartial({
         investor: investorA.publicKey,
         admin: admin.publicKey,
         projectState: projectStatePda,
@@ -207,7 +207,7 @@ describe("claim_revenue", () => {
 
     await investorBProgram.methods
       .buyTokens(new BN(30))
-      .accounts({
+      .accountsPartial({
         investor: investorB.publicKey,
         admin: admin.publicKey,
         projectState: projectStatePda,
@@ -225,7 +225,7 @@ describe("claim_revenue", () => {
     const [revenuePeriodPda] = findRevenuePeriodPda(mint.publicKey, 0);
     await program.methods
       .depositRevenue(0, new BN(DEPOSIT_AMOUNT))
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         projectState: projectStatePda,
         revenueVault: revenueVaultPda,

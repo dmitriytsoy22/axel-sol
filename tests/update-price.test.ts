@@ -70,7 +70,7 @@ async function initProject(
       year: 2023,
       valuationSol: new BN(carCost),
     })
-    .accounts({
+    .accountsPartial({
       admin: admin.publicKey,
       mint: mint.publicKey,
       projectState: projectStatePda,

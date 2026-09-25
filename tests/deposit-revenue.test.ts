@@ -112,7 +112,7 @@ describe("deposit_revenue", () => {
         year: 2023,
         valuationSol: new BN(CAR_COST),
       })
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         mint: mint.publicKey,
         projectState: projectStatePda,
@@ -134,7 +134,7 @@ describe("deposit_revenue", () => {
     const [whitelistPda] = findWhitelistPda(investor.publicKey);
     await program.methods
       .addToWhitelist(investor.publicKey)
-      .accounts({
+      .accountsPartial({
         admin: admin.publicKey,
         whitelistEntry: whitelistPda,
         systemProgram: SystemProgram.programId,
@@ -158,7 +158,7 @@ describe("deposit_revenue", () => {
 
     await investorProgram.methods
       .buyTokens(new BN(20))
-      .accounts({
+      .accountsPartial({
         investor: investor.publicKey,
         admin: admin.publicKey,
         projectState: projectStatePda,
@@ -290,7 +290,7 @@ describe("deposit_revenue", () => {
     try {
       await strangerProgram.methods
         .depositRevenue(2, new BN(LAMPORTS_PER_SOL))
-        .accounts({
+        .accountsPartial({
           admin: stranger.publicKey,
           projectState: projectStatePda,
           revenueVault: revenueVaultPda,
