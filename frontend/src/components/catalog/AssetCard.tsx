@@ -42,9 +42,10 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
           className="object-cover transition-transform duration-slow ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
         />
         <ProjectStatusBadge status={project.status} className="absolute left-3 top-3" />
-        {/* Share mints carry no photo of the car itself, so every photo is of the model. */}
+        {/* Share mints carry no photo of the car itself: the photo is of the model, or of an
+            Almaty street when no licensed photo of the model exists. */}
         <span className="absolute bottom-3 left-3 rounded-control bg-ink-950/70 px-2 py-0.5 text-small text-ink-25">
-          {t('illustrativePhoto')}
+          {t(photo.showsModel ? 'illustrativePhoto' : 'streetPhoto')}
         </span>
       </div>
 

@@ -74,7 +74,7 @@
     "overline": "Cars",
     "title": "The fleet",
     "lead": "Each car is a separate project with its own token, share price and payout history. Every figure on these cards is read from Solana {network}.",
-    "photoNote": "Photos show the car model, not the specific car.",
+    "photoNote": "Model photos are illustrative, not the specific car. Models without a licensed photo show an Almaty street.",
     "filterLabel": "Filter by status",
     "errorTitle": "Couldn't load the cars",
     "errorBody": "The Solana RPC node didn't respond. This is usually temporary.",
@@ -89,7 +89,8 @@
     "filterCity": "City",
     "filterClass": "Class",
     "noMatchTitle": "No car matches these filters",
-    "noMatchBody": "Pick another city, class or status."
+    "noMatchBody": "Pick another city, class or status.",
+    "streetPhoto": "Almaty street, not this model"
   },
   "Asset": {
     "breadcrumb": "Breadcrumb",

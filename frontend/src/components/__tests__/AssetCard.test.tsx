@@ -97,5 +97,7 @@ describe('AssetCard', () => {
       'src',
       expect.stringContaining(encodeURIComponent('/images/places/almaty-taxi-mountains.webp')),
     );
+    expect(screen.getByText('Almaty street, not this model')).toBeInTheDocument();
+    expect(screen.queryByText('Illustrative photo')).not.toBeInTheDocument();
   });
 });

@@ -10,7 +10,7 @@ interface AssetPhotoProps {
 }
 
 /* A licensed photo of the car's model, marked as illustrative: the share mint has no photo
-   of the car itself. */
+   of the car itself. Models without a licensed photo get an Almaty street, labeled as such. */
 export function AssetPhoto({ project }: AssetPhotoProps): JSX.Element {
   const t = useTranslations('Catalog');
   const photo = vehiclePhoto(project.car.make, project.car.model);
@@ -26,7 +26,7 @@ export function AssetPhoto({ project }: AssetPhotoProps): JSX.Element {
         className="object-cover"
       />
       <figcaption className="absolute bottom-3 left-3 rounded-control bg-ink-950/70 px-2 py-0.5 text-small text-ink-25">
-        {t('illustrativePhoto')}
+        {t(photo.showsModel ? 'illustrativePhoto' : 'streetPhoto')}
       </figcaption>
     </figure>
   );
