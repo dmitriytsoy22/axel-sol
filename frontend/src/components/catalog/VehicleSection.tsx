@@ -1,0 +1,157 @@
+'use client';
+
+import React, { useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { Camera, RotateCw } from 'lucide-react';
+import type { ProjectStatus } from '@/types/project';
+import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { formatNumber } from '@/lib/format';
+import { NETWORK_NAME } from '@/lib/network';
+import { AssetCard } from './AssetCard';
+import type { CatalogFeed } from './types';
+
+type Filter = ProjectStatus | 'all';
+
+const STATUS_ORDER: ProjectStatus[] = ['active', 'paused', 'closed'];
+
+function CardSkeleton(): JSX.Element {
+  return (
+    <div className="overflow-hidden rounded-card border border-border bg-card shadow-sm">
+      <Skeleton className="aspect-[4/3] w-full rounded-none" />
+      <div className="flex flex-col gap-3 p-5">
+        <Skeleton className="h-6 w-2/3" />
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="mt-4 h-10 w-full" />
+        <Skeleton className="mt-2 h-1.5 w-full" />
+      </div>
+    </div>
+  );
+}
+
+function Notice({
+  title,
+  body,
+  action,
+}: {
+  title: string;
+  body: string;
+  action?: React.ReactNode;
+}): JSX.Element {
+  return (
+    <div className="rounded-card border border-border bg-card px-6 py-10 text-center">
+      <p className="text-title font-semibold text-foreground">{title}</p>
+      <p className="mx-auto mt-2 max-w-[48ch] text-body text-muted-foreground">{body}</p>
+      {action && <div className="mt-6 flex justify-center">{action}</div>}
+    </div>
+  );
+}
+
+export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogFeed): JSX.Element {
+  const t = useTranslations('Catalog');
+  const locale = useLocale();
+  const [filter, setFilter] = useState<Filter>('all');
+
+  const statusLabel: Record<ProjectStatus, string> = {
+    active: t('statusActive'),
+    paused: t('statusPaused'),
+    closed: t('statusClosed'),
+  };
+
+  const presentStatuses = STATUS_ORDER.filter((status) =>
+    projects.some((p) => p.status === status),
+  );
+  // A filter only helps once the cars differ in status.
+  const showFilter = presentStatuses.length > 1;
+  const activeFilter: Filter = showFilter ? filter : 'all';
+  const visible = projects.filter((p) => activeFilter === 'all' || p.status === activeFilter);
+
+  const options: { value: Filter; label: string; count: number }[] = [
+    { value: 'all', label: t('filterAll'), count: projects.length },
+    ...presentStatuses.map((status) => ({
+      value: status,
+      label: statusLabel[status],
+      count: projects.filter((p) => p.status === status).length,
+    })),
+  ];
+
+  let body: React.ReactNode;
+  if (error) {
+    body = (
+      <Notice
+        title={t('errorTitle')}
+        body={t('errorBody')}
+        action={
+          <Button variant="secondary" onClick={onRetry}>
+            <RotateCw aria-hidden="true" strokeWidth={1.75} />
+            {t('retry')}
+          </Button>
+        }
+      />
+    );
+  } else if (isLoading) {
+    body = (
+      <div aria-busy="true" className="grid gap-6 sm:grid-cols-2">
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
+    );
+  } else if (projects.length === 0) {
+    body = <Notice title={t('emptyTitle')} body={t('emptySubtitle')} />;
+  } else {
+    body = (
+      <ul className="grid gap-6 sm:grid-cols-2">
+        {visible.map((project) => (
+          <li key={project.mint} className="flex">
+            <AssetCard project={project} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <section id="vehicles" aria-labelledby="vehicles-title" className="section-y scroll-mt-16">
+      <div className="page-container grid gap-10 lg:grid-cols-12 lg:gap-8">
+        <div className="lg:col-span-4">
+          <div className="lg:sticky lg:top-28">
+            <p className="text-overline uppercase text-muted-foreground">{t('overline')}</p>
+            <h2
+              id="vehicles-title"
+              className="mt-3 font-heading text-h3 font-medium text-foreground md:text-h2"
+            >
+              {t('title')}
+            </h2>
+            <p className="mt-4 max-w-[44ch] text-body text-muted-foreground">
+              {t('lead', { network: NETWORK_NAME })}
+            </p>
+            <p className="mt-6 flex max-w-[44ch] items-start gap-2 text-small text-muted-foreground">
+              <Camera aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
+              {t('photoNote')}
+            </p>
+          </div>
+        </div>
+
+        <div className="lg:col-span-8">
+          {showFilter && (
+            <div role="group" aria-label={t('filterLabel')} className="mb-6 flex flex-wrap gap-2">
+              {options.map(({ value, label, count }) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={activeFilter === value}
+                  onClick={() => setFilter(value)}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-border bg-card px-4 text-small font-medium text-muted-foreground transition-colors duration-fast ease-move hover:text-foreground aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background md:min-h-10"
+                >
+                  {label}
+                  <span className="tabular-nums opacity-70">{formatNumber(count, locale)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {body}
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -89,7 +89,9 @@ export default async function RootLayout({
           <WalletProvider>
             <ToastProvider>
               <Navbar />
-              <main className="flex-1">{children}</main>
+              <main id="main" className="flex-1">
+                {children}
+              </main>
               <Footer />
             </ToastProvider>
           </WalletProvider>

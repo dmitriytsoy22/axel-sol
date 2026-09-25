@@ -191,6 +191,33 @@
     padding-block: var(--section-py-mobile);
   }
 
+  /* Readability zone over the hero photo: a band under the nav, a floor under the stats and,
+     from md, a fade from the text column toward the open right side of the frame. */
+  .hero-scrim {
+    background:
+      linear-gradient(to bottom, oklch(var(--ink-950) / 0.7) 0%, oklch(var(--ink-950) / 0) 16%),
+      linear-gradient(
+        to top,
+        oklch(var(--ink-950) / 0.94) 0%,
+        oklch(var(--ink-950) / 0.6) 45%,
+        oklch(var(--ink-950) / 0.35) 100%
+      );
+  }
+
+  @media (min-width: 768px) {
+    .hero-scrim {
+      background:
+        linear-gradient(to bottom, oklch(var(--ink-950) / 0.6) 0%, oklch(var(--ink-950) / 0) 18%),
+        linear-gradient(to top, oklch(var(--ink-950) / 0.92) 0%, oklch(var(--ink-950) / 0) 40%),
+        linear-gradient(
+          to right,
+          oklch(var(--ink-950) / 0.9) 0%,
+          oklch(var(--ink-950) / 0.72) 50%,
+          oklch(var(--ink-950) / 0.15) 85%
+        );
+    }
+  }
+
   @media (min-width: 768px) {
     .section-y {
       padding-block: var(--section-py);
@@ -199,15 +226,22 @@
 }
 
 @layer utilities {
+  /* Semantic tokens, so the shimmer also reads on ink surfaces. */
   .skeleton-shimmer {
     background: linear-gradient(
       90deg,
-      oklch(var(--ink-100)) 25%,
-      oklch(var(--ink-50)) 50%,
-      oklch(var(--ink-100)) 75%
+      oklch(var(--secondary)) 25%,
+      oklch(var(--muted)) 50%,
+      oklch(var(--secondary)) 75%
     );
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite linear;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-shimmer {
+      animation: none;
+    }
   }
 }
 

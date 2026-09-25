@@ -77,22 +77,13 @@ const config: Config = {
           '950',
         ]),
 
-        /* Legacy aliases from the pre-redesign theme, mapped onto the new tokens.
-           Remove each one when the last component using it is migrated. */
+        border: token('border'),
         brand: {
           DEFAULT: token('brand'),
+          /* Legacy alias: the pre-redesign name for `primary`. Remove it when the asset,
+             dashboard and admin screens stop using `brand-primary`. */
           primary: token('primary'),
-          'primary-active': token('cyan-900'),
-          'primary-light': token('cyan-100'),
         },
-        surface: { secondary: token('muted'), hover: token('secondary') },
-        text: {
-          primary: token('foreground'),
-          secondary: token('muted-foreground'),
-          tertiary: token('subtle-foreground'),
-        },
-        border: { DEFAULT: token('border'), subtle: token('ink-100') },
-        semantic: { error: token('destructive'), 'error-muted': token('destructive-muted') },
       },
 
       /* Plain `border` and `ring` classes use the theme, not Tailwind's gray-200 / blue-500. */
@@ -112,9 +103,6 @@ const config: Config = {
         small: ['0.875rem', { lineHeight: '1.43' }],
         caption: ['0.75rem', { lineHeight: '1.33', letterSpacing: '0.01em' }],
         overline: ['0.75rem', { lineHeight: '1.33', letterSpacing: '0.08em' }],
-        /* Legacy aliases */
-        'display-lg': ['3rem', { lineHeight: '1.08', letterSpacing: '-0.02em' }],
-        'title-2': ['1.25rem', { lineHeight: '1.4', letterSpacing: '-0.005em' }],
       },
 
       borderRadius: {
@@ -122,8 +110,6 @@ const config: Config = {
         card: 'var(--radius)',
         panel: 'calc(var(--radius) + 4px)',
         pill: '9999px',
-        /* Legacy alias */
-        'card-sm': 'calc(var(--radius) - 4px)',
       },
 
       boxShadow: {
@@ -135,16 +121,12 @@ const config: Config = {
 
       maxWidth: {
         container: 'var(--container-max)',
-        /* Legacy alias */
-        'page-wide': 'var(--container-max)',
       },
 
       transitionDuration: {
         fast: 'var(--duration-fast)',
         base: 'var(--duration-base)',
         slow: 'var(--duration-slow)',
-        /* Legacy alias */
-        normal: 'var(--duration-base)',
       },
 
       transitionTimingFunction: {

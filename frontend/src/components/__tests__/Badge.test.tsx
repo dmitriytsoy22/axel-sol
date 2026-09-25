@@ -4,18 +4,13 @@ import { describe, it, expect } from 'vitest';
 import { Badge } from '../ui/Badge';
 
 describe('Badge', () => {
-  it('renders children correctly', () => {
-    render(<Badge status="active">Test Badge</Badge>);
-    expect(screen.getByText('Test Badge')).toBeInTheDocument();
-  });
+  it.each(['active', 'paused', 'closed'] as const)(
+    'names the %s status in text and keeps its color dot out of the accessibility tree',
+    (status) => {
+      const { container } = render(<Badge status={status}>{`Status ${status}`}</Badge>);
 
-  it('renders pulsing dot for active status', () => {
-    const { container } = render(<Badge status="active">Active</Badge>);
-    expect(container.querySelector('.animate-ping')).toBeInTheDocument();
-  });
-
-  it('does not render pulsing dot for closed status', () => {
-    const { container } = render(<Badge status="closed">Closed</Badge>);
-    expect(container.querySelector('.animate-ping')).not.toBeInTheDocument();
-  });
+      expect(screen.getByText(`Status ${status}`)).toBeVisible();
+      expect(container.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
+    },
+  );
 });

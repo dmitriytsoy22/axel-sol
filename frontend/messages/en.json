@@ -1,31 +1,57 @@
 {
   "Common": {
-    "connect": "Connect",
+    "connect": "Connect wallet",
     "installPhantom": "Install Phantom",
     "disconnect": "Disconnect",
     "copy": "Copy",
-    "copied": "✓ Copied",
-    "copyAddress": "Copy address"
+    "copied": "Copied",
+    "copyAddress": "Copy address",
+    "opensInNewTab": "(opens in a new tab)"
   },
   "Navigation": {
-    "catalog": "Catalog",
-    "dashboard": "Dashboard",
-    "payouts": "Payouts"
+    "catalog": "Cars",
+    "dashboard": "Portfolio",
+    "payouts": "Payouts",
+    "home": "AXEL home",
+    "main": "Main navigation",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "language": "Language",
+    "wallet": "Wallet",
+    "skipToContent": "Skip to content"
   },
   "HomePage": {
-    "title": "Invest in Real-World Assets",
-    "subtitle": "Tokenized taxi assets on Solana. Transparent. On-chain.",
-    "explore": "Explore Assets"
+    "title": "Own a share of a working Almaty taxi",
+    "subtitle": "Buy shares in a specific car. Its net income is deposited on Solana and split among shareholders by the program, and anyone can check every deposit and payout.",
+    "overline": "Almaty, Kazakhstan · Solana",
+    "browseCars": "Browse the cars",
+    "howPayoutsWork": "How payouts work",
+    "devnetNote": "Devnet demo: test SOL only, no real money.",
+    "statsTitle": "Live from Solana {network}",
+    "statsLoading": "Reading Solana {network}…",
+    "statsError": "Couldn't reach Solana {network}.",
+    "retry": "Try again",
+    "statCars": "Cars listed",
+    "statShares": "Shares sold",
+    "ofTotal": "{part} of {whole}",
+    "statSoldValue": "Value of shares sold",
+    "statPayouts": "Payout periods"
   },
   "Footer": {
-    "builtOnSolana": "Built on Solana",
-    "docs": "Docs"
+    "docs": "Documentation",
+    "tagline": "Shares in taxis working in Almaty, with income paid out on Solana.",
+    "product": "Product",
+    "verify": "Verify",
+    "program": "Program in Solana Explorer",
+    "source": "Source code",
+    "copyright": "© {year} AXEL · Almaty, Kazakhstan",
+    "networkNote": "Solana devnet: test data, no real money."
   },
   "Metadata": {
-    "title": "AXEL — Real-World Asset Tokenization on Solana",
-    "description": "Invest in tokenized taxi assets on Solana. Transparent on-chain ownership, real revenue, and blockchain-verified telemetry.",
-    "ogTitle": "AXEL — Real-World Asset Tokenization",
-    "ogDescription": "Tokenized taxi assets on Solana. Transparent. On-chain."
+    "title": "AXEL — Shares in working taxis, paid out on Solana",
+    "description": "Buy shares in taxis working in Almaty, Kazakhstan. Each car is its own token on Solana, its net income is split among shareholders by the program, and every deposit and payout is public.",
+    "ogTitle": "AXEL — Own a share of a working Almaty taxi",
+    "ogDescription": "Fractional shares in Almaty taxis. Payouts on Solana, public on-chain."
   },
   "Catalog": {
     "filterAll": "All",
@@ -35,13 +61,23 @@
     "statusClosed": "Closed",
     "statusFinalized": "Finalized",
     "statusInitializing": "Initializing",
-    "emptyTitle": "No assets found",
-    "emptySubtitle": "We couldn't find any tokens matching your criteria.",
-    "raised": "Raised",
-    "pricePerToken": "Price per token",
-    "investBtn": "Invest Now",
-    "viewBtn": "View Details",
-    "illustrativePhoto": "Illustrative photo"
+    "emptyTitle": "No cars listed yet",
+    "emptySubtitle": "New cars appear here as soon as their project is created on-chain.",
+    "raised": "Shares sold",
+    "pricePerToken": "Price per share",
+    "investBtn": "Buy shares",
+    "viewBtn": "View car",
+    "illustrativePhoto": "Illustrative photo",
+    "overline": "Cars",
+    "title": "The fleet",
+    "lead": "Each car is a separate project with its own token, share price and payout history. Every figure on these cards is read from Solana {network}.",
+    "photoNote": "Photos show the car model, not the specific car.",
+    "filterLabel": "Filter by status",
+    "errorTitle": "Couldn't load the cars",
+    "errorBody": "The Solana RPC node didn't respond. This is usually temporary.",
+    "retry": "Try again",
+    "payoutPeriods": "Payout periods",
+    "percentSold": "{percent} sold"
   },
   "Asset": {
     "fundingProgress": "Funding Progress",
@@ -131,9 +167,9 @@
     "retry": "Try Again"
   },
   "ConnectionStatus": {
-    "connected": "Connected to RPC",
-    "disconnected": "Disconnected from RPC",
-    "connecting": "Connecting..."
+    "connected": "Connected",
+    "disconnected": "Offline",
+    "connecting": "Connecting…"
   },
   "Payouts": {
     "title": "Payout History",
@@ -215,5 +251,57 @@
     "UnauthorizedOracle": "Unauthorized oracle",
     "TokensStillAvailable": "Tokens still available for sale",
     "ProjectAlreadyClosed": "Project is already closed"
+  },
+  "HowItWorks": {
+    "overline": "How it works",
+    "title": "From a verified wallet to a payout",
+    "lead": "Four steps, and each one leaves a record on Solana.",
+    "verifyTitle": "Verify once",
+    "verifyBody": "Pass a one-time identity check (KYC). Your wallet is then added to the on-chain list of approved investors.",
+    "buyTitle": "Buy shares in a car",
+    "buyBody": "Choose a car and buy whole shares at its listed price. The shares arrive in your wallet as that car's token.",
+    "earnTitle": "The car earns",
+    "earnBody": "The car works as a taxi in Almaty. Each period the operator deposits its net income, after expenses and a maintenance reserve, into the car's vault on Solana.",
+    "claimTitle": "Claim your payout",
+    "claimBody": "Your part of each deposit is your shares divided by all shares sold. Claim it from your portfolio; each period can be claimed once.",
+    "portfolioLink": "Open your portfolio",
+    "photoAlt": "A taxi on an Almaty street at golden hour, with the mountains behind it",
+    "photoCaption": "A taxi in Almaty. Photo: Alina Makhatyrova, Unsplash."
+  },
+  "Verify": {
+    "overline": "Verify",
+    "title": "Rules in code, records in public",
+    "lead": "You don't have to take our word for the numbers. The program enforces these rules, and every account listed here opens in Solana Explorer.",
+    "tokenTitle": "One token per car",
+    "tokenBody": "Each car is its own Token-2022 mint, with the make, model and year written into the token's metadata.",
+    "holdersTitle": "Verified holders only",
+    "holdersBody": "Only approved wallets can buy shares or receive them in a transfer. The token checks this on every transfer, whichever app sends it.",
+    "payoutsTitle": "Payouts split by the program",
+    "payoutsBody": "Income sits in a vault that only the program can pay out from. It works out each holder's part from their shares and rejects a second claim for the same period.",
+    "codeTitle": "Open source",
+    "codeBody": "The programs, the backend and this app are public under the MIT license.",
+    "codeLink": "Read the code on GitHub",
+    "ledgerTitle": "On Solana {network} now",
+    "ledgerLead": "Addresses read from the chain when this page loaded.",
+    "program": "AXEL program",
+    "shareToken": "Share token",
+    "vault": "Income vault",
+    "sharesSold": "Shares sold",
+    "ofTotal": "{part} of {whole}",
+    "openInExplorer": "(opens in Solana Explorer)",
+    "ledgerEmpty": "No cars on-chain yet.",
+    "ledgerError": "Couldn't read the car accounts from Solana. Try again from the stats above."
+  },
+  "Disclosure": {
+    "overline": "Before you invest",
+    "devnetTitle": "This is a devnet demo",
+    "devnetBody": "AXEL runs on Solana devnet, a test network. The cars listed here are test projects, prices are in devnet SOL, which has no market value, and nothing on this site is an offer to invest.",
+    "risksTitle": "What can go wrong with a real car",
+    "riskIncome": "Income depends on the car. It falls when the car is off the road for repairs, after an accident or when demand drops.",
+    "riskReport": "Payouts are not guaranteed. The operator reports and deposits the income, and the program does not yet check that amount against trip data.",
+    "riskExit": "There is no market for shares yet, so you may not be able to sell early.",
+    "riskValue": "A car loses value as it ages.",
+    "browseCars": "Browse the cars",
+    "readDocs": "Read the documentation"
   }
 }

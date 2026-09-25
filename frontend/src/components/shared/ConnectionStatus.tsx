@@ -3,35 +3,49 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useConnection } from '@solana/wallet-adapter-react';
+import { connectionConfig } from '@/lib/solana/connection';
 
-export function ConnectionStatus(): JSX.Element | null {
+type Status = 'connecting' | 'connected' | 'disconnected';
+
+const NETWORK_LABELS: Record<string, string> = {
+  devnet: 'Devnet',
+  testnet: 'Testnet',
+  'mainnet-beta': 'Mainnet',
+  localnet: 'Localnet',
+};
+
+const DOT: Record<Status, string> = {
+  connecting: 'bg-warning',
+  connected: 'bg-success',
+  disconnected: 'bg-destructive',
+};
+
+/* Names the network the app reads from. The RPC state is spelled out unless it is healthy. */
+export function ConnectionStatus(): JSX.Element {
   const t = useTranslations('ConnectionStatus');
   const { connection } = useConnection();
-  const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [status, setStatus] = useState<Status>('connecting');
 
   useEffect(() => {
     let mounted = true;
-    
+
     const checkConnection = async () => {
       try {
         if (!connection) {
           if (mounted) setStatus('disconnected');
           return;
         }
-        
-        // Simple health check against the RPC node
+
         const version = await connection.getVersion();
         if (version && mounted) {
           setStatus('connected');
         }
-      } catch (err) {
+      } catch {
         if (mounted) setStatus('disconnected');
       }
     };
 
     checkConnection();
-
-    // Poll every 30 seconds
     const interval = setInterval(checkConnection, 30000);
 
     return () => {
@@ -40,27 +54,23 @@ export function ConnectionStatus(): JSX.Element | null {
     };
   }, [connection]);
 
-  // Use Apple-inspired indicator UI
+  const network = NETWORK_LABELS[connectionConfig.network] ?? connectionConfig.network;
+
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800">
-      <div className="relative flex h-2.5 w-2.5">
-        {status === 'connecting' && (
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-        )}
-        {(status === 'connected' || status === 'connecting') && (
-          <span
-            className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-              status === 'connected' ? 'bg-cyan-400' : 'bg-yellow-400'
-            }`}
-          ></span>
-        )}
-        {status === 'disconnected' && (
-          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-        )}
-      </div>
-      <span className="text-xs font-medium text-zinc-400 hidden sm:inline-block">
-        {t(status)}
-      </span>
-    </div>
+    <span
+      title={t(status)}
+      className="inline-flex h-8 items-center gap-2 rounded-pill border border-border px-3 text-small font-medium text-muted-foreground"
+    >
+      <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${DOT[status]}`} />
+      <span>Solana {network}</span>
+      {status === 'connected' ? (
+        <span className="sr-only">{t(status)}</span>
+      ) : (
+        <>
+          <span aria-hidden="true">·</span>
+          <span className="text-foreground">{t(status)}</span>
+        </>
+      )}
+    </span>
   );
 }

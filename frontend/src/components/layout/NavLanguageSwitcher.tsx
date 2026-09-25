@@ -1,43 +1,91 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { usePathname, useRouter } from '@/i18n/routing';
-import { useLocale } from 'next-intl';
-import { Globe, ChevronDown, Check } from 'lucide-react';
+import { Check, ChevronDown, Globe } from 'lucide-react';
+import { LOCALE_OPTIONS } from './constants';
 
-export const NavLanguageSwitcher = (): JSX.Element => {
+export function useSwitchLocale(): (code: string) => void {
   const pathname = usePathname();
   const router = useRouter();
   const locale = useLocale();
 
-  const switchLocale = useCallback((newLocale: string) => {
-    router.replace(pathname as any, { locale: newLocale });
-  }, [pathname, router]);
+  return useCallback(
+    (code: string) => {
+      if (code !== locale) router.replace(pathname, { locale: code });
+    },
+    [locale, pathname, router],
+  );
+}
+
+export const NavLanguageSwitcher = (): JSX.Element => {
+  const t = useTranslations('Navigation');
+  const locale = useLocale();
+  const switchLocale = useSwitchLocale();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  const current = LOCALE_OPTIONS.find((option) => option.code === locale) ?? LOCALE_OPTIONS[0];
 
   return (
-    <div className="hidden sm:block relative group">
+    <div ref={rootRef} className="relative hidden md:block">
       <button
-        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-surface-secondary hover:bg-surface-hover transition-colors duration-200 border border-transparent cursor-pointer"
-        title="Switch Language"
+        type="button"
+        aria-expanded={open}
+        aria-controls={menuId}
+        aria-label={`${t('language')}: ${current.label}`}
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex h-10 items-center gap-1.5 rounded-control px-2.5 text-small font-medium text-muted-foreground transition-colors duration-fast ease-move hover:bg-secondary hover:text-foreground"
       >
-        <Globe size={18} className="text-text-secondary" strokeWidth={1.5} />
-        <span className="text-[12px] font-semibold text-text-secondary tracking-[0.05em] uppercase">{locale}</span>
-        <ChevronDown size={14} className="text-text-tertiary" strokeWidth={2} />
+        <Globe aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+        <span className="uppercase">{current.code}</span>
+        <ChevronDown aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
       </button>
-      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.1)] border border-border-subtle py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible origin-top-right scale-95 group-hover:scale-100 transition-all duration-200 ease-out z-dropdown">
-        <button onClick={() => switchLocale('en')} className="w-full flex items-center justify-between px-4 py-2 text-[13px] font-medium hover:bg-surface-secondary transition-colors border-none bg-transparent cursor-pointer">
-          <span className={locale === 'en' ? 'text-text-primary' : 'text-text-secondary'}>English</span>
-          {locale === 'en' && <Check size={16} className="text-brand-primary" strokeWidth={2.5} />}
-        </button>
-        <button onClick={() => switchLocale('ru')} className="w-full flex items-center justify-between px-4 py-2 text-[13px] font-medium hover:bg-surface-secondary transition-colors border-none bg-transparent cursor-pointer">
-          <span className={locale === 'ru' ? 'text-text-primary' : 'text-text-secondary'}>Русский</span>
-          {locale === 'ru' && <Check size={16} className="text-brand-primary" strokeWidth={2.5} />}
-        </button>
-        <button onClick={() => switchLocale('kk')} className="w-full flex items-center justify-between px-4 py-2 text-[13px] font-medium hover:bg-surface-secondary transition-colors border-none bg-transparent cursor-pointer">
-          <span className={locale === 'kk' ? 'text-text-primary' : 'text-text-secondary'}>Қазақша</span>
-          {locale === 'kk' && <Check size={16} className="text-brand-primary" strokeWidth={2.5} />}
-        </button>
-      </div>
+
+      {open && (
+        <ul
+          id={menuId}
+          className="absolute right-0 top-full z-dropdown mt-2 w-44 animate-slide-down rounded-card border border-border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          {LOCALE_OPTIONS.map(({ code, label }) => (
+            <li key={code}>
+              <button
+                type="button"
+                lang={code}
+                aria-current={code === locale ? 'true' : undefined}
+                onClick={() => {
+                  setOpen(false);
+                  switchLocale(code);
+                }}
+                className="flex h-10 w-full items-center justify-between rounded-control px-3 text-small text-foreground transition-colors duration-fast ease-move hover:bg-secondary"
+              >
+                {label}
+                {code === locale && (
+                  <Check aria-hidden="true" className="h-4 w-4 text-primary" strokeWidth={1.75} />
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

@@ -4,33 +4,23 @@ import { ProjectStatus } from '@/types/project';
 interface BadgeProps {
   status: ProjectStatus;
   children: ReactNode;
+  className?: string;
 }
 
-export function Badge({ status, children }: BadgeProps): JSX.Element {
-  const isPulsing = status === 'active';
+const DOT: Record<ProjectStatus, string> = {
+  active: 'bg-success',
+  paused: 'bg-warning',
+  closed: 'bg-subtle-foreground',
+};
 
-  const getStatusClasses = (): string => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-500 text-white';
-      case 'paused':
-        return 'bg-yellow-500 text-white';
-      case 'closed':
-        return 'bg-gray-300 text-gray-700';
-    }
-  };
-
+/* Status is never color alone: the dot always comes with its text label. */
+export function Badge({ status, children, className = '' }: BadgeProps): JSX.Element {
   return (
-    <div className="inline-flex items-center rounded-full px-3 py-1 space-x-2">
-      {isPulsing && (
-        <span className="relative flex h-2 w-2">
-          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${getStatusClasses()}`}></span>
-          <span className={`relative inline-flex rounded-full h-2 w-2 ${getStatusClasses()}`}></span>
-        </span>
-      )}
-      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusClasses()}`}>
-        {children}
-      </span>
-    </div>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-pill border border-border bg-card px-2.5 py-0.5 text-small font-medium text-card-foreground ${className}`}
+    >
+      <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${DOT[status]}`} />
+      {children}
+    </span>
   );
 }

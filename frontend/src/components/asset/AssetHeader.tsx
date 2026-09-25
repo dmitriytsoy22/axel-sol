@@ -39,7 +39,7 @@ export function AssetHeader({ project }: AssetHeaderProps): React.JSX.Element {
           priority
         />
         {isStockPhoto && (
-          <span className="absolute bottom-3 left-3 rounded-control bg-ink-950/60 px-2 py-0.5 text-caption text-ink-25">
+          <span className="absolute bottom-3 left-3 rounded-control bg-ink-950/70 px-2 py-0.5 text-small text-ink-25">
             {tCat('illustrativePhoto')}
           </span>
         )}

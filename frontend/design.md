@@ -157,7 +157,7 @@ Scale: 16 px base, ratio 1.25 (`--type-ratio`), rounded to the 4 px grid.
 | `text-lead`     | 18 / 1.55          | 0        | sans 400. Hero and section intros   |
 | `text-body`     | 16 / 1.5           | 0        | sans 400                            |
 | `text-small`    | 14 / 1.43          | 0        | sans 400/500. Tables, meta          |
-| `text-caption`  | 12 / 1.33          | +0.01em  | sans 500. Photo notes, legal        |
+| `text-caption`  | 12 / 1.33          | +0.01em  | sans 500. Unused: see decision 12   |
 | `text-overline` | 12 / 1.33          | +0.08em  | sans 600, uppercase. Section labels |
 
 Rules: at most three sizes per screen region; body text never below 16 px, inputs never below
@@ -175,7 +175,9 @@ v1 devnet data is in SOL; v2 moves prices to the tenge stablecoin (tKZT on devne
   56 (mobile) / 96 (desktop) between sections (`.section-y`, `--section-py`).
 - Container: `.page-container`, 1200 px content (`--container-max`) with 24 px gutters, 32 px
   from `lg`. One left edge for the whole page.
-- Grid: vehicle cards 1 column below 640, 2 from `sm`, 3 from `lg`.
+- Grid: vehicle cards 1 column below 640 and 2 from `sm`. From `lg` the two-column grid sits in 8
+  of 12 columns beside the section's sticky heading, so a short fleet never leaves an empty
+  third column.
 - Radii (`--radius` = 12 px): `rounded-control` 8 for buttons and inputs, `rounded-card` 12,
   `rounded-panel` 16 for modals and large panels, `rounded-pill` only for status badges and
   segmented filters. Buttons are not pills: this is money, not a consumer toy.
@@ -225,12 +227,30 @@ buttons carry an `aria-label` and a 44×44 hit area.
 Outline for the page stages that follow. Every number shown must come from the chain or be a
 product rule, never a placeholder.
 
-- **Home (catalog):** nav on ink over the hero, paper after scroll → hero (`.theme-ink`, night
-  photo, serif value proposition, one primary action "Browse vehicles", a text link to how
-  payouts work, stat row read from the chain) → vehicle grid with status filter → how it works in
-  three numbered steps (buy a share → the car works in Almaty → claim payouts on-chain) →
-  on-chain proof panel on ink (recent payouts with explorer links; Proof of solvency once v2
-  lands) → risk and devnet disclosure → footer on ink.
+- **Shell (built, stage 2):** a 64 px bar. On the home page it sits transparent on the hero in
+  the ink theme and turns into a solid paper bar after 16 px of scroll; every other page gets the
+  paper bar from the start. Left: logo, then Cars · Portfolio · Payouts with a brand-cyan
+  underline on the current page (`aria-current`). Right: network pill ("Solana Devnet", its dot
+  shows the RPC state and any state but "connected" is spelled out), language menu (click, not
+  hover; Escape and outside click close it), "Connect wallet" as an outline button, since the
+  page's primary action lives in the content. Below `md` the right side is a 44 px menu button;
+  the menu is a full-height panel under the bar with focus trap, Escape, scroll lock, large nav
+  rows, a three-way language switch, the wallet block and the network pill. Footer on ink:
+  logo and one-line tagline, "Product" and "Verify" link groups (Explorer, source, docs), then
+  the copyright and a devnet line.
+- **Home (catalog, built, stage 2):** hero on ink (Almaty night photo with an art-directed
+  portrait crop below `md`, overline, serif H1, lead, primary "Browse the cars" plus a text link
+  to how payouts work, a devnet note, then a four-figure stat row read from the chain: cars
+  listed, shares sold "x of y", value of shares sold at each car's current price, payout
+  periods) → the fleet: a sticky heading column (4 of 12) beside a two-column card grid (8 of
+  12), with the status filter shown only once the cars differ in status → how it works: four
+  numbered steps (verify once → buy shares → the car earns → claim), each of which leaves a
+  record on Solana, with the Almaty taxi photo → verify on ink: four claims the code enforces
+  (one token per car, verified holders only, payouts split by the program, open source) beside
+  a ledger panel with the program, each car's share token and income vault as Explorer links →
+  a "before you invest" panel: the devnet disclosure, four plain risks, and the page's closing
+  CTA → footer. Every section has its own loading, empty and error state; one chain read feeds
+  them all.
 - **Asset page:** photo with the illustrative note, title, status → sticky invest panel on the
   right (bottom bar on mobile) → funding progress and terms → payout history → telemetry.
 - **Dashboard:** portfolio summary tiles (equal tiles are fine on dashboards) → holdings → claim.
@@ -272,6 +292,23 @@ product rule, never a placeholder.
    Files: `src/components/layout/Logo.tsx`, `src/app/icon.svg`.
 9. **Status is never color alone.** Status badges pair a dot with a text label; positive
    payouts carry a sign. ← color "Status is never conveyed by color alone".
+10. **Only figures the chain returns.** The hero stats and the ledger are computed from the
+    same `useProjectState` read the cards use (`src/components/catalog/catalogStats.ts`).
+    While the read is running they show placeholders, never zeros; on failure they say so and
+    offer a retry. "Raised" became "value of shares sold" because v1 stores no raised total and
+    a price change would make a sum of past sales at today's price untrue. ← landing "Social
+    proof: quality and provability of numbers", anti-slop "fake and pressure".
+11. **Trust section states only what the code enforces.** Each claim maps to program code
+    (Token-2022 mint per car, transfer hook allow-list, program-owned revenue vault with a claim
+    record per period, MIT repository), and the risks list names the known gaps (the operator
+    reports income, no share market). ← anti-slop "fake and pressure", copy "Generic copy
+    test".
+12. **12 px only in capitals.** The checklist bans sentence text at 12 px, so `text-caption` is
+    no longer used for notes; photo notes and badges use `text-small` (14 px). 12 px survives
+    only as `text-overline` (uppercase, 600, +0.08em). ← guardrails checklist "Text size:
+    minimums".
+13. **Numbers follow the reader's locale.** `src/lib/format.ts` formats with `en-US`, `ru-KZ`
+    and `kk-KZ`: "1,250.5 SOL" in English, "1 250,5 SOL" in Russian and Kazakh.
 
 ## Constraints
 
@@ -280,14 +317,16 @@ product rule, never a placeholder.
 - Brand: the name AXEL, near-black and the cyan `#06B6D4` stay.
 - Live data: the catalog reads two v1 devnet projects, both with test metadata (Toyota Camry
   2023, no image). The UI never shows made-up figures as real.
-- Legacy aliases in `tailwind.config.ts` map the pre-redesign names onto the new tokens so
-  current screens keep working: `brand.primary*`, `surface.*`, `text.*`, `border.subtle`,
-  `semantic.*`, `text-display-lg`, `text-title-2`, `rounded-card-sm`, `max-w-page-wide`,
-  `duration-normal`. Remove each alias when its last user migrates.
-- Legacy components still use Tailwind's default palettes (`gray-*`, `red-*`, `green-*`,
-  `white`) and pill buttons. They move to semantic tokens during the page stages.
-- `src/app/opengraph-image.tsx` still draws the old mark and colors; update it with the layout
-  stage.
+- One legacy alias is left in `tailwind.config.ts`: `brand-primary`, the pre-redesign name for
+  `primary`, still used by the asset, dashboard and admin screens. Remove it when they migrate.
+- Legacy components on the asset, dashboard, payouts and admin screens still use Tailwind's
+  default palettes (`gray-*`, `red-*`, `green-*`, `white`) and pill buttons. They move to
+  semantic tokens during the page stages. The shared primitives (`Card`, `Badge`,
+  `ProgressBar`, `Skeleton`, `ConnectionStatus`) are already on tokens, so those screens changed
+  look slightly with stage 2.
+- `src/app/opengraph-image.tsx` draws the social card with static TTF instances of the site
+  fonts (`src/fonts/og/`), since Satori cannot read WOFF2. `src/middleware.ts` excludes
+  `/opengraph-image` so the i18n rewrite does not turn it into a 404.
 - Screenshots: `Google Chrome --headless=new` clamps the window to at least 500 px on macOS, so
   a 390 px capture is really a crop of a 500 px layout. Use Playwright's
   `chrome-headless-shell` for mobile widths.
@@ -296,3 +335,7 @@ product rule, never a placeholder.
 
 - 2026-09-25: Theme created (stage 1: direction, tokens, fonts, photo set). Calibrated against
   design-lab `knowledge/trends.md`, full update 2026-07.
+- 2026-09-25: Stage 2, shell and home. New navbar, mobile menu, footer and social card; the
+  catalog page became the landing (hero with chain stats, fleet, how it works, verify, before
+  you invest). Grid changed to two columns beside a sticky heading; decisions 10–13 added;
+  unused legacy aliases removed.

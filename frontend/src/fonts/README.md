@@ -13,3 +13,11 @@ including ₸, arrows and a few math signs.
 
 The subsets were made with `fontTools` (`varLib.instancer` and `pyftsubset`). To add glyphs,
 re-run the subset from the upstream variable fonts with a wider `--unicodes` range.
+
+## Social card fonts
+
+`og/AxelSerif-Medium.ttf` and `og/Onest-Medium.ttf` are static instances (weight 500) of the two
+files above, subset to printable ASCII plus a few punctuation marks. They exist only for
+`src/app/opengraph-image.tsx`: the image renderer (Satori) reads TTF but not WOFF2 or variable
+fonts. Same licenses as their sources. Made with `fontTools.varLib.instancer` and
+`fontTools.subset` from the WOFF2 files in this folder.

@@ -7,6 +7,7 @@ import { ProjectState } from '@/types/project';
 // MOCK next-intl
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => `mock_t_${key}`,
+  useLocale: () => 'en',
 }));
 
 vi.mock('@/i18n/routing', () => ({
