@@ -4,15 +4,12 @@ import { Keypair, PublicKey, type TransactionInstruction } from "@solana/web3.js
 import { expectError, expectEvent, expectOk, type ErrorName } from "./helpers/assert";
 import { big, bn, type TxResult } from "./helpers/env";
 import {
-  buy,
   claim,
   closeProject,
   DAY,
   deposit,
   depositNet,
   marketEnv,
-  newInvestor,
-  openProject,
   operatingProject,
   pauseProject,
   revenueParams,
@@ -20,7 +17,6 @@ import {
   type Market,
 } from "./helpers/fixtures";
 import {
-  cancelRaiseIx,
   closePositionIx,
   closeProjectIx,
   depositRevenueIx,
@@ -33,6 +29,7 @@ import {
   type ProjectRef,
 } from "./helpers/instructions";
 import { assertInvariants } from "./helpers/invariants";
+import { LIFECYCLE_STATES, projectIn } from "./helpers/lifecycle";
 import { positionPda } from "./helpers/pda";
 import { plain } from "./helpers/plain";
 import { ata, mintTo, readMint, tokenBalance } from "./helpers/tokens";
@@ -76,30 +73,9 @@ async function recordAs(market: Market, project: ProjectRef, oracle: Keypair, da
 }
 
 /** Every lifecycle state a project can be in, reached through instructions only. */
-const LIFECYCLE: Record<string, (market: Market) => Promise<ProjectRef>> = {
-  fundraising: (market) => openProject(market),
-  funded: async (market) => {
-    const project = await openProject(market, { totalShares: bn(10), softCapShares: bn(10) });
-    expectOk(await buy(market, project, await newInvestor(market), 10n));
-    return project;
-  },
-  failed: async (market) => {
-    const project = await openProject(market);
-    expectOk(await asAdmin(market, project, cancelRaiseIx));
-    return project;
-  },
-  operating: async (market) => (await operatingProject(market)).project,
-  paused: async (market) => {
-    const { project } = await operatingProject(market);
-    expectOk(await pauseProject(market, project));
-    return project;
-  },
-  closed: async (market) => {
-    const { project } = await operatingProject(market);
-    expectOk(await closeProject(market, project));
-    return project;
-  },
-};
+const LIFECYCLE: Record<string, (market: Market) => Promise<ProjectRef>> = Object.fromEntries(
+  LIFECYCLE_STATES.map((state) => [state, async (market: Market) => (await projectIn(market, state)).project]),
+);
 
 const setOperator: AdminAction = (project, admin) => setProjectRolesIx(project, admin, { operator: Keypair.generate().publicKey });
 

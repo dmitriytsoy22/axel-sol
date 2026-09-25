@@ -235,6 +235,7 @@ describe("set_investor by the demo KYC authority", () => {
     ["with the PROGRAM flag", () => ({ flags: InvestorFlag.demo | InvestorFlag.program }), "DemoScopeViolation"],
     ["as the Sumsub provider", () => ({ provider: KycProvider.sumsub }), "DemoScopeViolation"],
     ["for one second longer than 30 days", (env) => ({ expiresAt: bn(env.now() + 30n * DAY + 1n) }), "DemoExpiryTooLong"],
+    ["as a sanctions freeze", () => ({ status: InvestorStatus.frozen }), "DemoScopeViolation"],
   ];
 
   for (const [description, change, error] of outOfScope) {
@@ -265,6 +266,18 @@ describe("set_investor by the demo KYC authority", () => {
       assert.deepEqual(plain(env.fetch("investor", investorPda(wallet))), before);
     });
   }
+
+  test("cannot lift a sanctions freeze the KYC authority put on a DEMO record", async () => {
+    const { env, roles } = await configuredEnv();
+    const wallet = Keypair.generate().publicKey;
+    expectOk(await setInvestor(env, roles.demoKyc, wallet, demoParams(env)));
+    expectOk(await setInvestor(env, roles.kyc, wallet, { ...demoParams(env), status: InvestorStatus.frozen }));
+    const before = plain(env.fetch("investor", investorPda(wallet)));
+
+    expectError(await setInvestor(env, roles.demoKyc, wallet, demoParams(env)), "DemoRecordImmutable");
+
+    assert.deepEqual(plain(env.fetch("investor", investorPda(wallet))), before);
+  });
 
   test("a disabled demo key cannot sign", async () => {
     const { env, roles } = await configuredEnv();

@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::constants::{
-    MAX_RAISE_FEE_BPS, MAX_RECOVERY_DELAY, MAX_REVENUE_FEE_BPS, MIN_RECOVERY_DELAY,
+    MAX_ACTIVATION_WINDOW, MAX_RAISE_DURATION, MAX_RAISE_FEE_BPS, MAX_RECOVERY_DELAY,
+    MAX_REVENUE_FEE_BPS, MIN_RECOVERY_DELAY,
 };
 use crate::errors::AxelError;
 
@@ -68,8 +69,14 @@ impl Config {
             self.revenue_fee_bps <= MAX_REVENUE_FEE_BPS,
             AxelError::FeeTooHigh
         );
-        require!(self.min_raise_duration > 0, AxelError::InvalidDuration);
-        require!(self.max_activation_window > 0, AxelError::InvalidDuration);
+        require!(
+            (1..=MAX_RAISE_DURATION).contains(&self.min_raise_duration),
+            AxelError::InvalidDuration
+        );
+        require!(
+            (1..=MAX_ACTIVATION_WINDOW).contains(&self.max_activation_window),
+            AxelError::InvalidDuration
+        );
         require!(
             (MIN_RECOVERY_DELAY..=MAX_RECOVERY_DELAY).contains(&self.recovery_delay),
             AxelError::InvalidRecoveryDelay

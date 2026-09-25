@@ -28,6 +28,15 @@ pub const MAX_RAISE_FEE_BPS: u16 = 500;
 #[constant]
 pub const MAX_REVENUE_FEE_BPS: u16 = 2_000;
 
+/// Longest raise a project may run. With the activation window cap it bounds how long an
+/// investor's payment can sit in escrow before it is released or refundable.
+#[constant]
+pub const MAX_RAISE_DURATION: i64 = 180 * 24 * 60 * 60;
+/// Longest activation window the config may allow; a funded raise that is not activated
+/// within it becomes refundable.
+#[constant]
+pub const MAX_ACTIVATION_WINDOW: i64 = 90 * 24 * 60 * 60;
+
 /// The demo KYC key can never grant access for longer than this.
 #[constant]
 pub const MAX_DEMO_KYC_DURATION: i64 = 30 * 24 * 60 * 60;

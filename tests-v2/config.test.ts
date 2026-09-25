@@ -122,6 +122,8 @@ describe("initialize_config", () => {
     ["a revenue fee above 20%", (p) => { p.revenueFeeBps = 2_001; }, "FeeTooHigh"],
     ["a zero minimum raise duration", (p) => { p.minRaiseDuration = bn(0); }, "InvalidDuration"],
     ["a negative activation window", (p) => { p.maxActivationWindow = bn(-1); }, "InvalidDuration"],
+    ["a minimum raise longer than the 180 day cap", (p) => { p.minRaiseDuration = bn(180n * DAY + 1n); }, "InvalidDuration"],
+    ["an activation window longer than the 90 day cap", (p) => { p.maxActivationWindow = bn(90n * DAY + 1n); }, "InvalidDuration"],
     ["a recovery delay under one hour", (p) => { p.recoveryDelay = bn(HOUR - 1n); }, "InvalidRecoveryDelay"],
     ["a recovery delay over 30 days", (p) => { p.recoveryDelay = bn(30n * DAY + 1n); }, "InvalidRecoveryDelay"],
     ["the default admin", (p) => { p.admin = PublicKey.default; }, "InvalidAddress"],
@@ -152,7 +154,7 @@ describe("initialize_config", () => {
 });
 
 describe("update_config", () => {
-  test("the admin changes every setting up to the fee caps", async () => {
+  test("the admin changes every setting up to the protocol caps", async () => {
     const { env, roles, params } = await configuredEnv();
     const mints: [PublicKey, PublicKey, PublicKey, PublicKey] = [
       Keypair.generate().publicKey,
@@ -166,8 +168,8 @@ describe("update_config", () => {
       treasury: Keypair.generate().publicKey,
       raiseFeeBps: 500,
       revenueFeeBps: 2_000,
-      minRaiseDuration: bn(7n * DAY),
-      maxActivationWindow: bn(30n * DAY),
+      minRaiseDuration: bn(180n * DAY),
+      maxActivationWindow: bn(90n * DAY),
       allowedPaymentMints: mints,
       paused: true,
       recoveryDelay: bn(30n * DAY),
@@ -215,6 +217,8 @@ describe("update_config", () => {
     ["a revenue fee above the cap", () => ({ revenueFeeBps: 2_001 }), "FeeTooHigh"],
     ["a zero minimum raise duration", () => ({ minRaiseDuration: bn(0) }), "InvalidDuration"],
     ["a zero activation window", () => ({ maxActivationWindow: bn(0) }), "InvalidDuration"],
+    ["a minimum raise above the 180 day cap", () => ({ minRaiseDuration: bn(180n * DAY + 1n) }), "InvalidDuration"],
+    ["an activation window above the 90 day cap", () => ({ maxActivationWindow: bn(90n * DAY + 1n) }), "InvalidDuration"],
     ["a zero recovery delay", () => ({ recoveryDelay: bn(0) }), "InvalidRecoveryDelay"],
     ["a recovery delay given in milliseconds", () => ({ recoveryDelay: bn(3n * DAY * 1_000n) }), "InvalidRecoveryDelay"],
     ["the default KYC authority", () => ({ kycAuthority: PublicKey.default }), "InvalidAddress"],

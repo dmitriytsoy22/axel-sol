@@ -67,8 +67,12 @@ impl SetInvestor<'_> {
 
         let investor = &mut self.investor;
         if is_demo_authority {
+            // A sanctions freeze is a compliance decision; the demo key is a hot key on a
+            // web server, so it can neither impose nor lift one.
             require!(
-                params.flags == Investor::FLAG_DEMO && params.provider == KycProvider::Demo,
+                params.flags == Investor::FLAG_DEMO
+                    && params.provider == KycProvider::Demo
+                    && params.status != InvestorStatus::Frozen,
                 AxelError::DemoScopeViolation
             );
             let max_expiry = now
@@ -80,7 +84,7 @@ impl SetInvestor<'_> {
             );
             let is_new_record = investor.wallet == Pubkey::default();
             require!(
-                is_new_record || investor.is_demo(),
+                is_new_record || (investor.is_demo() && investor.status != InvestorStatus::Frozen),
                 AxelError::DemoRecordImmutable
             );
         }

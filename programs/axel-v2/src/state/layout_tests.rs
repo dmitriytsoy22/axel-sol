@@ -233,6 +233,13 @@ fn config_validation() {
         .validate()
         .unwrap();
     }
+    Config {
+        min_raise_duration: crate::constants::MAX_RAISE_DURATION,
+        max_activation_window: crate::constants::MAX_ACTIVATION_WINDOW,
+        ..valid.clone()
+    }
+    .validate()
+    .unwrap();
 
     let rejects = |mutate: fn(&mut Config), error: crate::errors::AxelError| {
         let mut config = valid.clone();
@@ -253,6 +260,14 @@ fn config_validation() {
     );
     rejects(|c| c.recovery_delay = -1, InvalidRecoveryDelay);
     rejects(|c| c.max_activation_window = -1, InvalidDuration);
+    rejects(
+        |c| c.min_raise_duration = crate::constants::MAX_RAISE_DURATION + 1,
+        InvalidDuration,
+    );
+    rejects(
+        |c| c.max_activation_window = crate::constants::MAX_ACTIVATION_WINDOW + 1,
+        InvalidDuration,
+    );
     rejects(|c| c.admin = Pubkey::default(), InvalidAddress);
     rejects(|c| c.kyc_authority = Pubkey::default(), InvalidAddress);
     rejects(|c| c.treasury = Pubkey::default(), InvalidAddress);

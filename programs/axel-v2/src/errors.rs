@@ -11,7 +11,7 @@ pub enum AxelError {
     InvalidAddress,
     #[msg("Fee exceeds the protocol hard cap")]
     FeeTooHigh,
-    #[msg("Duration must be greater than zero")]
+    #[msg("Duration must be greater than zero and within the protocol cap")]
     InvalidDuration,
     #[msg("Allowed payment mints contain a duplicate")]
     DuplicatePaymentMint,
@@ -31,11 +31,11 @@ pub enum AxelError {
     InvalidExpiry,
     #[msg("Jurisdiction must be an ISO 3166-1 numeric code")]
     InvalidJurisdiction,
-    #[msg("Demo KYC key may only assign the DEMO flag with the Demo provider")]
+    #[msg("Demo KYC key may only grant or revoke DEMO access with the Demo provider")]
     DemoScopeViolation,
     #[msg("Demo KYC access cannot last longer than 30 days")]
     DemoExpiryTooLong,
-    #[msg("Demo KYC key cannot modify a non-DEMO investor record")]
+    #[msg("Demo KYC key cannot modify a frozen or non-DEMO investor record")]
     DemoRecordImmutable,
     #[msg("Investor KYC is not active")]
     InvestorNotActive,
@@ -153,4 +153,8 @@ pub enum AxelError {
     RecoveryNotReady,
     #[msg("The owner's veto window has closed")]
     VetoWindowClosed,
+
+    // Raise limits
+    #[msg("Raise deadline is further away than the protocol cap")]
+    RaiseTooLong,
 }

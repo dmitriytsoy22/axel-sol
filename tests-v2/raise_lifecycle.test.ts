@@ -551,6 +551,18 @@ describe("refund", () => {
     assert.equal(readMint(market.env, project.shareMint).supply, TOTAL_SHARES);
   });
 
+  test("a buyer cannot refund another buyer's shares to itself (ConstraintSeeds)", async () => {
+    const market = await marketEnv();
+    const { project, buyers } = await failedRaise(market);
+    const [victim, attacker] = buyers;
+    const ix = await refundIx(project, attacker.publicKey, positionPda(project.address, victim.publicKey));
+
+    expectError(market.env.send([ix], [attacker]), "ConstraintSeeds");
+
+    assert.equal(tokenBalance(market.env, project.escrow), 50n * PRICE);
+    assertInvariants(market.env, project, buyers.map((buyer) => buyer.publicKey));
+  });
+
   test("a wallet without a position has nothing to refund", async () => {
     const market = await marketEnv();
     const { project } = await failedRaise(market);

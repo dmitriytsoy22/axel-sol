@@ -30,6 +30,7 @@ An AXEL project draft was created on Colosseum for the Frontier hackathon (sprin
 Done:
 - [x] Vendored the program IDL into `frontend/src/lib/solana/idl/` so a fresh clone builds without `anchor build`, and fixed the local dev CSP
 - [x] English documentation: [product](product.md), [architecture](architecture.md), [API](api.md), this roadmap. The Russian overview moved to [ru/](ru/) and the planning documents to [planning/](planning/).
+- [x] Replaced the stale v1 Codama output with a client generated for the v2 program in `sdk/axel-v2` ([v2.md](v2.md))
 
 Next steps. Each one addresses a limitation listed in [architecture.md](architecture.md#known-limitations):
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key (program upgrade)
@@ -39,7 +40,6 @@ Next steps. Each one addresses a limitation listed in [architecture.md](architec
 - [ ] Fix the account list in the backend's `record_telemetry` transaction, and mark simulated telemetry as simulated in the API
 - [ ] Connect the dashboard telemetry widget to the backend: one env variable, CORS enabled
 - [ ] Connect KYC in the UI (Sumsub with `externalUserId` = wallet) in place of the unmounted Blockpass prompt, and fix `useWhitelistStatus`
-- [ ] Regenerate `sdk/generated` from the current IDL
 - [ ] Public frontend deployment and a documented devnet demo path for judges (a whitelisted test wallet)
 - [ ] Recorded end-to-end devnet run with Explorer links: whitelist → buy → deposit → claim → transfer
 

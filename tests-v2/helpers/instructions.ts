@@ -339,14 +339,18 @@ export function recordTelemetryIx(
     .instruction();
 }
 
-export function refundIx(project: ProjectRef, owner: PublicKey): Promise<TransactionInstruction> {
+export function refundIx(
+  project: ProjectRef,
+  owner: PublicKey,
+  position: PublicKey = positionPda(project.address, owner),
+): Promise<TransactionInstruction> {
   return program.methods
     .refund()
     .accountsStrict({
       owner,
       investor: investorPda(owner),
       project: project.address,
-      position: positionPda(project.address, owner),
+      position,
       shareMint: project.shareMint,
       ownerShareAccount: ata(owner, project.shareMint, TOKEN_2022_PROGRAM_ID),
       paymentMint: project.paymentMint,

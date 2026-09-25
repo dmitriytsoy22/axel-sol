@@ -21,7 +21,7 @@ import {
   SYSTEM_ACCOUNT_ALREADY_IN_USE,
   type ErrorName,
 } from "./helpers/assert";
-import { bn, PROGRAM_ID } from "./helpers/env";
+import { big, bn, PROGRAM_ID } from "./helpers/env";
 import {
   ACTIVATION_WINDOW,
   CAR_METADATA,
@@ -302,6 +302,18 @@ describe("create_project", () => {
     expectOk(result);
   });
 
+  test("a raise may last exactly the 180 day protocol cap", async () => {
+    const market = await marketEnv();
+
+    const { result, project } = await createProjectTx(
+      market,
+      projectParams(market, { raiseDeadline: bn(market.env.now() + 180n * DAY) }),
+    );
+
+    expectOk(result);
+    assert.equal(big(market.env.fetch("project", project.address).raiseDeadline), market.env.now() + 180n * DAY);
+  });
+
   test("only the admin can create a project", async () => {
     const market = await marketEnv();
     const outsider = market.env.newAccount();
@@ -387,6 +399,11 @@ describe("create_project", () => {
     ],
     ["a raise shorter than the minimum", (m) => ({ raiseDeadline: bn(m.env.now() + 59n) }), "RaiseTooShort"],
     ["a deadline in the past", (m) => ({ raiseDeadline: bn(m.env.now() - 1n) }), "RaiseTooShort"],
+    [
+      "a raise one second longer than the 180 day cap",
+      (m) => ({ raiseDeadline: bn(m.env.now() + 180n * DAY + 1n) }),
+      "RaiseTooLong",
+    ],
     ["a zero activation window", () => ({ activationWindow: bn(0) }), "InvalidDuration"],
     [
       "an activation window above the maximum",

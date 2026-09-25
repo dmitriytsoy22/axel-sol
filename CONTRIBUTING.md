@@ -7,10 +7,11 @@ Issues and pull requests are welcome. For security problems, follow [SECURITY.md
 | Path | What it is |
 | :--- | :--- |
 | `programs/axel`, `programs/transfer-hook` | v1 Anchor programs, kept as legacy (Token-2022 mint, sale, revenue, whitelist, telemetry; transfer hook) |
-| `programs/axel-v2` | v2 Anchor program: escrowed raise, KYC registry, attested revenue deposits and claims, telemetry hash chain, time-locked share recovery, transfer hook in one program. Admin powers and mainnet requirements: [programs/axel-v2/README.md](programs/axel-v2/README.md) |
+| `programs/axel-v2` | v2 Anchor program: escrowed raise, KYC registry, attested revenue deposits and claims, telemetry hash chain, time-locked share recovery, transfer hook in one program. Design and test matrix: [docs/v2.md](docs/v2.md); admin powers and mainnet requirements: [programs/axel-v2/README.md](programs/axel-v2/README.md) |
 | `tests/` | v1 program tests (`node:test`) run against a local validator at `http://127.0.0.1:8899` |
 | `tests-v2/` | v2 program tests (`node:test`) on LiteSVM, with their own `package.json` |
-| `scripts/` | `init-project.ts` (creates a project on a cluster), `generate-clients.ts` (Codama SDK into `sdk/generated`) |
+| `scripts/` | `init-project.ts` (creates a v1 project on a cluster), `generate-clients.ts` (Codama client of the v2 program into `sdk/axel-v2`) |
+| `sdk/axel-v2/` | Generated TypeScript client of `axel_v2` (`@solana/kit`), with tests against the IDL |
 | `backend/` | NestJS service: Yandex Fleet telemetry oracle and Sumsub KYC webhook |
 | `frontend/` | Next.js 14 app |
 
@@ -37,7 +38,7 @@ npx tsc --noEmit                    # type check
 npm run build                       # production build
 ```
 
-The program IDL is vendored in `frontend/src/lib/solana/idl/` (`axel.json`, `axel.ts`), so the frontend builds without an Anchor toolchain. If you change the program interface, run `anchor build` and copy `target/idl/axel.json` and `target/types/axel.ts` there.
+The program IDLs are vendored in `frontend/src/lib/solana/idl/` (v1: `axel.json`, `axel.ts`) and `frontend/src/lib/solana/idl-v2/` (v2: `axel_v2.json`, `axel_v2.ts`), so the frontend builds without an Anchor toolchain. If you change the v1 interface, run `anchor build` and copy `target/idl/axel.json` and `target/types/axel.ts` there. For v2, run `anchor build` and `npm run export-idl`; CI checks that the committed copy matches the build.
 
 ## Backend
 
@@ -64,7 +65,9 @@ anchor test --provider.cluster localnet  # local validator + tests/**/*.ts
 npm run lint                             # tsc --noEmit over tests/ and scripts/ (needs anchor build)
 cargo test -p axel-v2                    # v2 math (unit + proptest), dates, telemetry chain, account layouts
 npm run test:v2                          # v2 program on LiteSVM (needs anchor build; reinstalls tests-v2 deps when its lockfile changes)
-npm run generate                         # regenerate sdk/generated from target/idl/axel.json
+npm run export-idl                       # copy target/idl/axel_v2.json and target/types/axel_v2.ts into frontend/src/lib/solana/idl-v2
+npm run generate                         # regenerate sdk/axel-v2 from target/idl/axel_v2.json
+npm --prefix sdk/axel-v2 ci && npm --prefix sdk/axel-v2 test   # generated client against the IDL
 npx tsx scripts/init-project.ts --cluster devnet   # create a project; admin = ~/.config/solana/id.json
 ```
 

@@ -51,12 +51,12 @@ programs/
   transfer-hook/src/lib.rs      execute, fallback, initialize_extra_account_meta_list
 tests/                          12 integration test files (node:test, local validator at 127.0.0.1:8899)
 scripts/                        init-project.ts (seed a project), generate-clients.ts (Codama)
-sdk/generated/                  Codama TypeScript client (stale, see api.md)
+sdk/axel-v2/                    Codama TypeScript client of the v2 program (see v2.md)
 backend/src/                    health, kyc, telemetry, yandex, solana modules
 frontend/src/
   app/[locale]/                 routes (en default, ru, kk)
   hooks/                        chain reads and transaction hooks
-  lib/solana/                   connection, PDA derivation, readers, instruction builders, vendored IDL
+  lib/solana/                   connection, PDA derivation, readers, instruction builders, vendored IDL (idl/ v1, idl-v2/ v2)
   lib/api/                      telemetry HTTP client
 Anchor.toml                     program IDs for localnet and devnet; provider cluster = devnet
 ```

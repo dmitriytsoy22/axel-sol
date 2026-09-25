@@ -9,7 +9,7 @@ The v2 program of AXEL in one Anchor program:
 - a telemetry hash chain;
 - time-locked share recovery.
 
-Tests: `cargo test -p axel-v2` (math, layouts) and `npm run test:v2` (the program on LiteSVM, in [`tests-v2/`](../../tests-v2)).
+Tests: `cargo test -p axel-v2` (math, layouts) and `npm run test:v2` (the program on LiteSVM, in [`tests-v2/`](../../tests-v2)). Design, accounts, instructions, state table and test matrix: [`docs/v2.md`](../../docs/v2.md).
 
 ## What the admin can and cannot do
 
@@ -25,6 +25,7 @@ The admin cannot:
 
 - take money out of an escrow or a revenue vault. The escrow goes to the operator on activation or back to buyers as refunds, and the revenue vault pays holders only;
 - raise fees above the hard caps (5% of a raise, 20% of revenue) or change the fees of an existing project;
+- keep investors' money in escrow indefinitely: a raise lasts at most 180 days and a funded raise must be activated within at most 90 days; otherwise anyone can move it to Failed and every buyer can take a refund;
 - move or burn shares directly. No human key holds any authority over a share mint: mint authority, freeze authority, permanent delegate and metadata update authority are the project PDA, and the hook and metadata pointer have no authority.
 
 ## Share recovery

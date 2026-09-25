@@ -219,6 +219,13 @@ impl<'info> CreateProject<'info> {
             params.raise_deadline >= min_deadline,
             AxelError::RaiseTooShort
         );
+        let max_deadline = now
+            .checked_add(MAX_RAISE_DURATION)
+            .ok_or(AxelError::Overflow)?;
+        require!(
+            params.raise_deadline <= max_deadline,
+            AxelError::RaiseTooLong
+        );
         require!(params.activation_window > 0, AxelError::InvalidDuration);
         require!(
             params.activation_window <= config.max_activation_window,
