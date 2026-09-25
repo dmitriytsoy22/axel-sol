@@ -6,8 +6,10 @@ Issues and pull requests are welcome. For security problems, follow [SECURITY.md
 
 | Path | What it is |
 | :--- | :--- |
-| `programs/axel`, `programs/transfer-hook` | Anchor programs (Token-2022 mint, sale, revenue, whitelist, telemetry; transfer hook) |
-| `tests/` | Program tests (`node:test`) run against a local validator at `http://127.0.0.1:8899` |
+| `programs/axel`, `programs/transfer-hook` | v1 Anchor programs, kept as legacy (Token-2022 mint, sale, revenue, whitelist, telemetry; transfer hook) |
+| `programs/axel-v2` | v2 Anchor program: escrowed raise, KYC registry, revenue accumulator, transfer hook in one program |
+| `tests/` | v1 program tests (`node:test`) run against a local validator at `http://127.0.0.1:8899` |
+| `tests-v2/` | v2 program tests (`node:test`) on LiteSVM, with their own `package.json` |
 | `scripts/` | `init-project.ts` (creates a project on a cluster), `generate-clients.ts` (Codama SDK into `sdk/generated`) |
 | `backend/` | NestJS service: Yandex Fleet telemetry oracle and Sumsub KYC webhook |
 | `frontend/` | Next.js 14 app |
@@ -60,6 +62,8 @@ npm install                              # test and codegen dependencies
 anchor build                             # target/deploy/*.so, target/idl, target/types
 anchor test --provider.cluster localnet  # local validator + tests/**/*.ts
 npm run lint                             # tsc --noEmit over tests/ and scripts/ (needs anchor build)
+cargo test -p axel-v2                    # v2 math (unit + proptest) and account layouts
+npm run test:v2                          # v2 program on LiteSVM (needs anchor build; installs tests-v2 deps on first run)
 npm run generate                         # regenerate sdk/generated from target/idl/axel.json
 npx tsx scripts/init-project.ts --cluster devnet   # create a project; admin = ~/.config/solana/id.json
 ```
