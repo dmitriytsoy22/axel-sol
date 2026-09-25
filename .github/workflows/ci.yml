@@ -153,11 +153,13 @@ jobs:
             sdk/axel-v2/package-lock.json
 
       - name: v2 program tests on LiteSVM
-        run: npm run test:v2:ci
+        run: |
+          set -o pipefail
+          npm run test:v2:ci 2>&1 | tee tests-v2/test-output.log
 
       - name: Report failed v2 tests as annotations
         if: failure()
-        run: node scripts/ci/junit-annotations.mjs tests-v2/junit.xml
+        run: node scripts/ci/junit-annotations.mjs tests-v2/junit.xml tests-v2/test-output.log
 
       - name: Check the IDL vendored in the frontend and the backend, and the SDK, match the build
         run: |

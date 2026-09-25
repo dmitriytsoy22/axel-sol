@@ -58,3 +58,4 @@ scripts/seed-devnet/out/localnet*
 scripts/seed-devnet/out/*.localnet*
 scripts/seed-devnet/out/*.tmp
 tests-v2/junit.xml
+tests-v2/test-output.log

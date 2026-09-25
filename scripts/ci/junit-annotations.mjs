@@ -1,9 +1,13 @@
 // Turns failed test cases in a JUnit report into GitHub Actions error annotations.
 // Annotations are readable through the public checks API, unlike job logs.
+// An optional second argument is the raw test output: native crashes (a test file's process
+// aborting) never reach the JUnit report, so their panic lines are annotated from there.
 import { existsSync, readFileSync } from "node:fs";
 
 const MAX_ANNOTATIONS = 10;
+const MAX_CRASH_LINES = 40;
 const path = process.argv[2];
+const outputPath = process.argv[3];
 
 if (!path || !existsSync(path)) {
   console.log(`::notice title=No JUnit report::${path ?? "(no path given)"} was not written`);
@@ -23,6 +27,20 @@ const decode = (text) =>
 // Workflow commands treat %, CR and LF specially in the message and ":" / "," in properties.
 const escapeData = (text) => text.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 const escapeProperty = (text) => escapeData(text).replace(/:/g, "%3A").replace(/,/g, "%2C");
+
+if (outputPath && existsSync(outputPath)) {
+  const crashLines = [
+    ...new Set(
+      readFileSync(outputPath, "utf8")
+        .split("\n")
+        .filter((line) => /panicked at|fatal runtime error|SIGABRT|memory allocation|thread '/.test(line))
+        .map((line) => line.trim()),
+    ),
+  ].slice(0, MAX_CRASH_LINES);
+  if (crashLines.length > 0) {
+    console.log(`::error title=Crash output::${escapeData(crashLines.join("\n"))}`);
+  }
+}
 
 const xml = readFileSync(path, "utf8");
 const failures = [];
