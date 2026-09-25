@@ -360,7 +360,7 @@ The v2 app on a local validator seeded by `scripts/seed-devnet` at tiny scale, i
 
 | Check the car's data yourself | Proof of solvency |
 |---------|----------|
-| ![The verify panel after a check in the browser: 92 trip days rebuilt to the head Solana holds, three income reports matching their on-chain hashes, one simulated demo month labelled, and the purchase papers matching](assets/screenshots/03-verify.png) | ![Proof of solvency: all six cars pass every check, with the income vaults, what holders are owed and the raise escrows](assets/screenshots/04-solvency.png) |
+| ![The verify panel after a check in the browser: 92 trip days rebuilt to the head Solana holds, three income reports matching their on-chain hashes, and the purchase papers matching](assets/screenshots/03-verify.png) | ![Proof of solvency: all six cars pass every check, with the income vaults, what holders are owed and the raise escrows](assets/screenshots/04-solvency.png) |
 
 | Portfolio | Judge demo |
 |---------|----------|
