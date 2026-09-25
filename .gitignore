@@ -46,3 +46,9 @@ target
 node_modules
 test-ledger
 .yarn
+
+# Seed script: devnet results in scripts/seed-devnet/out are committed, local runs are not
+!scripts/seed-devnet/out/
+scripts/seed-devnet/out/localnet*
+scripts/seed-devnet/out/*.localnet*
+scripts/seed-devnet/out/*.tmp

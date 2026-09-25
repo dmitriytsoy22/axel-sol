@@ -252,6 +252,19 @@ cargo test -p axel-v2                       # v2: math, dates, telemetry chain, 
 npm run test:v2                             # v2: the program on LiteSVM, no validator needed
 ```
 
+**Demo data for v2** (a fictional fleet in every project state, on a local validator)
+
+```bash
+anchor build -p axel_v2
+npm run seed:validator                             # separate terminal
+export DEMO_SEED_SECRET=$(openssl rand -hex 32)
+npm run seed -- --cluster localnet --scale small   # tiny, small or full; --dry-run prints the SOL budget
+npm run seed:verify -- --cluster localnet          # proof of solvency (I1–I5) for every project
+npm run test:seed                                  # the seed's unit tests, no validator
+```
+
+How the seed works, its outputs and its assumptions: [scripts/seed-devnet/README.md](scripts/seed-devnet/README.md).
+
 `npm test` runs `node --import tsx/esm --test tests/**/*.ts` against a validator at `http://127.0.0.1:8899`. `Anchor.toml` sets the provider cluster to devnet, so always pass `--provider.cluster localnet`. To create a v1 project on a cluster: `npm run init-project -- --cluster devnet` (admin = `~/.config/solana/id.json`). CI builds all programs and runs the v2 Rust and LiteSVM tests (530); the v1 tests (49) need a local validator and run locally only.
 
 More detail: [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -277,6 +290,7 @@ axel-sol/
 ├── tests/                          # 12 node:test files for both programs (local validator)
 ├── tests-v2/                       # v2 program tests on LiteSVM
 ├── scripts/                        # init-project.ts, generate-clients.ts, last-project.json
+│   └── seed-devnet/                # v2 demo seed: plan, executor, SOL budget, proof-of-solvency check
 ├── sdk/axel-v2/                    # Codama TypeScript client of the v2 program (docs/v2.md)
 ├── migrations/deploy.ts            # Anchor scaffold, unused
 ├── backend/src/                    # NestJS: health, kyc, telemetry, yandex, solana modules
@@ -325,6 +339,7 @@ Done so far:
 - Rewrote this README to match the code.
 - Wrote the AXEL v2 program (`programs/axel-v2`, 24 instructions): escrowed fundraising with refunds, a KYC registry with restricted signers, a transfer hook inside the program, attested revenue deposits with claims that are safe against transfers and late buys, a telemetry hash chain and time-locked share recovery. It has 35 Rust tests and 530 LiteSVM tests, a generated client in `sdk/axel-v2`, and CI. Design: [docs/v2.md](docs/v2.md). It is not deployed yet.
 - Redesigned the frontend ([`frontend/design.md`](frontend/design.md)): new landing page, asset, portfolio, payouts and operator pages, self-hosted fonts, licensed photos, and pages checked for layout, contrast and accessibility at five widths in EN / RU / KK. The asset page no longer shows made-up specs or income projections.
+- Wrote the v2 demo seed ([`scripts/seed-devnet`](scripts/seed-devnet/README.md)). From a seed string it plans a fictional fleet in every project state: backfilled telemetry, attested deposits, claims, transfers, a failed raise with refunds and a share recovery. Every economic figure is labeled as an assumption. The executor is idempotent and resumable, the dry run prices the SOL budget with live rent, and a proof-of-solvency check verifies I1–I5 for every project. It ran end to end on a local validator; devnet is still to come.
 
 In progress during the hackathon (**planned, not done yet**):
 - [ ] Public frontend deployment with a judge demo path (a whitelisted devnet test wallet)
@@ -347,6 +362,7 @@ In progress during the hackathon (**planned, not done yet**):
 - [x] AXEL v2 program with its tests and TypeScript client (not deployed)
 - [x] Frontend redesign
 - [x] Program build and v2 tests in CI (the v1 tests run locally only)
+- [x] v2 demo seed with a proof-of-solvency check, run on a local validator
 - [ ] Public deployment and judge demo path
 - [ ] End-to-end devnet demo, including a holder-to-holder transfer
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key
