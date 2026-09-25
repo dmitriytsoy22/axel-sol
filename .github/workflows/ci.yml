@@ -102,7 +102,7 @@ jobs:
         run: npm run test:seed
 
   programs:
-    name: Programs (build, Rust tests, v2 tests on LiteSVM, IDL and SDK)
+    name: Programs (build, Rust tests, IDL and SDK)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
