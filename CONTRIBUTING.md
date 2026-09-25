@@ -11,9 +11,10 @@ Issues and pull requests are welcome. For security problems, follow [SECURITY.md
 | `tests/` | v1 program tests (`node:test`) run against a local validator at `http://127.0.0.1:8899` |
 | `tests-v2/` | v2 program tests (`node:test`) on LiteSVM, with their own `package.json` |
 | `scripts/` | `init-project.ts` (creates a v1 project on a cluster), `generate-clients.ts` (Codama client of the v2 program into `sdk/axel-v2`) |
+| `scripts/seed-devnet/` | Demo seed for v2: a fictional fleet in every project state, with its own `package.json` ([README](scripts/seed-devnet/README.md)) |
 | `sdk/axel-v2/` | Generated TypeScript client of `axel_v2` (`@solana/kit`), with tests against the IDL |
 | `backend/` | NestJS service: the v2 oracle (published telemetry, `record_telemetry` batches, attested revenue reports), wallet sign-in and Sumsub KYC webhook (v2 `set_investor`), and the v2 event indexer |
-| `frontend/` | Next.js 14 app |
+| `frontend/` | Next.js 14 app on `axel_v2`, with the judge demo routes, the Solana Actions and the Playwright suite in `frontend/e2e` |
 
 ## Prerequisites
 
@@ -126,10 +127,11 @@ npm run seed -- --scale tiny             # seed it; needs DEMO_SEED_SECRET, see 
 
 `Anchor.toml` sets `[provider] cluster = "devnet"`, so a plain `anchor test` would deploy to devnet. Pass `--provider.cluster localnet` when running tests. The tests, `scripts/`, and the root `npm run lint` import from `target/`, which only exists after `anchor build`.
 
-Deployed devnet program IDs (from `Anchor.toml`):
+Program IDs (from `Anchor.toml`):
 
-- `axel`: `DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M`
-- `transfer_hook`: `5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ`
+- `axel_v2`: `AXLcoEH3vJXUSL7nEr1T4d77NarThcbVrnbBzBR8XPZi` (not deployed yet; the keypair is kept outside the repository)
+- `axel` (v1, devnet): `DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M`
+- `transfer_hook` (v1, devnet): `5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ`
 
 ## Pull requests
 

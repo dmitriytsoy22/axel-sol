@@ -3,9 +3,10 @@
 AXEL exposes these interfaces:
 
 1. **A small HTTP backend** in `backend/`: health, published telemetry, revenue reports and deposit attestation, KYC, and the history of v2 program events.
-2. **The Solana programs.** Clients call them directly. The frontend and the backend use `axel_v2` ([v2.md](v2.md)); the v1 `axel` and `transfer_hook` programs below are what runs on devnet today.
-3. **The indexer API** that the frontend reads payout history from when one is configured. The backend indexes every v2 event ([below](#program-events-what-is-indexed)) but does not serve this wallet-payout endpoint yet; its contract is fixed [below](#indexer-api-read-by-the-frontend).
-4. **The judge demo routes and Solana Actions (Blinks)** of the frontend, in `frontend/src/app/api/`: [demo access, shares and simulated months](#judge-demo-api) on devnet, and [invest and claim Blinks](#solana-actions-blinks).
+2. **The Solana program `axel_v2`** ([reference](#program-reference-axel_v2), design in [v2.md](v2.md)). Clients call it directly. It is not deployed yet. The v1 `axel` and `transfer_hook` programs, which run on devnet since before the hackathon, are documented at the end as [legacy](#legacy-program-reference-axel-v1).
+3. **The TypeScript clients:** the frontend's Anchor-based client and the generated Codama SDK ([below](#typescript-client-frontend-axel_v2)).
+4. **The indexer API** that the frontend reads payout history from when one is configured. The backend indexes every v2 event ([below](#program-events-what-is-indexed)) but does not serve this wallet-payout endpoint yet; its contract is fixed [below](#indexer-api-read-by-the-frontend).
+5. **The judge demo routes and Solana Actions (Blinks)** of the frontend, in `frontend/src/app/api/`: [demo access, shares and simulated months](#judge-demo-api) on devnet, and [invest and claim Blinks](#solana-actions-blinks).
 
 All business actions (buy, deposit, claim, KYC, pause and so on) are Solana transactions. The backend signs three kinds of v2 transactions: `set_investor` after a Sumsub review (KYC key), `record_telemetry` batches (oracle key), and its co-signature on an operator's `deposit_revenue` (oracle key).
 
@@ -643,10 +644,362 @@ The `/demo` page walks through the path: access → buy in an open raise (the ap
 
 `GET /actions.json` maps `/assets/*` (and `/ru/assets/*`, `/kk/assets/*`) to the invest action. The car page links both Blinks on dial.to (`?action=solana-action:<url>&cluster=devnet`).
 
-## Program Reference: `axel`
+## Program Reference: `axel_v2`
+
+- Program ID: `AXLcoEH3vJXUSL7nEr1T4d77NarThcbVrnbBzBR8XPZi` (not deployed yet).
+- IDL: `target/idl/axel_v2.json` and `target/types/axel_v2.ts`, produced by `anchor build`. They are vendored in `frontend/src/lib/solana/idl-v2/` and `backend/src/solana/idl/`, and CI fails when a vendored copy differs from a fresh build.
+- Anchor instruction discriminators are the first 8 bytes of `sha256("global:<instruction_name>")`; `execute` uses the SPL transfer-hook interface's `Execute` discriminator instead.
+- Design, rules and the test behind each check: [v2.md](v2.md). This section lists the interface as the IDL defines it.
+
+How to read the account lists:
+- Accounts are listed in order.
+- `mut` means writable; `signer` means the account must sign.
+- `= project.operator` means the account must equal that field (Anchor `has_one` / `relations`).
+- In PDA seeds, strings are UTF-8 bytes, account names are the account's address, and the period index is 4 little-endian bytes.
+- "ATA of X for Y" is X's associated token account for mint Y, under the mint's token program.
+
+Argument types:
+
+```rust
+struct InitializeConfigParams { admin: Pubkey, kyc_authority: Pubkey, demo_kyc_authority: Pubkey, treasury: Pubkey,
+    raise_fee_bps: u16, revenue_fee_bps: u16, min_raise_duration: i64, max_activation_window: i64,
+    allowed_payment_mints: [Pubkey; 4], recovery_delay: i64 }
+struct UpdateConfigParams { kyc_authority: Option<Pubkey>, demo_kyc_authority: Option<Pubkey>, treasury: Option<Pubkey>,
+    raise_fee_bps: Option<u16>, revenue_fee_bps: Option<u16>, min_raise_duration: Option<i64>,
+    max_activation_window: Option<i64>, allowed_payment_mints: Option<[Pubkey; 4]>, paused: Option<bool>,
+    recovery_delay: Option<i64> }
+struct SetInvestorParams { status: InvestorStatus, expires_at: i64, jurisdiction: u16, flags: u8, provider: KycProvider }
+struct CreateProjectParams { price_per_share: u64, total_shares: u64, soft_cap_shares: u64, raise_deadline: i64,
+    activation_window: i64, operator: Pubkey, oracle: Pubkey, allow_demo: bool, name: String, symbol: String,
+    uri: String, additional_metadata: Vec<MetadataField> }
+struct MetadataField { key: String, value: String }
+struct DepositRevenueParams { gross: u64, period_start: u32, period_end: u32, report_hash: [u8; 32], kind: RevenueKind }
+struct TelemetryEntry { date: u32, data_hash: [u8; 32], trips: u16, km: u32, rent_paid: u32, status: u8 }
+
+enum InvestorStatus { None, Active, Revoked, Frozen }
+enum KycProvider { Manual, Sumsub, Demo }
+enum RevenueKind { Regular, Final }
+enum ProjectState { Fundraising, Funded, Operating, Paused, Failed, Closed }
+```
+
+- Times are unix seconds (`i64`); dates are `YYYYMMDD` (`u32`) and must be real calendar days.
+- Amounts are base units of the project's payment mint. `price_per_share × total_shares` must fit in a `u64`.
+- `Investor.flags`: `1` DEMO (verified through the devnet demo; a project must set `allow_demo` to accept it), `2` QUALIFIED, `4` PROGRAM (a program-owned wallet). `jurisdiction` is an ISO 3166-1 numeric code (0 when unknown).
+- `TelemetryEntry.status`: see [Telemetry: what is published](#telemetry-what-is-published).
+
+### Config and admin handover
+
+#### `initialize_config(params: InitializeConfigParams)`
+
+Creates the global config. Only the program's upgrade authority may call it.
+
+`authority` (mut, signer) · `config` (mut, PDA `["config"]`) · `program` (`AXLcoEH3vJXUSL7nEr1T4d77NarThcbVrnbBzBR8XPZi`) · `program_data` · `system_program` (System program)
+
+#### `update_config(params: UpdateConfigParams)`
+
+Updates fees, windows, payment mints, pause flag and KYC keys. Admin only.
+
+`admin` (signer, = config.admin) · `config` (mut, PDA `["config"]`)
+
+#### `propose_admin(new_admin: pubkey)`
+
+First step of the admin handover. The default key withdraws a pending proposal.
+
+`admin` (signer, = config.admin) · `config` (mut, PDA `["config"]`)
+
+#### `accept_admin()`
+
+Second step of the admin handover, signed by the proposed admin.
+
+`pending_admin` (signer) · `config` (mut, PDA `["config"]`)
+
+### KYC
+
+#### `set_investor(wallet: pubkey, params: SetInvestorParams)`
+
+Creates or updates the KYC record of `wallet`. Signed by the KYC authority, or by the demo KYC authority for DEMO records that expire within 30 days.
+
+`authority` (mut, signer) · `config` (PDA `["config"]`) · `investor` (mut, PDA `["investor", arg wallet]`) · `system_program` (System program)
+
+### Raise
+
+#### `create_project(params: CreateProjectParams)`
+
+Creates a share mint, its transfer hook accounts, the project and its escrow and revenue vaults, and opens the raise. Admin only.
+
+`payer` (mut, signer) · `admin` (signer, = config.admin) · `config` (mut, PDA `["config"]`) · `share_mint` (mut, signer) · `project` (mut, PDA `["project", share_mint]`) · `extra_account_metas` (mut, PDA `["extra-account-metas", share_mint]`) · `payment_mint` · `escrow_vault` (mut, PDA `["escrow", project]`) · `revenue_vault` (mut, PDA `["revenue", project]`) · `share_token_program` (Token-2022) · `payment_token_program` · `system_program` (System program)
+
+#### `buy_shares(shares: u64, max_total_cost: u64)`
+
+Buys shares in an open raise; payment goes to the escrow. Moves the project to Funded when the last share is sold.
+
+`payer` (mut, signer) · `owner` (signer) · `config` (PDA `["config"]`) · `investor` (PDA `["investor", owner]`) · `project` (mut, PDA `["project", share_mint]`) · `position` (mut, PDA `["position", project, owner]`) · `share_mint` (mut, = project.share_mint) · `owner_share_account` (mut, ATA of owner for share_mint) · `payment_mint` (= project.payment_mint) · `owner_payment_account` (mut) · `escrow_vault` (mut, = project.escrow_vault) · `share_token_program` (Token-2022) · `payment_token_program` · `associated_token_program` (Associated Token program) · `system_program` (System program)
+
+#### `finalize_raise()`
+
+Settles a raise whose outcome is certain: Funded or Failed. Anyone may call it.
+
+`project` (mut, PDA `["project", project.share_mint]`)
+
+#### `activate_project(acquisition_doc_hash: [u8; 32])`
+
+Pays a funded raise out to the treasury and the operator and starts operation. Admin only, before the activation deadline.
+
+`admin` (mut, signer, = config.admin) · `config` (PDA `["config"]`) · `project` (mut, PDA `["project", project.share_mint]`) · `payment_mint` (= project.payment_mint) · `escrow_vault` (mut, = project.escrow_vault) · `treasury` (= config.treasury) · `treasury_token_account` (mut, ATA of treasury for payment_mint) · `operator` (= project.operator) · `operator_token_account` (mut, ATA of operator for payment_mint) · `payment_token_program` · `associated_token_program` (Associated Token program) · `system_program` (System program)
+
+#### `cancel_raise()`
+
+Fails a raise that has not been activated, opening refunds. Admin only.
+
+`admin` (signer, = config.admin) · `config` (PDA `["config"]`) · `project` (mut, PDA `["project", project.share_mint]`)
+
+#### `refund()`
+
+Burns the owner's shares of a failed raise and returns what they cost.
+
+`owner` (mut, signer) · `investor` (PDA `["investor", owner]`) · `project` (mut, PDA `["project", share_mint]`) · `position` (mut, PDA `["position", project, owner]`) · `share_mint` (mut, = project.share_mint) · `owner_share_account` (mut, ATA of owner for share_mint) · `payment_mint` (= project.payment_mint) · `owner_payment_account` (mut, ATA of owner for payment_mint) · `escrow_vault` (mut, = project.escrow_vault) · `share_token_program` (Token-2022) · `payment_token_program` · `associated_token_program` (Associated Token program) · `system_program` (System program)
+
+### Positions and transfers
+
+#### `open_position()`
+
+Opens the owner's position and thaws its share account so it can receive shares. Anyone may pay; the owner needs an eligible KYC record but does not sign.
+
+`payer` (mut, signer) · `owner` · `investor` (PDA `["investor", owner]`) · `project` (PDA `["project", share_mint]`) · `position` (mut, PDA `["position", project, owner]`) · `share_mint` (= project.share_mint) · `owner_share_account` (mut, ATA of owner for share_mint) · `share_token_program` (Token-2022) · `associated_token_program` (Associated Token program) · `system_program` (System program)
+
+#### `close_position()`
+
+Closes an empty position and its share account, returning the rent to the owner. Once the project is closed it also burns the shares left in the position.
+
+`owner` (mut, signer) · `project` (mut, PDA `["project", share_mint]`) · `position` (mut, PDA `["position", project, owner]`) · `share_mint` (mut, = project.share_mint) · `owner_share_account` (mut, ATA of owner for share_mint) · `share_token_program` (Token-2022) · `associated_token_program` (Associated Token program) · `system_program` (System program)
+
+#### `execute(amount: u64)`
+
+Transfer hook of the share mints, invoked by Token-2022 on every share transfer. Settles revenue for both owners, moves the shares in their positions and rejects the transfer unless both owners are eligible and the project is operating.
+
+`source` · `mint` · `destination` · `authority` · `extra_account_metas` · `config` (PDA `["config"]`) · `project` (PDA `["project", mint]`) · `source_investor` · `destination_investor` · `source_position` (mut) · `destination_position` (mut)
+
+### Revenue and telemetry
+
+#### `deposit_revenue(params: DepositRevenueParams)`
+
+The operator pays in one period's revenue, co-signed by the project's oracle as attestor. The platform fee goes to the treasury, the rest to the holders pro rata.
+
+`operator` (mut, signer, = project.operator) · `oracle` (signer, = project.oracle) · `config` (PDA `["config"]`) · `project` (mut, PDA `["project", project.share_mint]`) · `period` (mut, PDA `["period", project, project.period_count]`) · `payment_mint` (= project.payment_mint) · `operator_payment_account` (mut) · `revenue_vault` (mut, = project.revenue_vault) · `treasury` (= config.treasury) · `treasury_token_account` (mut, ATA of treasury for payment_mint) · `payment_token_program` · `associated_token_program` (Associated Token program) · `system_program` (System program)
+
+#### `claim()`
+
+Pays a position's unclaimed revenue to the owner's canonical payment account. Anyone may trigger it for any owner.
+
+`claimer` (mut, signer) · `owner` · `investor` (PDA `["investor", owner]`) · `project` (mut, PDA `["project", project.share_mint]`) · `position` (mut, PDA `["position", project, owner]`) · `payment_mint` (= project.payment_mint) · `owner_payment_account` (mut, ATA of owner for payment_mint) · `revenue_vault` (mut, = project.revenue_vault) · `payment_token_program` · `associated_token_program` (Associated Token program) · `system_program` (System program)
+
+#### `record_telemetry(entries: Vec<TelemetryEntry>)`
+
+Appends up to 20 daily records to the project's telemetry hash chain. Oracle only.
+
+`oracle` (signer, = project.oracle) · `project` (mut, PDA `["project", project.share_mint]`)
+
+### Project operations
+
+#### `pause_project()`
+
+Pauses an operating project: no transfers or deposits, claims keep working. Admin only.
+
+`admin` (signer, = config.admin) · `config` (PDA `["config"]`) · `project` (mut, PDA `["project", project.share_mint]`)
+
+#### `resume_project()`
+
+Resumes a paused project. Admin only.
+
+`admin` (signer, = config.admin) · `config` (PDA `["config"]`) · `project` (mut, PDA `["project", project.share_mint]`)
+
+#### `set_project_roles(operator: Option<pubkey>, oracle: Option<pubkey>)`
+
+Replaces the operator or the oracle of an operating or paused project. Admin only.
+
+`admin` (signer, = config.admin) · `config` (PDA `["config"]`) · `project` (mut, PDA `["project", project.share_mint]`)
+
+#### `close_project()`
+
+Closes an operating or paused project for good without moving any funds; revenue stays claimable. Admin only.
+
+`admin` (signer, = config.admin) · `config` (PDA `["config"]`) · `project` (mut, PDA `["project", project.share_mint]`)
+
+### Recovery
+
+#### `propose_recovery(shares: u64, reason_hash: [u8; 32])`
+
+Proposes moving `shares` of `from_owner`, a holder who lost its key, to its new wallet `to_owner` once `config.recovery_delay` has passed. Admin only.
+
+`admin` (mut, signer, = config.admin) · `config` (PDA `["config"]`) · `project` (PDA `["project", project.share_mint]`) · `from_owner` · `from_investor` (PDA `["investor", from_owner]`) · `from_position` (PDA `["position", project, from_owner]`) · `to_owner` · `to_investor` (PDA `["investor", to_owner]`) · `request` (mut, PDA `["recovery", project, from_owner]`) · `system_program` (System program)
+
+#### `cancel_recovery()`
+
+Withdraws a pending recovery: the affected owner can veto it until its eta, the admin can withdraw it until it is executed.
+
+`authority` (signer) · `config` (PDA `["config"]`) · `request` (mut, PDA `["recovery", request.project, request.from_owner]`) · `proposer` (mut, = request.proposer)
+
+#### `execute_recovery()`
+
+Carries out a recovery after its delay: burns the shares of the old wallet, mints as many to the new one and moves the unclaimed revenue with them. Anyone may call it.
+
+`executor` (mut, signer) · `config` (PDA `["config"]`) · `project` (PDA `["project", share_mint]`) · `request` (mut, PDA `["recovery", project, from_owner]`) · `proposer` (mut, = request.proposer) · `share_mint` (mut, = project.share_mint) · `from_owner` · `from_investor` (PDA `["investor", from_owner]`) · `from_position` (mut, PDA `["position", project, from_owner]`) · `from_share_account` (mut, ATA of from_owner for share_mint) · `to_owner` (= request.to_owner) · `to_investor` (PDA `["investor", to_owner]`) · `to_position` (mut, PDA `["position", project, to_owner]`) · `to_share_account` (mut, ATA of to_owner for share_mint) · `share_token_program` (Token-2022) · `associated_token_program` (Associated Token program) · `system_program` (System program)
+
+`execute` is called by Token-2022 during `transfer_checked`, never by clients. Token-2022 resolves the six extra accounts from the validation account at `["extra-account-metas", share_mint]`: the config and the project as fixed addresses, the two `Investor` PDAs from the token accounts' owners, and the two `Position` PDAs. A client adds them to the transfer in that order, followed by the program ID and the validation account ([TypeScript Client](#typescript-client-frontend-axel_v2)).
+
+### Accounts
+
+Sizes, rent and the `getProgramAccounts` memcmp offsets are in [v2.md](v2.md#accounts-and-seeds).
+
+| Account | Fields after the 8-byte discriminator |
+|---|---|
+| `Config` | `admin: pubkey`, `pending_admin: pubkey`, `kyc_authority: pubkey`, `demo_kyc_authority: pubkey`, `treasury: pubkey`, `raise_fee_bps: u16`, `revenue_fee_bps: u16`, `min_raise_duration: i64`, `max_activation_window: i64`, `allowed_payment_mints: [pubkey; 4]`, `paused: bool`, `project_count: u64`, `bump: u8`, `recovery_delay: i64` |
+| `Investor` | `wallet: pubkey`, `status: InvestorStatus`, `flags: u8`, `jurisdiction: u16`, `expires_at: i64`, `updated_at: i64`, `provider: KycProvider`, `bump: u8` |
+| `Position` | `project: pubkey`, `owner: pubkey`, `shares: u64`, `acc_checkpoint: u128`, `accrued: u64`, `total_claimed: u64`, `paid_in: u64`, `bump: u8` |
+| `Project` | `share_mint: pubkey`, `payment_mint: pubkey`, `payment_token_program: pubkey`, `operator: pubkey`, `oracle: pubkey`, `escrow_vault: pubkey`, `revenue_vault: pubkey`, `state: ProjectState`, `flags: u8`, `price_per_share: u64`, `total_shares: u64`, `soft_cap_shares: u64`, `shares_sold: u64`, `shares_refunded: u64`, `raise_deadline: i64`, `activation_window: i64`, `activation_deadline: i64`, `created_at: i64`, `activated_at: i64`, `closed_at: i64`, `raise_fee_bps: u16`, `revenue_fee_bps: u16`, `acc_per_share: u128`, `total_deposited_net: u64`, `total_fees: u64`, `total_claimed: u64`, `total_refunded: u64`, `period_count: u32`, `telemetry_head: [u8; 32]`, `telemetry_count: u32`, `last_telemetry_date: u32`, `acquisition_doc_hash: [u8; 32]`, `bump: u8`, `escrow_bump: u8`, `revenue_bump: u8`, `shares_retired: u64` |
+| `RecoveryRequest` | `project: pubkey`, `from_owner: pubkey`, `to_owner: pubkey`, `shares: u64`, `reason_hash: [u8; 32]`, `proposer: pubkey`, `proposed_at: i64`, `eta: i64`, `bump: u8` |
+| `RevenuePeriod` | `project: pubkey`, `index: u32`, `period_start: u32`, `period_end: u32`, `gross: u64`, `fee: u64`, `net: u64`, `supply: u64`, `acc_after: u128`, `report_hash: [u8; 32]`, `attestor: pubkey`, `telemetry_head: [u8; 32]`, `kind: RevenueKind`, `deposited_at: i64`, `bump: u8` |
+
+`Project.flags`: `1` ALLOW_DEMO. `acc_per_share` and `acc_checkpoint` are Q64.64 fixed point ([v2.md](v2.md#revenue-math)).
+
+### Event Types
+
+Every instruction that changes state emits one or more of these 23 events (`emit!`, logged as `Program data:`). The backend indexes all of them ([Program Events](#program-events-what-is-indexed)).
+
+| Event | Fields |
+|---|---|
+| `AdminChanged` | `previous_admin`, `new_admin` |
+| `AdminProposed` | `admin`, `pending_admin` |
+| `Claimed` | `project`, `owner`, `claimer`, `amount` |
+| `ConfigUpdated` | `admin`, `kyc_authority`, `demo_kyc_authority`, `treasury`, `raise_fee_bps`, `revenue_fee_bps`, `min_raise_duration`, `max_activation_window`, `allowed_payment_mints`, `paused`, `recovery_delay` |
+| `InvestorUpdated` | `wallet`, `status`, `flags`, `jurisdiction`, `expires_at`, `provider`, `authority` |
+| `PositionClosed` | `project`, `owner`, `shares_burned` |
+| `PositionOpened` | `project`, `owner`, `payer` |
+| `ProjectActivated` | `project`, `gross`, `fee`, `operator_amount`, `acquisition_doc_hash` |
+| `ProjectClosed` | `project`, `unclaimed` |
+| `ProjectCreated` | `project`, `share_mint`, `payment_mint`, `operator`, `price_per_share`, `total_shares`, `soft_cap_shares`, `raise_deadline` |
+| `ProjectPaused` | `project` |
+| `ProjectResumed` | `project` |
+| `RaiseCancelled` | `project`, `previous_state` |
+| `RaiseFinalized` | `project`, `outcome`, `shares_sold` |
+| `RecoveryCancelled` | `project`, `from_owner`, `to_owner`, `shares`, `cancelled_by` |
+| `RecoveryExecuted` | `project`, `from_owner`, `to_owner`, `shares`, `accrued_moved`, `reason_hash`, `executor` |
+| `RecoveryProposed` | `project`, `from_owner`, `to_owner`, `shares`, `reason_hash`, `proposer`, `eta` |
+| `Refunded` | `project`, `owner`, `shares`, `amount` |
+| `RevenueDeposited` | `project`, `index`, `period_start`, `period_end`, `gross`, `fee`, `net`, `supply`, `acc_after`, `report_hash`, `attestor`, `kind` |
+| `RolesUpdated` | `project`, `operator`, `oracle` |
+| `SharesPurchased` | `project`, `owner`, `payer`, `shares`, `cost`, `shares_sold` |
+| `SharesTransferred` | `project`, `from`, `to`, `amount` |
+| `TelemetryRecorded` | `project`, `date`, `data_hash`, `trips`, `km`, `rent_paid`, `status`, `head`, `count` |
+
+### Errors (`AxelError`)
+
+Codes are only ever appended, so a code keeps its meaning across upgrades. The frontend has a message for each in `messages/*.json` (`ProgramErrors`).
+
+| Code | Name | Message |
+|---|---|---|
+| 6000 | `Unauthorized` | Signer is not authorized for this action |
+| 6001 | `InvalidAddress` | Address must not be the default public key |
+| 6002 | `FeeTooHigh` | Fee exceeds the protocol hard cap |
+| 6003 | `InvalidDuration` | Duration must be greater than zero and within the protocol cap |
+| 6004 | `DuplicatePaymentMint` | Allowed payment mints contain a duplicate |
+| 6005 | `DemoAuthorityConflict` | Demo KYC authority must differ from the KYC authority |
+| 6006 | `AdminUnchanged` | New admin must differ from the current admin |
+| 6007 | `NoPendingAdmin` | There is no pending admin to accept |
+| 6008 | `InvalidInvestorStatus` | Investor status None cannot be assigned |
+| 6009 | `InvalidInvestorFlags` | Investor flags contain unknown bits |
+| 6010 | `InvalidExpiry` | An active investor must expire in the future |
+| 6011 | `InvalidJurisdiction` | Jurisdiction must be an ISO 3166-1 numeric code |
+| 6012 | `DemoScopeViolation` | Demo KYC key may only grant or revoke DEMO access with the Demo provider |
+| 6013 | `DemoExpiryTooLong` | Demo KYC access cannot last longer than 30 days |
+| 6014 | `DemoRecordImmutable` | Demo KYC key cannot modify a frozen or non-DEMO investor record |
+| 6015 | `InvestorNotActive` | Investor KYC is not active |
+| 6016 | `InvestorExpired` | Investor KYC has expired |
+| 6017 | `InvestorFrozen` | Investor is frozen |
+| 6018 | `DemoNotAllowed` | Project does not accept DEMO investors |
+| 6019 | `InvalidState` | Instruction is not allowed in the current project state |
+| 6020 | `ProtocolPaused` | Protocol is paused |
+| 6021 | `PaymentMintNotAllowed` | Payment mint is not in the allowlist |
+| 6022 | `UnsupportedPaymentMint` | Payment mint has an unsupported Token-2022 extension |
+| 6023 | `InvalidPrice` | Price per share must be greater than zero |
+| 6024 | `InvalidShareSupply` | Share supply must satisfy 0 < soft cap <= total shares |
+| 6025 | `RaiseTooShort` | Raise duration is shorter than the configured minimum |
+| 6026 | `ActivationWindowTooLong` | Activation window exceeds the configured maximum |
+| 6027 | `RaiseEnded` | Raise deadline has passed |
+| 6028 | `RaiseNotFinalizable` | Raise cannot be finalized yet |
+| 6029 | `ExceedsSupply` | Purchase exceeds the remaining shares |
+| 6030 | `SlippageExceeded` | Total cost exceeds the allowed maximum |
+| 6031 | `ZeroAmount` | Amount must be greater than zero |
+| 6032 | `ActivationExpired` | Activation deadline has passed |
+| 6033 | `ZeroSupply` | There are no outstanding shares |
+| 6034 | `NotTransferring` | Hook was invoked outside of a Token-2022 transfer |
+| 6035 | `SourceNotAllowed` | Sender is not allowed to transfer shares |
+| 6036 | `DestinationNotAllowed` | Recipient is not allowed to hold shares |
+| 6037 | `RecipientNotOnboarded` | Recipient has no position in this project |
+| 6038 | `ShareMintMismatch` | Mint is not the share mint of this project |
+| 6039 | `PositionMismatch` | Position does not match the expected project or owner |
+| 6040 | `LedgerMismatch` | Token balance does not match the position ledger |
+| 6041 | `InvalidTokenAccount` | Token account is not valid for this operation |
+| 6042 | `NothingToClaim` | Nothing to claim |
+| 6043 | `NothingToRefund` | Nothing to refund |
+| 6044 | `PositionNotEmpty` | Position still holds shares or unclaimed revenue |
+| 6045 | `InvalidPeriodDates` | Revenue period dates are invalid |
+| 6046 | `TooManyTelemetryEntries` | Too many telemetry entries in one transaction |
+| 6047 | `TelemetryDateNotIncreasing` | Telemetry dates must strictly increase |
+| 6048 | `Overflow` | Arithmetic overflow |
+| 6049 | `DivisionByZero` | Division by zero |
+| 6050 | `CheckpointAhead` | Position checkpoint is ahead of the project accumulator |
+| 6051 | `InvalidBps` | Basis points exceed 10000 |
+| 6052 | `InvalidMetadata` | Token metadata is empty, too long, duplicated or uses a reserved key |
+| 6053 | `RoleConflict` | Operator and oracle must be different keys |
+| 6054 | `InvalidDocumentHash` | Acquisition document hash must not be empty |
+| 6055 | `VaultShortfall` | Vault holds less than the amount it owes |
+| 6056 | `InvalidReportHash` | Revenue report hash must not be empty |
+| 6057 | `InvalidAttestor` | Revenue deposit must be co-signed by the project's oracle |
+| 6058 | `EmptyTelemetryBatch` | Telemetry batch is empty |
+| 6059 | `InvalidTelemetryDate` | Telemetry date must be a calendar date as YYYYMMDD |
+| 6060 | `InvalidRecoveryDelay` | Recovery delay must be between 1 hour and 30 days |
+| 6061 | `InvalidReasonHash` | Recovery reason hash must not be empty |
+| 6062 | `RecoveryToSameOwner` | Recovery must move shares to a different wallet |
+| 6063 | `InsufficientShares` | Position holds fewer shares than the recovery moves |
+| 6064 | `RecoveryNotReady` | Recovery delay has not elapsed |
+| 6065 | `VetoWindowClosed` | The owner's veto window has closed |
+| 6066 | `RaiseTooLong` | Raise deadline is further away than the protocol cap |
+
+## TypeScript Client (frontend, `axel_v2`)
+
+The frontend talks to `axel_v2` through `@coral-xyz/anchor` and the IDL vendored in `frontend/src/lib/solana/idl-v2/`. `lib/solana/program.ts` builds the `Program` at the configured address; it only builds instructions and decodes accounts, and every read goes through the `Connection` the caller passes.
+
+| Module | What it has |
+|---|---|
+| `connection.ts` | Cluster, RPC URL and program ID from the environment; Explorer links |
+| `pda.ts` | `configAddress`, `investorAddress(wallet)`, `projectAddress(shareMint)`, `positionAddress(project, owner)`, `periodAddress(project, index)`, `escrowAddress(project)`, `revenueAddress(project)`, `extraAccountMetasAddress(shareMint)`; `shareAccountAddress` and `paymentAccountAddress` for the owners' canonical token accounts |
+| `accounts.ts` | Decoders from account bytes to plain types with `bigint` amounts; account sizes and the memcmp offsets readers filter by |
+| `readers.ts` | `fetchConfig`, `fetchInvestor(wallet)`, `fetchProjects` (one `getProgramAccounts` plus one `getMultipleAccounts` for the share and payment mints), `fetchProject(shareMint)`, `fetchPositions(owner)` (memcmp on the owner at offset 40), `fetchPosition`, `fetchRevenuePeriods(project)` (memcmp at offset 8), `fetchTokenBalance` |
+| `tokens.ts` | The car from the share mint's Token-2022 metadata (`make`, `model`, `year`, `city`, `class`, `park`); the payment token's decimals and symbol; sums per payment token |
+| `math.ts` | The program's `math.rs` on BigInt: `splitFee`, `sharesValue`, `proRata`, `accIncrement`, `owed`, `deposit`, and `pendingRevenue(position, accPerShare)` = `accrued + (shares × (acc − checkpoint)) >> 64`, which is exactly what a claim pays |
+| `instructions.ts` | `buySharesInstruction`, `refundInstruction`, `claimInstruction`, `openPositionInstruction`, `closePositionInstruction`, `transferSharesInstruction`; `finalizeRaiseInstruction`; admin `manageProjectInstruction` (cancel raise, pause, resume, close), `setProjectRolesInstruction`, `activateProjectInstruction`, `depositRevenueInstruction` (the oracle co-signs), `setInvestorInstruction` |
+| `transaction.ts` | Compute unit limits per action, `buildTransaction` (limit first), `MAX_CLAIMS_PER_TRANSACTION` = 4, `confirmSignature` |
+| `errors.ts` | `describeTxError`: the i18n message of a failed transaction, from Anchor's log line, a program's custom error in the logs or in a signature status (by instruction index), a wallet refusal, missing SOL, an expired blockhash or an unreachable node |
+| `eligibility.ts`, `lifecycle.ts`, `kyc.ts` | The program's KYC eligibility rule, what each project state allows, and the records the console's KYC form writes |
+
+`transferSharesInstruction` is a Token-2022 `transfer_checked` with the hook's accounts appended in the order wallets resolve them (config, project, both investors, both positions, the hook program, the validation account), so it needs no RPC call and works in wallets that do not resolve transfer hooks. A recipient without a position is onboarded with `openPositionInstruction` in the same transaction.
+
+Every send goes through `hooks/useTransactionSender.ts`: it sets the compute unit limit, has the wallet sign, polls the signature until confirmed, and shows the outcome in a toast with the Explorer link.
+
+The client is tested in `frontend/src/lib/solana/__tests__` without mocks: builders against the IDL's account lists, flags, fixed addresses and PDA seeds, and exact bytes; the transfer against `@solana/spl-token`'s own hook resolver; readers, math and PDAs against accounts the real program wrote in LiteSVM (`tests-v2/scripts/export-frontend-fixture.ts` exports them, with what each holder's claim paid).
+
+v1 clients build instructions from `target/idl/axel.json` after `anchor build`, as `tests/` and `scripts/init-project.ts` do.
+
+## Codama SDK (`sdk/axel-v2`)
+
+The Codama client covers the v2 program only. `npm run generate` runs `scripts/generate-clients.ts`, which reads `target/idl/axel_v2.json` and renders a `@solana/kit` client into `sdk/axel-v2/src/generated`. See [v2.md](v2.md#idl-and-typescript-client). The stale v1 output that used to live in `sdk/generated` was removed. The frontend keeps using Anchor with the vendored IDL, because the wallet adapter and the existing hooks are built on `@solana/web3.js` 1.
+
+## Legacy Program Reference: `axel` (v1)
 
 - Program ID: `DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M`
-- IDL: `target/idl/axel.json` and `target/types/axel.ts`, produced by `anchor build`. The frontend no longer vendors it: it runs on `axel_v2`.
+- Deployed on devnet before the hackathon; kept as legacy ([architecture.md](architecture.md#legacy-v1-programs)). The app, the backend and the seed use `axel_v2`.
+- IDL: `target/idl/axel.json` and `target/types/axel.ts`, produced by `anchor build`. It is not vendored anywhere.
 
 Anchor instruction discriminators are the first 8 bytes of `sha256("global:<instruction_name>")`.
 
@@ -738,7 +1091,7 @@ Errors: `ZeroPricePerShare`, `ProjectNotActive`. A wrong signer fails with Ancho
 
 Errors: `ProjectAlreadyClosed`. A wrong signer fails with `ConstraintHasOne`.
 
-### Accounts
+### Accounts (v1)
 
 | Account | Layout after the 8-byte discriminator |
 |---|---|
@@ -748,7 +1101,7 @@ Errors: `ProjectAlreadyClosed`. A wrong signer fails with `ConstraintHasOne`.
 | `WhitelistEntry` | `approved: bool`, `bump: u8` |
 | `TelemetryRecord` | `project: pubkey` (the mint), `date: u32`, `data_hash: [u8; 32]`, `oracle_pubkey: pubkey`, `recorded_at: i64`, `bump: u8` |
 
-### Errors (`AxelError`)
+### Errors (v1 `AxelError`)
 
 | Code | Name | Code | Name |
 |---|---|---|---|
@@ -763,7 +1116,7 @@ Errors: `ProjectAlreadyClosed`. A wrong signer fails with `ConstraintHasOne`.
 | 6008 | `InvalidRevenueVault` | 6018 | `TokensStillAvailable` |
 | 6009 | `ZeroDepositAmount` | 6019 | `ProjectAlreadyClosed` |
 
-## Program Reference: `transfer_hook`
+## Legacy Program Reference: `transfer_hook` (v1)
 
 - Program ID: `5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ`
 - Its IDL is produced by `anchor build` at `target/idl/transfer_hook.json`. It is not vendored in the frontend.
@@ -776,32 +1129,3 @@ Errors: `ProjectAlreadyClosed`. A wrong signer fails with `ConstraintHasOne`.
 Errors: `6000 SourceNotWhitelisted`, `6001 DestinationNotWhitelisted`.
 
 To send shares from a client, build the transfer with `createTransferCheckedWithTransferHookInstruction` or `transferCheckedWithTransferHook` from `@solana/spl-token`, using `TOKEN_2022_PROGRAM_ID`. These helpers resolve the extra accounts from the on-chain list, as `tests/transfer-hook-execute.test.ts` does.
-
-## TypeScript Client (frontend, `axel_v2`)
-
-The frontend talks to `axel_v2` through `@coral-xyz/anchor` and the IDL vendored in `frontend/src/lib/solana/idl-v2/`. `lib/solana/program.ts` builds the `Program` at the configured address; it only builds instructions and decodes accounts, and every read goes through the `Connection` the caller passes.
-
-| Module | What it has |
-|---|---|
-| `connection.ts` | Cluster, RPC URL and program ID from the environment; Explorer links |
-| `pda.ts` | `configAddress`, `investorAddress(wallet)`, `projectAddress(shareMint)`, `positionAddress(project, owner)`, `periodAddress(project, index)`, `escrowAddress(project)`, `revenueAddress(project)`, `extraAccountMetasAddress(shareMint)`; `shareAccountAddress` and `paymentAccountAddress` for the owners' canonical token accounts |
-| `accounts.ts` | Decoders from account bytes to plain types with `bigint` amounts; account sizes and the memcmp offsets readers filter by |
-| `readers.ts` | `fetchConfig`, `fetchInvestor(wallet)`, `fetchProjects` (one `getProgramAccounts` plus one `getMultipleAccounts` for the share and payment mints), `fetchProject(shareMint)`, `fetchPositions(owner)` (memcmp on the owner at offset 40), `fetchPosition`, `fetchRevenuePeriods(project)` (memcmp at offset 8), `fetchTokenBalance` |
-| `tokens.ts` | The car from the share mint's Token-2022 metadata (`make`, `model`, `year`, `city`, `class`, `park`); the payment token's decimals and symbol; sums per payment token |
-| `math.ts` | The program's `math.rs` on BigInt: `splitFee`, `sharesValue`, `proRata`, `accIncrement`, `owed`, `deposit`, and `pendingRevenue(position, accPerShare)` = `accrued + (shares × (acc − checkpoint)) >> 64`, which is exactly what a claim pays |
-| `instructions.ts` | `buySharesInstruction`, `refundInstruction`, `claimInstruction`, `openPositionInstruction`, `closePositionInstruction`, `transferSharesInstruction`; `finalizeRaiseInstruction`; admin `manageProjectInstruction` (cancel raise, pause, resume, close), `setProjectRolesInstruction`, `activateProjectInstruction`, `depositRevenueInstruction` (the oracle co-signs), `setInvestorInstruction` |
-| `transaction.ts` | Compute unit limits per action, `buildTransaction` (limit first), `MAX_CLAIMS_PER_TRANSACTION` = 4, `confirmSignature` |
-| `errors.ts` | `describeTxError`: the i18n message of a failed transaction, from Anchor's log line, a program's custom error in the logs or in a signature status (by instruction index), a wallet refusal, missing SOL, an expired blockhash or an unreachable node |
-| `eligibility.ts`, `lifecycle.ts`, `kyc.ts` | The program's KYC eligibility rule, what each project state allows, and the records the console's KYC form writes |
-
-`transferSharesInstruction` is a Token-2022 `transfer_checked` with the hook's accounts appended in the order wallets resolve them (config, project, both investors, both positions, the hook program, the validation account), so it needs no RPC call and works in wallets that do not resolve transfer hooks. A recipient without a position is onboarded with `openPositionInstruction` in the same transaction.
-
-Every send goes through `hooks/useTransactionSender.ts`: it sets the compute unit limit, has the wallet sign, polls the signature until confirmed, and shows the outcome in a toast with the Explorer link.
-
-The client is tested in `frontend/src/lib/solana/__tests__` without mocks: builders against the IDL's account lists, flags, fixed addresses and PDA seeds, and exact bytes; the transfer against `@solana/spl-token`'s own hook resolver; readers, math and PDAs against accounts the real program wrote in LiteSVM (`tests-v2/scripts/export-frontend-fixture.ts` exports them, with what each holder's claim paid).
-
-v1 clients build instructions from `target/idl/axel.json` after `anchor build`, as `tests/` and `scripts/init-project.ts` do.
-
-## Codama SDK (`sdk/axel-v2`)
-
-The Codama client covers the v2 program only. `npm run generate` runs `scripts/generate-clients.ts`, which reads `target/idl/axel_v2.json` and renders a `@solana/kit` client into `sdk/axel-v2/src/generated`. See [v2.md](v2.md#idl-and-typescript-client). The stale v1 output that used to live in `sdk/generated` was removed. The frontend keeps using Anchor with the vendored IDL, because the wallet adapter and the existing hooks are built on `@solana/web3.js` 1.

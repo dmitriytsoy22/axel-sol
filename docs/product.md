@@ -1,93 +1,101 @@
 # Product
 
-This page describes the v1 product that runs on devnet today. The frontend has already moved to the v2 program ([v2.md](v2.md)), which is not deployed yet: there, buyers pay a stablecoin into escrow and get a refund if the raise fails, KYC is a per-wallet record written by the KYC key, revenue is claimed per car whenever the holder likes, and transfers need no fee. [architecture.md](architecture.md#frontend) lists what each page does on v2.
+This page describes AXEL as built on the v2 program, `axel_v2` ([v2.md](v2.md)). v2 is not deployed yet: it runs on local validators and in the end-to-end suite, with a fictional demo fleet. The v1 product that has been on devnet since April 2026 is summarized at the end ([v1, the pre-hackathon product](#v1-the-pre-hackathon-product)).
 
 ## What is AXEL?
 
-AXEL tokenizes taxi cars on Solana. Each car is a project with its own Token-2022 mint. The car's VIN, make, model, year and valuation are stored in on-chain token metadata.
+AXEL lets people own shares of a specific working taxi car in Kazakhstan and receive its income on Solana.
 
-- **Buying.** Wallets that passed KYC and are whitelisted buy whole shares for SOL at a fixed price.
-- **Revenue.** The car owner deposits the car's revenue into a program vault once per period. Each holder claims a pro-rata share.
-- **Transfers.** A transfer hook lets shares move only between whitelisted wallets.
-- **Telemetry.** A backend oracle publishes each car's daily figures (trips, mileage, the rent the park charged) and appends their SHA-256 to the v2 program's hash chain. The v2 program is not deployed yet, and the backend writes no v1 telemetry.
+- **One car, one project.** Each car has its own project account and its own Token-2022 share mint. The car's make, model, year, city, class and park are in the mint's on-chain metadata.
+- **Raise in escrow.** Verified investors buy whole shares at a fixed price in a stablecoin (tKZT test tenge on devnet). The money waits in the project's escrow vault. If the raise misses its soft cap by the deadline, or the car is not bought in time, every buyer gets exactly their money back.
+- **The fleet runs the car.** When the raise succeeds, the platform releases the escrow to the fleet operator against the hash of the car's purchase documents. The operator puts the car on the road with drivers through a taxi park.
+- **Attested income.** Each month the operator deposits the car's net income. The platform's oracle co-signs a deposit only when its report adds up from the car's published daily trip data, and the report's hash goes on-chain with the deposit.
+- **Claims and transfers.** Each holder claims its share of every deposit whenever it likes. Shares can move only between verified wallets, and the income earned before a transfer stays with the sender.
+- **Recovery.** A holder who loses its wallet, or its heirs, can get the shares back through a time-locked process the owner can veto.
 
-**Status:** MVP on Solana devnet, not audited. Only devnet SOL is involved. Nothing in the repository shows a live vehicle or Yandex Fleet park connected. [architecture.md](architecture.md#known-limitations) lists the open issues.
+**Status:** not deployed and not audited. The demo data is fictional, and no live vehicle or Yandex Fleet park is connected. [architecture.md](architecture.md#known-limitations) lists the open issues.
 
 ## Problem
 
-1. **Owning a cash-flowing car is all-or-nothing.** A taxi earns every day, but getting that income means buying and running the whole car. There is no simple way to hold a small, transferable share of one specific vehicle.
+1. **Owning a cash-flowing car is all-or-nothing.** A taxi earns every day, but getting that income means buying and running the whole car. There is no simple way to hold a small, transferable share of one specific vehicle, or to pool money safely for a car that is not bought yet.
 2. **Income reported by the owner is hard to check.** Ride-hailing platforms such as Yandex Pro already record every order per car. Co-investors normally see only what the owner chooses to report.
 3. **Shares of a real asset need holder rules.** A plain SPL token can be sent to anyone. Real-asset shares need an allow-list of holders, and they need that list enforced on every transfer, not only on the first sale.
 
 ## Target Users
 
-- **Car owner / operator (project admin).** The owner already owns a car and runs it through Yandex Pro. They sell shares in it and then deposit its revenue each period. Per the spec, the admin "already owns the vehicle". AXEL is a direct sale of ownership shares, not a fundraise.
-- **Investors.** Individuals with a Solana wallet (Phantom or Solflare in the UI) who pass KYC. They want small, direct exposure to one real vehicle's income, and payouts they can check on-chain.
-- **Platform operator.** Runs the backend, with a separate key for each role:
-  - the daily telemetry job and the co-signing of revenue deposits, as the projects' v2 oracle;
-  - the KYC flow, whose webhook writes v2 KYC records.
+- **Investors.** Individuals with a Solana wallet who pass KYC. They want small, direct exposure to one real vehicle's income, payouts they can check on-chain, and their money back if the car is never bought.
+- **Fleet operators.** Taxi fleets in Kazakhstan's cities (the demo has Almaty, Astana and Shymkent) that want to add cars without borrowing. They receive the raise to buy the car, run it, and deposit its income each month.
+- **The platform.** It creates projects, releases raises, runs KYC and the oracle, and earns fees. Each of its roles has a separate key:
+  - the admin (a Squads multisig on mainnet);
+  - the KYC key, held by the backend;
+  - the oracle key, held by the backend;
+  - the treasury.
 
 ## How It Works
 
-1. **Create a project.**
-   - The owner runs `npm run init-project`, which calls `initialize_project`.
-   - This creates a Token-2022 mint with 0 decimals and fixes the maximum share count: `car_cost / price_per_share`.
-   - No shares exist yet. There is no UI for this step.
-2. **Get whitelisted.** On v1 an investor's wallet gets a `WhitelistEntry` by calling `add_to_whitelist` directly. On v2 the backend's Sumsub flow writes KYC records, and so does the console's KYC tab.
-3. **Buy shares.**
-   - On the asset page, the investor picks a number of shares.
-   - `buy_tokens` sends `shares × price` in SOL straight to the owner's wallet, then mints the shares into the investor's token account.
-   - On a first purchase it also creates that account and unfreezes it.
-4. **Deposit revenue.**
-   - The owner deposits the period's net amount with `deposit_revenue`, in SOL. (The v1 admin panel had a form for it; the v2 console leaves deposits to the backend, because v2 needs the oracle's co-signature.)
-   - The program records the number of shares sold at that moment.
-5. **Claim.** On the dashboard, each holder claims `balance / shares sold at deposit × period amount` from the vault, once per wallet per period. "Claim all" batches several periods into one transaction.
-6. **Transfer.**
-   - Holders can send shares to another whitelisted wallet.
-   - Token-2022 withholds a 1% fee, in shares, from each transfer.
-   - The hook rejects any transfer where either side is not whitelisted.
-7. **Verify activity (v2).**
-   - The backend reads each day of the car from Yandex Fleet: trips and distance from the orders, and the rent from the park's charges.
-   - It publishes the day as canonical JSON and appends its SHA-256 to the project's on-chain hash chain.
-   - Anyone can fetch the published days, recompute the chain and compare it with the program's head.
-   - The oracle co-signs a revenue deposit only when its report adds up from those days and the operator's stated expenses. The report's hash is stored with the deposit.
-   - The asset page's "Check the car's data yourself" downloads the published daily records and reports and recomputes the chain and every report hash in the browser; the Proof of solvency page checks every vault against what the program owes.
+1. **KYC.** An investor's wallet gets an `Investor` record: active, with an expiry and a jurisdiction.
+   - The backend writes it after Sumsub approves the wallet, which first signs in with Sign-In With Solana.
+   - The console's KYC tab can write it by hand.
+   - On devnet the judge demo writes a 29-day DEMO record that only demo cars accept.
+2. **Open a raise.** The admin creates the project: the share mint, the price per share in a stablecoin, the number of shares, the soft cap, the raise deadline, the activation window, the operator and the oracle. There is no UI for this step yet; the demo seed creates the projects.
+3. **Buy shares.** On the car page the investor picks a number of shares. The dialog explains where the money goes, the refund rule, and any power the stablecoin's issuer has to freeze funds. `buy_shares` pays into the escrow and mints the shares.
+4. **Settle the raise.** When the outcome is certain, anyone can settle it: Funded (the soft cap was met, and the raise sold out or reached its deadline) or Failed. In Failed each buyer takes a refund of exactly what they paid, and the refund dialog settles the raise first if nobody has.
+5. **Release to the operator.** The admin activates a funded raise before its activation deadline, with the purchase documents' hash. The platform's raise fee goes to the treasury, and the rest to the operator. The car is now "On the road".
+6. **Record the car's days.** The backend publishes each day of the car and appends its hash to the project's on-chain chain. A day's record holds the trips, kilometres, the rent the park charged, and whether the data is real or simulated.
+7. **Deposit income.** For each month:
+   - the operator drafts a report with the backend: rent from the published days − park fee − maintenance − insurance;
+   - the operator signs the `deposit_revenue` that report implies;
+   - the backend's oracle adds its signature only if the deposit matches the rebuilt report.
 
-## Business Model (as implemented)
+   The platform's revenue fee goes to the treasury, and the rest is split among holders at once, by shares.
+8. **Claim.** The portfolio shows exactly what a claim pays now. A holder claims per car or with "Claim all" (up to four cars per transaction), and the money always goes to the holder's own token account.
+9. **Transfer.** A holder sends shares to another verified wallet. The recipient's KYC is checked while its address is typed, and a first-time recipient is onboarded in the same transaction. The hook checks both wallets on every transfer, whichever app sends it.
+10. **Verify.** "Check the car's data yourself" on the car page recomputes, in the browser, the chain of published days and every report hash, and compares them with the chain. The Proof of solvency page checks every car's vaults against what the program owes.
+11. **End of the car's life.** When the car is sold, the proceeds are deposited as a `Final` payout and the project is closed. Claims stay open for good.
+
+## Business Model
 
 | Money flow | Payer → receiver | Mechanism |
 |---|---|---|
-| Primary sale | Investor → admin wallet, at purchase time | `buy_tokens` transfers `shares × price_per_share` lamports. There is no escrow, deadline or refund. |
-| Revenue distribution | Admin → revenue vault → holders | `deposit_revenue` once per period, then `claim_revenue` pro-rata by each holder |
-| Secondary transfer fee | Sender → withheld in recipient's token account (shares, not SOL) | Token-2022 `TransferFeeConfig`, 100 bps, no maximum. The admin is the withdraw-withheld authority. No instruction or UI collects the fees yet. |
-| Project close | Revenue vault → admin | `close_project` sweeps the whole vault, including any unclaimed revenue |
+| Raise | Investors → escrow → operator | `buy_shares` into the escrow; `activate_project` pays the operator. Refunds from the escrow if the raise fails |
+| Raise fee | Escrow → treasury, at activation | `raise_fee_bps` of the raise; at most 5%, the demo uses 2% |
+| Monthly income | Operator → revenue vault → holders | `deposit_revenue` with the oracle's co-signature, then `claim` by or for each holder |
+| Revenue fee | Deposit → treasury | `revenue_fee_bps` of each deposit; at most 20%, the demo uses 5% |
+| Sale of the car | Operator → revenue vault → holders | A `Final` deposit through the same accumulator, charged the same revenue fee |
 
-What the code does **not** contain:
-
-- **No platform fee** or subscription of any kind.
-- **No off-chain pricing.** Prices are set in SOL by the admin (`update_price`, no UI).
-- **No enforced revenue formula.** The spec's formula `Profit = Revenue − Expenses − Reserve` is computed only in the admin form. The program records whatever amount is deposited.
-- **No revenue tie-in to telemetry on v1.** The v1 program records whatever amount the admin deposits. On v2 the backend's oracle co-signs a deposit only if it matches a report built from the published days: rent − park fee − maintenance − insurance.
+- **Fees are fixed per project.** Both rates are copied from the config when the project is created, so a later config change never touches an existing car.
+- **No transfer fee.** Transfers between holders cost only the Solana network fee.
+- **Demo figures.** Car prices, rents, the park's fee and expenses in the demo seed are labelled assumptions ([`scripts/seed-devnet/economics.ts`](../scripts/seed-devnet/economics.ts)). They have not been checked against real listings and parks.
 
 ## What Is Enforced vs What Is Trusted
 
-| Enforced by the programs | Still trusted off-chain |
+| Enforced by the program | Still trusted off-chain |
 |---|---|
-| Only whitelisted wallets can buy, and both sides of a transfer must be whitelisted | Who gets whitelisted. KYC runs off-chain, and the current program lets any signer edit the whitelist ([known limitation](architecture.md#known-limitations)). |
-| Supply cap; mint authority can be revoked for good once all shares are sold | That the car exists and matches the VIN in metadata |
-| Pro-rata payout math, one claim per wallet per period | That the admin deposits the car's real net revenue |
-| Only the registered oracle can write telemetry, once per day (v1); on v2, days only append to a hash chain, and every deposit needs the oracle's co-signature | That the oracle's data really came from Yandex, and that the operator's expense items are complete. Simulated data is marked `data_origin: "simulated"` in every record and is refused on mainnet. |
-| Price, supply, sales, deposits and claims are all public accounts | The admin's use of permanent-delegate, fee and close powers |
+| Only wallets with an eligible KYC record can buy, receive or send shares; the hook checks both owners on every transfer | That the KYC provider verified the person correctly |
+| The raise sits in escrow until activation; a failed raise refunds every buyer exactly; activation needs the purchase documents' hash | That the operator really bought the car the documents describe |
+| Every deposit carries the oracle's co-signature, the report hash and the telemetry head; the telemetry chain is append-only | That the fleet system reported the truth and that the operator's expense items are complete. Simulated data is marked `data_origin: "simulated"` in every record and refused on mainnet |
+| Pro-rata payouts through the accumulator; payouts never exceed net deposits; money goes only to the owner's own account | That the operator deposits every month's income |
+| Fees capped at 5% and 20% and fixed per project; the price is immutable; no instruction sweeps a vault | That the admin activates, pauses and closes projects in good faith, within those limits |
+| Recovery needs a time lock and gives the owner a veto | That the admin proposes recoveries only for genuine lost-key or inheritance cases |
 
 ## MVP Limits
 
-- **Devnet only.** Two test projects exist, both created by the seed script with the same test car metadata (Toyota Camry 2023). Nothing is deployed to mainnet, and the programs have not been audited.
-- **One car per project.** The program supports many projects (one per mint); the v2 console switches between them, and projects can only be created from the CLI.
-- **Centralized oracle.** A single backend keypair and a single data source (Yandex Fleet API). A car can be configured as simulated, and its records say so.
-- **Global whitelist.** One `WhitelistEntry` per wallet covers every project.
-- **Units.**
-  - Prices and payouts are in SOL; telemetry revenue is in KZT.
-  - No fiat on- or off-ramp.
-  - Shares are whole units, and the 1% fee rounds up to at least one share per transfer.
-- **KYC loop not wired in the UI.** The backend's sign-in and Sumsub endpoints exist and write v2 records, but the frontend has no KYC flow yet. The asset page only reads the wallet's KYC record and explains why buying is unavailable.
-- **Single keys.** Admin and oracle are single keys. On devnet they are the same key. No multisig is configured.
+- **Not deployed.** v2 runs on local validators; devnet deployment is blocked on devnet SOL. The programs have not been audited.
+- **Fictional demo fleet.** Every car, park and investor in the demo is generated by `scripts/seed-devnet` and labelled as such, and tKZT has no market value.
+- **Centralized oracle.** One backend key per project and one data source, Yandex Fleet, whose request formats have not been run against a real park.
+- **Not every flow is in the web app yet.**
+  - Project creation happens in the seed or a script.
+  - The operator's attested deposit flow runs through the backend's API; the console does not call it.
+  - The Sumsub KYC flow exists in the backend; the web app does not start it.
+- **Units.** Prices and payouts are in the project's payment stablecoin; report figures are whole tenge. There is no fiat on- or off-ramp. Shares are whole units.
+- **Single keys on devnet.** The admin, KYC, oracle and upgrade keys are single keys; mainnet requires Squads multisigs for the admin and the upgrade authority.
+
+## v1, the pre-hackathon product
+
+The v1 programs (`axel` and `transfer_hook`) are on devnet since 2026-04-07, with two test projects. They sold shares directly for SOL: the admin received the money at once, with no escrow or refund.
+
+- **KYC.** A global whitelist that any signer could edit.
+- **Revenue.** The admin deposited SOL once per period, and holders claimed on their current balance.
+- **Transfers.** Token-2022 withheld a 1% fee on each transfer.
+
+The web app no longer uses v1. Its limitations and the v2 fix for each are in [architecture.md](architecture.md#v1-limitations) and [v2.md](v2.md#v1-limitation--v2-fix).

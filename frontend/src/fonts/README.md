@@ -2,7 +2,8 @@
 
 All fonts are self-hosted through `next/font/local`, so the build never calls Google Fonts.
 Each file is a variable WOFF2 subset. The subset covers Latin, Latin-1, Latin Extended-A, the full
-Cyrillic block (Russian and Kazakh: Ә Ғ Қ Ң Ө Ұ Ү Һ І), general punctuation, currency signs
+Cyrillic block (Russian and Kazakh, including U+04D8, U+0492, U+049A, U+04A2, U+04E8, U+04B0, U+04AE,
+U+04BA and U+0406), general punctuation, currency signs
 including ₸, arrows and a few math signs.
 
 | File                           | Role                               | Source                                                        | License                            | Changes                                                                                                                                                                                |

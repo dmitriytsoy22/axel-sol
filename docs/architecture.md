@@ -1,83 +1,83 @@
 # Architecture
 
-This document describes the code as it is in this repository. Where the code and the earlier planning documents disagree, the code wins. [planning/README.md](planning/README.md) lists those differences.
+This document describes the code as it is in this repository. Where the code and the earlier planning documents disagree, the code wins; [planning/README.md](planning/README.md) lists those differences. The full specification of the program (every account, instruction, check, state and test) is in [v2.md](v2.md).
 
 ## System Overview
 
-AXEL has four parts:
+AXEL has five parts:
 
-- Two Anchor programs on Solana: `axel` and `transfer_hook`.
-- One Token-2022 mint per car.
-- A Next.js frontend that reads chain state directly.
-- A small NestJS backend. It does the jobs that need secrets or a server:
-  - binding wallets to Sumsub applicants and writing their v2 KYC records;
-  - the daily telemetry job, which publishes each car's day and appends its hash to the v2 chain as the project's oracle;
+- **`axel_v2`**, one Anchor program on Solana ([v2.md](v2.md)). It takes a car's raise in escrow, keeps the KYC registry, is the transfer hook of every share mint, distributes attested revenue, records telemetry and runs share recovery.
+- **One Token-2022 share mint per car**, whose every authority is the project PDA or none, and **stablecoin vaults** (escrow and revenue) owned by the project PDA.
+- **A Next.js web app** that reads chain state directly and builds transactions from the vendored IDL. It also hosts the judge demo routes and the Solana Actions (Blinks).
+- **A NestJS backend** for the jobs that need secrets or a server:
+  - binding wallets to Sumsub applicants and writing their KYC records;
+  - the daily telemetry job, which publishes each car's day and appends its hash to the chain as the project's oracle;
   - co-signing revenue deposits whose report matches the published data;
-  - indexing the history of v2 program events for project timelines and claim histories.
+  - indexing the history of program events for project timelines and claim histories.
 
   It keeps KYC state, the published days, the attested reports and the indexed events in one SQLite file.
+- **The demo seed** ([`scripts/seed-devnet`](../scripts/seed-devnet/README.md)), which fills a cluster with a fictional fleet in every project state and publishes the files the app verifies.
 
-The frontend and the backend run on the v2 program, `axel_v2` ([v2.md](v2.md)), which is not deployed yet. The program sections of this document describe v1, which is what devnet runs.
+**Deployment status.** `axel_v2` is not deployed yet; everything above runs on local validators and in the end-to-end suite. The v1 programs (`axel` and `transfer_hook`) that were deployed to devnet before the hackathon are kept as legacy and are described at the end of this document ([Legacy: v1 Programs](#legacy-v1-programs)).
 
 ```
-             Investor / admin browser (Phantom or Solflare, devnet)
-                                   │
-                                   ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ Frontend — Next.js 14 (frontend/)                                │
-│ catalog · asset page · dashboard · payouts · solvency · admin    │
-│ reads accounts over JSON-RPC, builds transactions from the IDL   │
-└───────┬───────────────────────────────────────────┬──────────────┘
-        │ RPC reads + wallet-signed transactions    │ HTTP /telemetry/*, /reports/*, /events
-        ▼                                           ▼
-┌────────────────────────────────┐   ┌────────────────────────────────────┐
-│ Solana (devnet)                │   │ Backend — NestJS 11 (backend/)     │
-│                                │   │ SQLite: KYC, published days,       │
-│ axel program                   │   │   attested reports, event index    │
-│   12 instructions, 5 acct types│   │ telemetry job                      │──► Yandex Fleet API
-│ axel_v2 program (not deployed) │◄──┤   record_telemetry (oracle key)    │
-│ transfer_hook program          │ tx│ reports: co-sign deposit_revenue   │
-│ Token-2022 mint (one per car)  │   │ KYC sign-in + Sumsub webhook       │◄── Sumsub webhook
-│                                │   │   set_investor (KYC authority key) │
-│                                ├──►│ event indexer                      │
-└────────────────────────────────┘ ws│   logsSubscribe + history (RPC)    │
-                                     └────────────────────────────────────┘
+            Investor / judge wallet (Phantom, Solflare or any Wallet Standard wallet)
+                                       │
+                                       ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ Web app — Next.js 14 (frontend/)                                       │
+│ catalog · car page + Verify · portfolio · payouts · solvency · console │
+│ /demo, /api/demo/* (judge routes) · /api/actions/* (Blinks)            │
+│ reads accounts over JSON-RPC, builds transactions from the v2 IDL      │
+└───────┬──────────────────────────────────────────────┬─────────────────┘
+        │ RPC reads + wallet-signed transactions       │ HTTP /telemetry/*, /reports/*, /events
+        ▼                                              ▼
+┌──────────────────────────────────────┐   ┌────────────────────────────────────┐
+│ Solana                               │   │ Backend — NestJS 11 (backend/)     │
+│                                      │   │ SQLite: KYC, published days,       │
+│ axel_v2 (24 instructions)            │   │   attested reports, event index    │
+│   Config · Investor · Project        │   │ telemetry job                      │──► Yandex Fleet API
+│   Position · RevenuePeriod           │◄──┤   record_telemetry (oracle key)    │
+│   RecoveryRequest                    │ tx│ reports: co-sign deposit_revenue   │
+│   escrow + revenue token vaults      │   │ KYC sign-in + Sumsub webhook       │◄── Sumsub webhook
+│ Token-2022 share mint (one per car)  │   │   set_investor (KYC authority key) │
+│   transfer hook → axel_v2 `execute`  ├──►│ event indexer                      │
+│ payment mint (stablecoin)            │ ws│   logsSubscribe + history (RPC)    │
+└──────────────────────────────────────┘   └────────────────────────────────────┘
 ```
 
 **Golden rule (from the spec):**
-- Business state lives in on-chain accounts. The frontend reads it straight from RPC, and no server keeps a copy.
+- Business state lives in on-chain accounts. The web app reads it straight from RPC, and no server keeps a copy.
 - The backend's SQLite file holds:
   - sign-in nonces, which wallet belongs to which Sumsub applicant, and a log of webhook events;
   - the published text of every telemetry day, with its place in the chain;
   - the revenue reports the oracle attested;
-  - an index of the v2 program's events. It is a copy of chain history for timelines, not state: balances and project states are still read from the accounts, and the index can be rebuilt from the chain.
+  - an index of the program's events. It is a copy of chain history for timelines, not state: balances and project states are still read from the accounts, and the index can be rebuilt from the chain.
 
-  KYC status itself lives in the v2 `Investor` accounts. The telemetry chain head and each deposit's report hash live in `Project` and `RevenuePeriod`, so the stored texts can always be checked against the chain.
+  KYC status itself lives in the `Investor` accounts. The telemetry chain head and each deposit's report hash live in `Project` and `RevenuePeriod`, so the stored texts can always be checked against the chain.
 
 ## Repository Layout
 
 ```
 programs/
-  axel/src/
-    lib.rs                      entry point, 12 instructions
-    errors.rs                   AxelError (codes 6000–6019)
-    state/                      ProjectState, RevenuePeriod, ClaimRecord, WhitelistEntry, TelemetryRecord
-    instructions/admin/         initialize_project, whitelist, deposit_revenue, pause_resume,
-                                revoke_mint_authority, update_price, close_project
-    instructions/investor/      buy_tokens, claim_revenue
-    instructions/oracle/        record_telemetry
-  transfer-hook/src/lib.rs      execute, fallback, initialize_extra_account_meta_list
-tests/                          12 integration test files (node:test, local validator at 127.0.0.1:8899)
-scripts/                        init-project.ts (seed a project), generate-clients.ts (Codama)
-sdk/axel-v2/                    Codama TypeScript client of the v2 program (see v2.md)
-backend/src/                    health, kyc, fleet (Yandex Fleet client, simulator), telemetry, reports, indexer, solana modules
+  axel-v2/src/                  v2 program: instructions/, state/, math.rs, hook, constants, errors (docs/v2.md)
+  axel/src/, transfer-hook/src/ v1 programs (legacy, devnet)
+tests-v2/                       v2 program tests on LiteSVM (node:test); scripts/ exports the frontend fixture
+tests/                          v1 integration tests (node:test, local validator at 127.0.0.1:8899)
+sdk/axel-v2/                    Codama TypeScript client of axel_v2 (@solana/kit)
+scripts/
+  seed-devnet/                  demo seed: plan, executor, SOL budget, publishing, proof-of-solvency check
+  generate-clients.ts           Codama generation of sdk/axel-v2
+  init-project.ts               v1 project creation
+backend/src/                    health, kyc, fleet (Yandex Fleet client, simulator), telemetry, reports, indexer, solana
 frontend/src/
   app/[locale]/                 routes (en default, ru, kk)
   app/api/demo/                 judge demo routes (devnet and localnet only)
   app/api/actions/, app/actions.json   Solana Actions (Blinks): invest and claim
-  hooks/                        chain reads and transaction hooks (axel_v2)
+  hooks/                        chain reads and transaction hooks
   lib/solana/                   axel_v2 client: cluster config, PDAs, readers, math, instruction builders, error messages, vendored IDL (idl-v2/)
-  lib/api/                      telemetry and indexer HTTP clients
+  lib/verify/                   in-browser verification of published car data
+  lib/api/                      telemetry, indexer and published-data HTTP clients
   lib/demo/, lib/actions/       demo route logic (keys, limits, tokens, transactions) and the Actions handlers
 frontend/e2e/                   Playwright suite on a local stack: validator + demo seed + backend + next dev (e2e/stack/)
 Anchor.toml                     program IDs for localnet and devnet; provider cluster = devnet
@@ -86,16 +86,23 @@ Anchor.toml                     program IDs for localnet and devnet; provider cl
 Toolchain pins:
 - Anchor 0.32.1
 - `spl-token-2022` 8
-- `rust-toolchain.toml` pins Rust 1.89.0
+- `rust-toolchain.toml` pins Rust 1.89.0; the root `Cargo.toml` pins platform-tools v1.52
 
-## Deployed Programs (devnet)
+## Deployment
 
-| Program | ID |
-|---|---|
-| axel | [`DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M`](https://explorer.solana.com/address/DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M?cluster=devnet) |
-| transfer_hook | [`5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ`](https://explorer.solana.com/address/5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ?cluster=devnet) |
+| Program | Cluster | ID |
+|---|---|---|
+| `axel_v2` | not deployed | `AXLcoEH3vJXUSL7nEr1T4d77NarThcbVrnbBzBR8XPZi` (reserved; the keypair is kept outside the repository) |
+| `axel` (v1) | devnet | [`DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M`](https://explorer.solana.com/address/DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M?cluster=devnet) |
+| `transfer_hook` (v1) | devnet | [`5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ`](https://explorer.solana.com/address/5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ?cluster=devnet) |
 
-On 2026-09-24, devnet held two `ProjectState` accounts. Both were created by `scripts/init-project.ts` and carry its test metadata:
+**What deploying v2 needs.**
+- **Program.** About 4.12 SOL of rent at devnet's current rate for the 811,688-byte program ([v2.md](v2.md#build-test-and-deploy)).
+- **Config and demo data.** The deployer, as upgrade authority, calls `initialize_config`. The demo seed does this, then fills the program with the fictional fleet: about 1.62 SOL at full scale, run twice an hour apart for the recovery.
+- **Web app.** The seed needs the public site's URL first, because the share mints' metadata points to it. The judge demo's faucet needs about 1.8 SOL for 80 judges and 150 simulated months.
+- **Blocker.** None of this has devnet SOL yet.
+
+On 2026-09-24, devnet held two v1 `ProjectState` accounts. Both were created by `scripts/init-project.ts` and carry its test metadata:
 - Token name "Axel Taxi #001"
 - Toyota Camry 2023, VIN `XTA210990Y2856777`
 
@@ -111,124 +118,126 @@ Both projects have the same settings:
 
 Every transaction on these two accounts is dated 2026-04-07: 4 and 6 transactions respectively.
 
-## Token-2022 Mint
+## Roles and Keys
 
-`initialize_project` creates the mint with 0 decimals, so one token is one whole share. It then configures six mint extensions. The table shows each extension and who holds its authority.
-
-| Extension | Configuration in `initialize_project.rs` | Authority |
-|---|---|---|
-| TransferHook | Hook program = `params.transfer_hook_program_id` (the seed script passes the deployed `transfer_hook`) | admin |
-| DefaultAccountState | `Frozen`: every new token account starts frozen | — |
-| PermanentDelegate | Delegate can transfer or burn shares from any holder account | admin |
-| TransferFeeConfig | 100 basis points (1%), maximum fee `u64::MAX` (no cap) | config and withdraw-withheld: admin |
-| MetadataPointer | Points to the mint itself | admin |
-| TokenMetadata | name, symbol, uri, and extra fields `vin`, `make`, `model`, `year`, `valuation_sol` | update authority: admin |
-
-The mint's base authorities:
-
-- **Mint authority:** the `ProjectState` PDA, so only the program can mint. `revoke_mint_authority` sets it to `None` once every share is sold.
-- **Freeze authority:** the `ProjectState` PDA. The program thaws a buyer's new token account inside `buy_tokens`.
-
-Other details:
-
-- **No shares at creation.** `initialize_project` mints nothing. Shares are minted to the buyer inside `buy_tokens`. Minting is not a transfer, so primary sales do not trigger the hook or the fee.
-- **Transfer fee:** withheld in shares, not SOL, in the recipient's token account. No program instruction or UI collects withheld fees yet. The admin could withdraw them with standard Token-2022 instructions as the withdraw-withheld authority.
-- **Memo Transfer:** not enabled. It was in the spec but is not in the code.
-- **Hook setup:** the mint does not create the hook's `ExtraAccountMetaList`. That account must be created separately with `transfer_hook.initialize_extra_account_meta_list` (see [Known Limitations](#known-limitations)).
-
-## Accounts and PDAs
-
-All `axel` accounts are Anchor accounts (8-byte discriminator), owned by the `axel` program. Integers are little-endian where they appear in seeds.
-
-| Account | Program | Seeds | Fields |
+| Role | On-chain | Who holds it | Can |
 |---|---|---|---|
-| `ProjectState` | axel | `["project", mint]` | `admin`, `mint`, `revenue_vault`, `token_supply`, `tokens_sold`, `price_per_share` (lamports), `status` (Active / Paused / Closed), `period_count`, `oracle_pubkey`, `bump`, `revenue_vault_bump` |
-| Revenue vault | axel (system-owned address) | `["revenue", mint]` | No data. A plain system account that holds the SOL for payouts; only the program can sign for it. |
-| `RevenuePeriod` | axel | `["revenue_period", mint, period_index: u32]` | `project` (stores the **mint**), `period_index`, `total_deposited` (lamports), `token_supply_snapshot`, `deposited_at`, `bump` |
-| `ClaimRecord` | axel | `["claim", revenue_period_pda, investor]` | `claimed`, `bump`. Its existence blocks a second claim by the same wallet for that period. |
-| `WhitelistEntry` | axel | `["whitelist", wallet]` | `approved`, `bump`. **Global**: one entry per wallet, shared by all projects. |
-| `TelemetryRecord` | axel | `["telemetry", mint, date: u32]` | `project` (stores the mint), `date` (YYYYMMDD, e.g. `20260401`), `data_hash` (SHA-256), `oracle_pubkey`, `recorded_at`, `bump` |
-| `ExtraAccountMetaList` | transfer_hook | `["extra-account-metas", mint]` | The extra accounts Token-2022 must pass to the hook (see below) |
-| Investor token account | Associated Token program | standard ATA for Token-2022 | Created and thawed by `buy_tokens` the first time a wallet buys |
+| Upgrade authority | `ProgramData.upgrade_authority` | the deployer; a Squads multisig on mainnet | upgrade the program; call `initialize_config` once |
+| Admin | `Config.admin` | the founder's key; a Squads multisig on mainnet | create projects, activate or cancel a raise, pause, resume and close projects, change operator and oracle, update the config within hard caps, propose a recovery |
+| KYC authority | `Config.kyc_authority` | the backend (`KYC_AUTHORITY_KEYPAIR_PATH`) | write any `Investor` record |
+| Demo KYC authority | `Config.demo_kyc_authority` | the web server's demo routes (`DEMO_KYC_SECRET`), devnet only; the default key disables it | grant or revoke DEMO access for at most 30 days, nothing else |
+| Treasury | `Config.treasury` | the platform | receives the raise and revenue fees in its associated token accounts |
+| Operator | `Project.operator` | the fleet that runs the car | receives the raise on activation; pays in revenue |
+| Oracle | `Project.oracle` | the backend (`ORACLE_KEYPAIR_PATH`); the demo car's oracle is a demo route key | record telemetry; co-sign every revenue deposit |
+| Anyone | — | any wallet | finalize a raise, open a position for a verified wallet, claim for a holder, execute a recovery after its delay |
 
-## Instructions (`axel` program)
+The operator and the oracle must be different keys. The KYC key and the demo KYC key must differ. The web server's demo routes hold five keys (faucet, demo KYC, desk, the demo car's operator and oracle) and never the admin, KYC authority, treasury or upgrade keys ([api.md](api.md#judge-demo-api)).
 
-There are 12 instructions. "Admin" means `ProjectState.admin`, enforced with Anchor `has_one = admin`.
+## The `axel_v2` Program
 
-| # | Instruction | Who can call | Preconditions | Effect |
-|---|---|---|---|---|
-| 1 | `initialize_project(params)` | Any wallet; it becomes the project admin. The new mint keypair also signs. | `price_per_share > 0`; `car_cost % price_per_share == 0` | Creates the Token-2022 mint (6 extensions, metadata) and `ProjectState` (Active, `token_supply = car_cost / price_per_share`, `tokens_sold = 0`) |
-| 2 | `add_to_whitelist(wallet)` | **Any signer.** There is no admin check (see Known Limitations). | — | Creates or updates `WhitelistEntry{approved: true}`; the signer pays rent (`init_if_needed`) |
-| 3 | `remove_from_whitelist(wallet)` | **Any signer.** There is no admin check. | Entry exists | Sets `approved = false`; the account stays |
-| 4 | `buy_tokens(token_amount)` | A wallet whose `WhitelistEntry.approved` is true | Status Active; `token_amount > 0`; `token_amount <= token_supply - tokens_sold` | Sends `token_amount × price_per_share` lamports from the investor **directly to the admin**. If the investor's ATA does not exist, creates it and thaws it. Mints the shares to the investor and adds them to `tokens_sold`. |
-| 5 | `deposit_revenue(period_index, amount)` | Admin | Status Active; `amount > 0`; `period_index == period_count`; `tokens_sold > 0` | Moves `amount` lamports from the admin to the revenue vault. Creates a `RevenuePeriod` with `token_supply_snapshot = tokens_sold`. Increments `period_count`. |
-| 6 | `claim_revenue(period_index)` | Any holder | Status Active. The token account is Token-2022, for this mint, and owned by the signer. Balance > 0; payout > 0; no `ClaimRecord` yet. | `payout = balance × total_deposited / token_supply_snapshot`, using u128 and rounding down. The vault pays the investor, and a `ClaimRecord` is created. |
-| 7 | `pause_project` | Admin | Status Active | Status becomes Paused |
-| 8 | `resume_project` | Admin | Status Paused | Status becomes Active |
-| 9 | `record_telemetry(date, data_hash)` | The project's `oracle_pubkey` | Status Active; no record yet for `(mint, date)` | Creates a `TelemetryRecord`; the oracle pays rent |
-| 10 | `revoke_mint_authority` | Admin | `tokens_sold == token_supply` (any status) | Token-2022 `SetAuthority(MintTokens → None)`. The supply is then fixed for good. |
-| 11 | `update_price(new_price_per_share)` | Admin | Status Active; new price > 0 | Updates `price_per_share` |
-| 12 | `close_project` | Admin | Status is not Closed | Sends the vault's **entire** balance to the admin, including unclaimed revenue, and sets status Closed. No accounts are closed, so no rent is reclaimed. |
+A summary; [v2.md](v2.md) has the details and the tests behind each rule.
+
+### Share Mint and Payment Mint
+
+`create_project` creates the share mint at a fresh keypair address. It is Token-2022 with 0 decimals and these settings:
+
+| Setting | Value |
+|---|---|
+| Mint and freeze authority | project PDA. The program mints only in `buy_shares` during the raise, and in `execute_recovery` the same number it burns |
+| TransferHook | program `axel_v2`, authority none |
+| DefaultAccountState | Frozen. A share account works only after `buy_shares`, `open_position` or `execute_recovery` thawed it |
+| PermanentDelegate | project PDA, used only by `execute_recovery` |
+| MetadataPointer | to the mint itself, authority none |
+| TokenMetadata | name, symbol, uri and up to 8 car attributes (the seed writes `make`, `model`, `year`, `city`, `class`, `park`, `plate_hash`, `data_origin`); update authority project PDA, never used after creation |
+| TransferFeeConfig | not present |
+
+Payment mints must be in `Config.allowed_payment_mints` (up to 4): SPL Token, or Token-2022 with only allowlisted extensions. The devnet test token is tKZT, an SPL Token with 6 decimals and no freeze authority.
+
+### Accounts
+
+| Account | Seeds | Holds |
+|---|---|---|
+| `Config` | `["config"]` | admin and pending admin, KYC keys, treasury, fees for new projects, raise windows, allowed payment mints, protocol pause, recovery delay |
+| `Investor` | `["investor", wallet]` | KYC status (`Active`, `Revoked`, `Frozen`), flags (`DEMO`, …), jurisdiction, expiry, provider |
+| `Project` | `["project", share_mint]` | mints, operator, oracle, vaults, state, price, supply and sales, deadlines, fee snapshot, the revenue accumulator and totals, the telemetry head, count and last date, the purchase documents' hash |
+| `Position` | `["position", project, owner]` | shares (always equal to the owner's share balance), accumulator checkpoint, unclaimed revenue, totals |
+| `RevenuePeriod` | `["period", project, index]` | period dates, gross, fee, net, supply, accumulator after, report hash, attestor, telemetry head at the deposit, kind |
+| `RecoveryRequest` | `["recovery", project, from_owner]` | both wallets, shares, reason hash, proposer, `eta` |
+| Hook validation account | `["extra-account-metas", share_mint]` | the six extra accounts Token-2022 passes to the hook |
+| Escrow and revenue vaults | `["escrow", project]`, `["revenue", project]` | payment-token accounts owned by the project PDA |
 
 ### Project Lifecycle
 
 ```
-initialize_project
-        │
-        ▼
-   ┌──────────┐  pause_project   ┌──────────┐
-   │  Active  │ ───────────────► │  Paused  │
-   │          │ ◄─────────────── │          │
-   └────┬─────┘  resume_project  └────┬─────┘
-        │ close_project               │ close_project
-        ▼                             ▼
-   ┌──────────────────────────────────────┐
-   │ Closed (final; vault swept to admin) │
-   └──────────────────────────────────────┘
+Fundraising ──► Funded ──► Operating ◄──► Paused
+     │            │            │             │
+     └─► Failed ◄─┘            └─► Closed ◄──┘
 ```
 
-Only these instructions work while the project is **Paused** or **Closed**:
-- `add_to_whitelist` and `remove_from_whitelist`
-- `revoke_mint_authority`
-- `resume_project` (Paused only)
-- `close_project` (Paused only)
+| From | To | By |
+|---|---|---|
+| — | Fundraising | `create_project` (admin) |
+| Fundraising | Funded | `buy_shares` selling the last share, or `finalize_raise` (anyone) after the deadline with the soft cap met |
+| Fundraising | Failed | `finalize_raise` after the deadline below the soft cap, or `cancel_raise` (admin) |
+| Funded | Operating | `activate_project` (admin, before the activation deadline, with the purchase documents' hash) |
+| Funded | Failed | `finalize_raise` after the activation deadline, or `cancel_raise` (admin) |
+| Operating | Paused, and back | `pause_project`, `resume_project` (admin) |
+| Operating or Paused | Closed | `close_project` (admin) |
 
-Everything that needs Active is blocked: `buy_tokens`, `deposit_revenue`, `claim_revenue`, `record_telemetry`, `update_price` and `pause_project`.
+- **Failed** and **Closed** are final. Refunds work only in Failed; claims work in Operating, Paused and Closed. In Failed the escrow can only flow back to buyers, each getting exactly `shares × price`.
+- **Fees.** Activation pays `floor(gross × raise_fee_bps / 10 000)` to the treasury and the rest of the escrow to the operator. Each deposit pays `floor(gross × revenue_fee_bps / 10 000)` to the treasury. Both rates are copied from the config when the project is created and capped at 5% and 20%.
+- **Windows.** A raise lasts at most 180 days, and a funded raise must be activated within the project's activation window (at most 90 days). Otherwise anyone can move it to Failed.
+- **The protocol pause** (`Config.paused`) stops what brings money in or moves shares forward: buying, activation, transfers, deposits, and proposing or executing a recovery. It never stops claims, refunds, closing a position or a recovery veto.
+- Every state-gated instruction is tested in each of the six states ([v2.md](v2.md#state-machine)).
 
-Token transfers between holders are **not** blocked in either state, because the hook does not read project status.
+### Transfer Hook (v2)
 
-## Transfer Hook
+Token-2022 calls `axel_v2`'s `execute` on every share transfer, after it has moved the balances, with six extra accounts resolved from the validation account: the config, the project, both owners' `Investor` records and both `Position`s.
 
-Token-2022 calls `transfer_hook` on every `transfer_checked` of a share. Minting is not a transfer, so primary sales never reach the hook.
+The hook:
+1. requires the `transferring` flag Token-2022 sets on both token accounts, so a direct call fails;
+2. checks that the mint is the project's share mint, the protocol is not paused and the project is Operating;
+3. checks that both **token account owners** (not the transfer authority) have an eligible KYC record: Active, not expired, and DEMO only where the project accepts demo investors;
+4. settles both positions and moves the amount between them, and fails with `LedgerMismatch` unless each balance now equals its position.
 
-The hook reads its extra accounts from the `ExtraAccountMetaList` PDA, which is created by `initialize_extra_account_meta_list`:
+A recipient needs a position first. The app adds `open_position` to the same transaction and lists the hook's accounts itself, so the transfer works in wallets that do not resolve extra accounts. A transfer costs about 40–66k compute units.
+
+### Revenue and Claims
+
+Revenue per share is an accumulator `acc` in Q64.64:
 
 ```
-Account index during Execute
-  0  source token account
-  1  mint
-  2  destination token account
-  3  source owner (or delegate)
-  4  ExtraAccountMetaList PDA            ["extra-account-metas", mint] under transfer_hook
-  5  axel program ID                     static pubkey
-  6  source WhitelistEntry               ["whitelist", account 3]        under axel (index 5)
-  7  destination WhitelistEntry          ["whitelist", owner field of account 2, bytes 32..64]
+deposit:  fee = floor(gross × revenue_fee_bps / 10 000); net = gross − fee
+          acc += floor(net × 2^64 / supply)              supply = sold − refunded − retired
+settle:   owed = floor(shares × (acc − checkpoint) / 2^64); accrued += owed; checkpoint = acc
+claim:    settle; pay accrued to the owner's canonical payment account; accrued = 0
 ```
 
-`execute` accepts the transfer only if both whitelist accounts pass three checks:
-1. The account is owned by the `axel` program.
-2. It is at least 10 bytes long.
-3. Byte 8, the `approved` flag, equals 1.
+- Every rounding step floors, so the sum of all payouts never exceeds the sum of net deposits; the dust stays in the vault. A proptest in `math.rs` and a 200-step randomized run against a BigInt model check it.
+- The hook settles both sides before shares move, so income earned before a transfer stays with the sender, and shares bought or received later earn only from then on.
+- `claim` can be sent by anyone, and the money always goes to the owner's own associated token account. The seed uses this for an autopay crank.
+- The sale of the car is a `deposit_revenue` of kind `Final` through the same accumulator, before `close_project`. Claims stay open after closing.
 
-If the source fails, the error is `SourceNotWhitelisted`. If the destination fails, the error is `DestinationNotWhitelisted`, and the whole transfer reverts.
+Invariants checked after every step of the randomized tests, by the seed on every project, and (except I3) live on the Proof of solvency page:
+- **I1** revenue owed to holders ≤ deposited net − claimed ≤ revenue vault balance;
+- **I2** share supply = sold − refunded − retired = sum of positions;
+- **I3** every holder's share balance = its position;
+- **I4** escrow balance = (sold − refunded) × price while the escrow exists;
+- **I5** no position's checkpoint is ahead of `acc`.
 
-A `fallback` handler sends the SPL transfer-hook interface's `Execute` discriminator to `execute`.
+### Recovery
 
-Seed 6 uses the account at index 3. For a permanent-delegate transfer that account is the delegate (the admin), so the admin's wallet must also be whitelisted.
+Recovery gets a holder's shares back after a lost key, or passes them to heirs:
+
+1. **Propose.** The admin calls `propose_recovery` with the old wallet, the new wallet (which needs an eligible KYC record), the shares and the SHA-256 of the off-chain case file. The request's `eta` is `now + recovery_delay` (1 hour to 30 days).
+2. **Veto.** Until `eta` the old wallet can cancel it, and the admin can withdraw it until it runs. No pause blocks a cancellation. The portfolio page shows a pending request with a veto button.
+3. **Execute.** From `eta` anyone can call `execute_recovery`. It re-checks the pause, the freeze, the new wallet's KYC and both ledgers. Then it burns the shares from the old wallet as permanent delegate, mints the same number to the new wallet, and moves the unclaimed revenue pro rata.
+
+The supply never changes, a sanctions-frozen wallet is never touched, and recovery works in every project state. Mainnet needs a delay of at least 72 hours and Squads multisigs as admin and upgrade authority ([programs/axel-v2/README.md](../programs/axel-v2/README.md#mainnet-requirements)).
 
 ## Oracle / Telemetry Flow
 
-This is the v2 flow. The backend no longer sends anything to the v1 program.
+This is the v2 flow. The backend does not send anything to the v1 program.
 
 ```
 Yandex Fleet API / simulator      Backend                                          Solana (axel_v2)
@@ -293,7 +302,7 @@ getSignaturesForAddress(axel_v2, until = cursor), paged to the cursor, then olde
 
 ## KYC Flow (v2)
 
-The backend writes v2 `Investor` records with its own key, `Config.kyc_authority`. That key signs nothing else, and the admin key is not on the server.
+The backend writes `Investor` records with its own key, `Config.kyc_authority`. That key signs nothing else, and the admin key is not on the server.
 
 ```
 Wallet ──► GET  /kyc/nonce?wallet=…     Sign-In With Solana message with a single-use nonce (5 min)
@@ -316,16 +325,20 @@ Safety rules:
 - **Retries are safe.** Sumsub retries any non-2xx answer. An RPC outage, a failed transaction or a Sumsub API error returns 5xx, and the retry finds the on-chain record as it really is.
 - **Fail closed.** Without `SUMSUB_WEBHOOK_SECRET` or the KYC key the webhook answers 503; in production the backend does not start without them ([api.md](api.md#backend-configuration)).
 
-v2 is not deployed yet, so these records exist only on a local validator or LiteSVM. The frontend does not call `/kyc/nonce` or `/kyc/session` yet and has no Sumsub WebSDK: its console writes `Investor` records with `set_investor` when the connected wallet holds the KYC key or the demo KYC key, and the judge demo writes DEMO records through its own routes. v1 wallets are whitelisted by calling `add_to_whitelist` directly; the backend no longer calls v1.
+Where the records come from today:
+- The web app does not call `/kyc/nonce` or `/kyc/session` yet and has no Sumsub WebSDK.
+- Its console writes `Investor` records with `set_investor` when the connected wallet holds the KYC key or the demo KYC key.
+- The judge demo writes DEMO records through its own routes.
+- The Sumsub request shapes have not been run against Sumsub's sandbox.
 
 ## Frontend
 
-The frontend runs on `axel_v2`. The v1 client and IDL were removed from it; with v2 not deployed, devnet shows an empty catalog, and the app is used against a local validator (`NEXT_PUBLIC_SOLANA_NETWORK=localnet`).
+The frontend runs on `axel_v2`; the v1 client and IDL were removed from it. With v2 not deployed, devnet shows an empty catalog, and the app is used against a local validator (`NEXT_PUBLIC_SOLANA_NETWORK=localnet`).
 
 It uses:
 - Next.js 14 App Router, React 18, TypeScript and Tailwind.
 - `next-intl`. Locales are `en` (default, no URL prefix), `ru` and `kk`, so for example `/ru/dashboard`.
-- Wallet Adapter with Phantom and Solflare and `autoConnect`. The cluster, RPC and program ID come from the environment ([api.md](api.md#frontend-environment)). A build with `NEXT_PUBLIC_E2E=1` adds "E2E Burner" (`lib/solana/e2eBurnerWallet.ts`), which signs with a key in `localStorage`, for the end-to-end suite only and never on mainnet.
+- Wallet Adapter with Phantom and Solflare, plus any Wallet Standard wallet, and `autoConnect`. The cluster, RPC and program ID come from the environment ([api.md](api.md#frontend-environment)). A build with `NEXT_PUBLIC_E2E=1` adds "E2E Burner" (`lib/solana/e2eBurnerWallet.ts`), which signs with a key in `localStorage`, for the end-to-end suite only and never on mainnet.
 - The client in `lib/solana/` ([api.md](api.md#typescript-client-frontend-axel_v2)). Amounts are `bigint` base units of the project's payment token and are shown with its symbol and decimals (tKZT, USDC), never in SOL; the SOL balance in the wallet menu is for fees.
 
 | Route | What it does | Chain access |
@@ -351,24 +364,69 @@ Details:
 - "Check the car's data yourself" (`components/asset/VerifyData.tsx`, `lib/verify/`) downloads the car's published files ([api.md](api.md#published-car-data-read-by-verify)), rebuilds the telemetry hash chain with the browser's WebCrypto over RFC 8785 canonical JSON, and compares it with the project's `telemetry_head`, `telemetry_count` and `last_telemetry_date`. It also checks every deposit's income report against its `report_hash`, finds the day each deposit's `telemetry_head` snapshot points to, and checks the purchase document against `acquisition_doc_hash`.
 - Proof of solvency (`lib/solana/solvency.ts`) reads the accounts in several RPC calls, so a transaction can land between them; a failed check is read again once before it is reported. The rule that every share account equals its position needs every token account of every share mint and is left to the seed's `verify-invariants` script.
 - Every transaction result is shown in a toast with an Explorer link. Failures are explained in the user's language: every `axel_v2` error code has a message in `messages/*.json` (`ProgramErrors`), and wallet refusals, missing SOL, expired blockhashes and RPC failures have their own (`TxErrors`).
-- Revenue deposits need the oracle's co-signature, which the console cannot produce. The backend's `POST /reports/draft` and `POST /reports/attest` provide it ([Oracle / Telemetry Flow](#oracle--telemetry-flow)), but the console does not call them yet. `create_project` has no UI yet.
+- Revenue deposits need the oracle's co-signature, which the console cannot produce. The backend's `POST /reports/draft` and `POST /reports/attest` provide it ([Oracle / Telemetry Flow](#oracle--telemetry-flow)), but the console does not call them yet. `create_project` has no UI yet; projects are created by the seed or a script.
 - Car photos are stock photos picked by make and model (`components/catalog/vehiclePhoto.ts`) and always marked "Illustrative photo": a share mint holds no photo of its car. Credits are in `public/images/CREDITS.md`. Design rules: [`frontend/design.md`](../frontend/design.md).
 - Security headers are set in `next.config.mjs`: a CSP whose `connect-src` allows the public Solana clusters, Helius, a local validator, and the configured RPC, telemetry, indexer and published-data origins; `X-Frame-Options: DENY`; `nosniff`; a Referrer-Policy; and a Permissions-Policy.
 
-## Security Properties (as implemented)
+## Demo Seed
 
-- **Primary sale:** only whitelisted wallets can buy (`buy_tokens` constraint).
-- **Holder-to-holder transfers:** both wallets must be approved, or the transfer reverts (transfer hook).
-- **Frozen by default:** new token accounts cannot move shares until the program thaws them.
-- **Program-only authority:** minting, thawing and payouts from the vault are signed by the program's PDAs; no private key can do them.
-- **Fixed supply:** `token_supply` caps minting. After `revoke_mint_authority`, the mint authority is gone for good.
-- **No double claim per wallet:** `ClaimRecord` is created with `init`, so a second claim for the same period fails.
-- **Checked arithmetic:** overflow is checked with `checked_*` operations; the payout uses u128.
-- **Oracle-only telemetry:** only the registered oracle key can write telemetry, and only one record per project per day (v1). In v2 the oracle appends to a hash chain with strictly increasing dates, and co-signs every revenue deposit.
+[`scripts/seed-devnet`](../scripts/seed-devnet/README.md) fills a cluster running `axel_v2` with a fictional fleet: tKZT, the config, four "Demo Park" parks, KYC-verified investors, and cars in all six states. On top of that it adds months of telemetry, attested deposits, claims (some by an autopay crank), transfers, a car sale before closing, a pause, a failed raise with refunds and a share recovery.
+
+- **Deterministic.** Every key comes from `DEMO_SEED_SECRET` through HKDF, and the plan is a pure function of the seed, the scale and the anchor date.
+- **Resumable.** The executor writes each step's signature as pending before sending it. After a crash it looks the signature up on the cluster, so no step runs twice.
+- **Published and checked.** It publishes each car's files in the layout the app's "Verify" reads, all hashed as RFC 8785 JSON. After a run it checks I1–I5 on every project, recomputes every published hash against the chain, and compares every position with its BigInt ledger model.
+- **Budgeted.** `--dry-run` prices the SOL budget with the cluster's live rent.
+- **Labelled.** Every economic figure is labelled as an assumption, and every document and share mint carries `data_origin: "devnet-demo-seed"`.
+
+## Testing
+
+| Suite | Command | What it proves |
+|---|---|---|
+| Program on LiteSVM (530) | `npm run test:v2` | every instruction, every rejection with its exact error, every state × instruction, authority checks, randomized runs against a BigInt model with the invariants after every step |
+| Program in Rust (35) | `cargo test -p axel-v2` | the math with proptest (no overpayment, bounded dust, no overflow), dates, the telemetry chain, account layouts |
+| SDK (73) | `npm --prefix sdk/axel-v2 test` | the generated client against Anchor's coder for every instruction, account and type |
+| Frontend (522) | `npx vitest run` in `frontend/` | instruction builders against the IDL and `@solana/spl-token`'s hook resolver; readers and payout math against accounts the real program wrote; verification, solvency, demo routes, Blinks and components |
+| Backend (366) | `npm test` in `backend/` | the whole app with only the RPC, Sumsub, Yandex Fleet and the clock replaced; the fake RPC applies `set_investor` and `record_telemetry` as the program does |
+| Backend indexer (1) | `npm run test:localnet` in `backend/` | the indexer against `solana-test-validator` running `axel_v2.so`, including a restart |
+| Demo seed (90) | `npm run test:seed` | canonical JSON against RFC 8785, the chain against the program's vectors, keys, the plan, the budget, the ledger model |
+| End to end (3) | `npm run test:e2e` in `frontend/` | the judge path and the KYC refusal against the real app, backend and program on a freshly seeded validator |
+| v1 (49) | `anchor test --provider.cluster localnet` | the legacy programs on a local validator |
+
+CI (`.github/workflows/ci.yml`) runs the frontend, backend, programs and end-to-end jobs. It also fails when the vendored IDL or the SDK differs from a fresh build. The v1 tests, the backend's `test:localnet` and `test:seed` run locally only.
+
+## Security Properties (v2, as implemented)
+
+- **KYC on every hold and move.** Only wallets with an eligible `Investor` record can buy, open a position, receive a recovery, or be on either side of a transfer. The hook checks the token accounts' owners, so a delegate cannot move a non-verified owner's shares.
+- **Only the KYC key writes KYC.** The demo key is limited to DEMO records of at most 30 days and cannot touch frozen or non-DEMO records. `initialize_config` accepts only the upgrade authority, so nobody can front-run the deployment.
+- **Money has one way out of each vault.** The escrow goes to the operator's and the treasury's canonical accounts on activation, or back to each buyer on refund. The revenue vault pays only an owner's canonical account on claim. No instruction sweeps a vault, and `close_project` moves no funds.
+- **No human authority over a share mint.** Mint, freeze, permanent delegate and metadata update authority are the project PDA; the hook and the metadata pointer have none.
+- **The ledger always matches the balances.** Every thawed share account has exactly one position, and a transfer fails unless both balances equal their positions afterwards.
+- **Exact payouts.** The accumulator floors at every step, and claims can never exceed net deposits.
+- **Attested revenue.** Every deposit is signed by the operator and the oracle, which must be different keys, and stores the report hash and the telemetry head.
+- **Append-only telemetry.** Real calendar dates must strictly increase, so no day can be rewritten or inserted.
+- **Bounded powers.** Fees are capped at 5% and 20% and fixed per project. Escrow time is capped at 180 + 90 days. The price is immutable. Recovery is time-locked and vetoable.
+- **Checked arithmetic** everywhere, with u128 intermediates for the accumulator.
 
 ## Known Limitations
 
-These come from reading the v1 code on 2026-09-24. The program items are fixed in `axel_v2` ([v2.md](v2.md#v1-limitation--v2-fix)); items 5 and 6 were fixed when the backend moved to v2, and items 7 and 8 when the frontend did.
+### v2 (open)
+
+These are the known gaps of the current code. None of them is a v1 leftover.
+
+1. **Not deployed and not audited.** `axel_v2` has run only on LiteSVM and local validators.
+2. **One oracle key per project.** It attests what the fleet system reports; whether the fleet system reports the truth is trusted. The backend holds the same key for telemetry and for co-signing deposits.
+3. **Rent attribution.** Yandex Fleet rent is matched to a car through the drivers assigned to it now, not at the time of the charge. The Yandex Fleet and Sumsub request formats have not been run against the real services.
+4. **`close_project` before the `Final` deposit.** Nothing requires the sale proceeds to be deposited before closing. If the admin closes first, they can no longer be deposited on-chain; the admin still cannot take them.
+5. **A stolen key can veto a recovery.** Recovery is designed for lost keys and inheritance, not theft.
+6. **Single keys on devnet.** The admin and the upgrade authority are single keys. The mainnet requirements (Squads multisigs, a recovery delay of at least 72 hours) are documented but not enforced by the program.
+7. **The app is not wired to every backend flow.** It has no Sumsub KYC flow and no operator deposit flow. It does not show the telemetry widget's `dataOrigin`. The payout indexer endpoint (`GET /v2/wallets/:wallet/payouts`) is not served by the backend yet. The backend publishes real cars' days under its own routes, not in the layout "Verify" reads.
+8. **Backend operations.** The backend must run as a single instance (ordering and rate limits live in the process). The KYC and oracle keys are JSON files on disk. The indexer reads at `confirmed` commitment, and days older than 31 are not backfilled.
+9. **Proof of solvency in the browser** skips I3 (every share account equals its position), which needs every token account of every share mint; the seed's `verify-invariants` script checks it.
+10. **Wallets and the hook.** Wallets that do not resolve extra accounts cannot transfer shares on their own. The app builds transfers with the hook's accounts itself.
+
+### v1 Limitations
+
+These come from reading the v1 code on 2026-09-24. The program items are fixed in `axel_v2` ([v2.md](v2.md#v1-limitation--v2-fix)); items 5 and 6 were fixed when the backend moved to v2, and items 7 and 8 when the frontend did. The numbering is referenced from [v2.md](v2.md#v1-limitation--v2-fix).
 
 1. **Anyone can whitelist anyone.** `add_to_whitelist` and `remove_from_whitelist` accept any signer. Any wallet can approve itself, which defeats KYC gating for `buy_tokens` and for the hook. It can also revoke other wallets. The integration tests call both instructions with a freshly generated keypair.
 2. **Revenue claims use the current balance.** `claim_revenue` pays `current balance / snapshot × deposit`. Two cases pay out more than intended:
@@ -388,3 +446,135 @@ These come from reading the v1 code on 2026-09-24. The program items are fixed i
 9. **The revenue vault is subject to rent rules.** The vault is a 0-byte system account, so Solana's rent-state rules apply. A deposit that would leave an empty vault below the rent-exempt minimum (890,880 lamports) is rejected. So is a claim that would leave a non-zero balance below that minimum. Rounding dust can therefore block the last claim of a period, unless the vault holds extra SOL.
 10. **Transfer-fee rounding.** Token-2022 rounds the fee up, and shares have 0 decimals, so every transfer pays at least one whole share. A 1-share transfer delivers nothing to the recipient.
 11. **The admin holds strong powers.** The admin receives all sale proceeds immediately and sweeps the vault on close. The admin is also the permanent delegate: it can move or burn any holder's shares with Token-2022 directly. On devnet these are single keys. The code comment mentions a Squads multisig for production, but none is configured.
+
+## Legacy: v1 Programs
+
+v1 is two Anchor programs, `axel` and `transfer_hook`, deployed on devnet on 2026-04-07 ([Deployment](#deployment)). They stay in `programs/axel` and `programs/transfer-hook` with their tests; the app, the backend and the seed no longer use them. This section documents them as deployed.
+
+### Token-2022 Mint (v1)
+
+`initialize_project` creates the mint with 0 decimals, so one token is one whole share. It then configures six mint extensions. The table shows each extension and who holds its authority.
+
+| Extension | Configuration in `initialize_project.rs` | Authority |
+|---|---|---|
+| TransferHook | Hook program = `params.transfer_hook_program_id` (the seed script passes the deployed `transfer_hook`) | admin |
+| DefaultAccountState | `Frozen`: every new token account starts frozen | — |
+| PermanentDelegate | Delegate can transfer or burn shares from any holder account | admin |
+| TransferFeeConfig | 100 basis points (1%), maximum fee `u64::MAX` (no cap) | config and withdraw-withheld: admin |
+| MetadataPointer | Points to the mint itself | admin |
+| TokenMetadata | name, symbol, uri, and extra fields `vin`, `make`, `model`, `year`, `valuation_sol` | update authority: admin |
+
+The mint's base authorities:
+
+- **Mint authority:** the `ProjectState` PDA, so only the program can mint. `revoke_mint_authority` sets it to `None` once every share is sold.
+- **Freeze authority:** the `ProjectState` PDA. The program thaws a buyer's new token account inside `buy_tokens`.
+
+Other details:
+
+- **No shares at creation.** `initialize_project` mints nothing. Shares are minted to the buyer inside `buy_tokens`. Minting is not a transfer, so primary sales do not trigger the hook or the fee.
+- **Transfer fee:** withheld in shares, not SOL, in the recipient's token account. No program instruction or UI collects withheld fees. The admin could withdraw them with standard Token-2022 instructions as the withdraw-withheld authority.
+- **Memo Transfer:** not enabled. It was in the spec but is not in the code.
+- **Hook setup:** the mint does not create the hook's `ExtraAccountMetaList`. That account must be created separately with `transfer_hook.initialize_extra_account_meta_list` (see [v1 Limitations](#v1-limitations)).
+
+### Accounts and PDAs (v1)
+
+All `axel` accounts are Anchor accounts (8-byte discriminator), owned by the `axel` program. Integers are little-endian where they appear in seeds.
+
+| Account | Program | Seeds | Fields |
+|---|---|---|---|
+| `ProjectState` | axel | `["project", mint]` | `admin`, `mint`, `revenue_vault`, `token_supply`, `tokens_sold`, `price_per_share` (lamports), `status` (Active / Paused / Closed), `period_count`, `oracle_pubkey`, `bump`, `revenue_vault_bump` |
+| Revenue vault | axel (system-owned address) | `["revenue", mint]` | No data. A plain system account that holds the SOL for payouts; only the program can sign for it. |
+| `RevenuePeriod` | axel | `["revenue_period", mint, period_index: u32]` | `project` (stores the **mint**), `period_index`, `total_deposited` (lamports), `token_supply_snapshot`, `deposited_at`, `bump` |
+| `ClaimRecord` | axel | `["claim", revenue_period_pda, investor]` | `claimed`, `bump`. Its existence blocks a second claim by the same wallet for that period. |
+| `WhitelistEntry` | axel | `["whitelist", wallet]` | `approved`, `bump`. **Global**: one entry per wallet, shared by all projects. |
+| `TelemetryRecord` | axel | `["telemetry", mint, date: u32]` | `project` (stores the mint), `date` (YYYYMMDD, e.g. `20260401`), `data_hash` (SHA-256), `oracle_pubkey`, `recorded_at`, `bump` |
+| `ExtraAccountMetaList` | transfer_hook | `["extra-account-metas", mint]` | The extra accounts Token-2022 must pass to the hook (see below) |
+| Investor token account | Associated Token program | standard ATA for Token-2022 | Created and thawed by `buy_tokens` the first time a wallet buys |
+
+### Instructions (`axel` program)
+
+There are 12 instructions. "Admin" means `ProjectState.admin`, enforced with Anchor `has_one = admin`.
+
+| # | Instruction | Who can call | Preconditions | Effect |
+|---|---|---|---|---|
+| 1 | `initialize_project(params)` | Any wallet; it becomes the project admin. The new mint keypair also signs. | `price_per_share > 0`; `car_cost % price_per_share == 0` | Creates the Token-2022 mint (6 extensions, metadata) and `ProjectState` (Active, `token_supply = car_cost / price_per_share`, `tokens_sold = 0`) |
+| 2 | `add_to_whitelist(wallet)` | **Any signer.** There is no admin check (see v1 Limitations). | — | Creates or updates `WhitelistEntry{approved: true}`; the signer pays rent (`init_if_needed`) |
+| 3 | `remove_from_whitelist(wallet)` | **Any signer.** There is no admin check. | Entry exists | Sets `approved = false`; the account stays |
+| 4 | `buy_tokens(token_amount)` | A wallet whose `WhitelistEntry.approved` is true | Status Active; `token_amount > 0`; `token_amount <= token_supply - tokens_sold` | Sends `token_amount × price_per_share` lamports from the investor **directly to the admin**. If the investor's ATA does not exist, creates it and thaws it. Mints the shares to the investor and adds them to `tokens_sold`. |
+| 5 | `deposit_revenue(period_index, amount)` | Admin | Status Active; `amount > 0`; `period_index == period_count`; `tokens_sold > 0` | Moves `amount` lamports from the admin to the revenue vault. Creates a `RevenuePeriod` with `token_supply_snapshot = tokens_sold`. Increments `period_count`. |
+| 6 | `claim_revenue(period_index)` | Any holder | Status Active. The token account is Token-2022, for this mint, and owned by the signer. Balance > 0; payout > 0; no `ClaimRecord` yet. | `payout = balance × total_deposited / token_supply_snapshot`, using u128 and rounding down. The vault pays the investor, and a `ClaimRecord` is created. |
+| 7 | `pause_project` | Admin | Status Active | Status becomes Paused |
+| 8 | `resume_project` | Admin | Status Paused | Status becomes Active |
+| 9 | `record_telemetry(date, data_hash)` | The project's `oracle_pubkey` | Status Active; no record yet for `(mint, date)` | Creates a `TelemetryRecord`; the oracle pays rent |
+| 10 | `revoke_mint_authority` | Admin | `tokens_sold == token_supply` (any status) | Token-2022 `SetAuthority(MintTokens → None)`. The supply is then fixed for good. |
+| 11 | `update_price(new_price_per_share)` | Admin | Status Active; new price > 0 | Updates `price_per_share` |
+| 12 | `close_project` | Admin | Status is not Closed | Sends the vault's **entire** balance to the admin, including unclaimed revenue, and sets status Closed. No accounts are closed, so no rent is reclaimed. |
+
+#### Project Lifecycle (v1)
+
+```
+initialize_project
+        │
+        ▼
+   ┌──────────┐  pause_project   ┌──────────┐
+   │  Active  │ ───────────────► │  Paused  │
+   │          │ ◄─────────────── │          │
+   └────┬─────┘  resume_project  └────┬─────┘
+        │ close_project               │ close_project
+        ▼                             ▼
+   ┌──────────────────────────────────────┐
+   │ Closed (final; vault swept to admin) │
+   └──────────────────────────────────────┘
+```
+
+Only these instructions work while the project is **Paused** or **Closed**:
+- `add_to_whitelist` and `remove_from_whitelist`
+- `revoke_mint_authority`
+- `resume_project` (Paused only)
+- `close_project` (Paused only)
+
+Everything that needs Active is blocked: `buy_tokens`, `deposit_revenue`, `claim_revenue`, `record_telemetry`, `update_price` and `pause_project`.
+
+Token transfers between holders are **not** blocked in either state, because the hook does not read project status.
+
+### Transfer Hook (v1)
+
+Token-2022 calls `transfer_hook` on every `transfer_checked` of a share. Minting is not a transfer, so primary sales never reach the hook.
+
+The hook reads its extra accounts from the `ExtraAccountMetaList` PDA, which is created by `initialize_extra_account_meta_list`:
+
+```
+Account index during Execute
+  0  source token account
+  1  mint
+  2  destination token account
+  3  source owner (or delegate)
+  4  ExtraAccountMetaList PDA            ["extra-account-metas", mint] under transfer_hook
+  5  axel program ID                     static pubkey
+  6  source WhitelistEntry               ["whitelist", account 3]        under axel (index 5)
+  7  destination WhitelistEntry          ["whitelist", owner field of account 2, bytes 32..64]
+```
+
+`execute` accepts the transfer only if both whitelist accounts pass three checks:
+1. The account is owned by the `axel` program.
+2. It is at least 10 bytes long.
+3. Byte 8, the `approved` flag, equals 1.
+
+If the source fails, the error is `SourceNotWhitelisted`. If the destination fails, the error is `DestinationNotWhitelisted`, and the whole transfer reverts.
+
+A `fallback` handler sends the SPL transfer-hook interface's `Execute` discriminator to `execute`.
+
+Seed 6 uses the account at index 3. For a permanent-delegate transfer that account is the delegate (the admin), so the admin's wallet must also be whitelisted.
+
+### Security Properties (v1)
+
+- **Primary sale:** only whitelisted wallets can buy (`buy_tokens` constraint).
+- **Holder-to-holder transfers:** both wallets must be approved, or the transfer reverts (transfer hook).
+- **Frozen by default:** new token accounts cannot move shares until the program thaws them.
+- **Program-only authority:** minting, thawing and payouts from the vault are signed by the program's PDAs; no private key can do them.
+- **Fixed supply:** `token_supply` caps minting. After `revoke_mint_authority`, the mint authority is gone for good.
+- **No double claim per wallet:** `ClaimRecord` is created with `init`, so a second claim for the same period fails.
+- **Checked arithmetic:** overflow is checked with `checked_*` operations; the payout uses u128.
+- **Oracle-only telemetry:** only the registered oracle key can write telemetry, and only one record per project per day.
+
+These properties are weakened by the [v1 Limitations](#v1-limitations) above, which is why v2 replaced the programs.

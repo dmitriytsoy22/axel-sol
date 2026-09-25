@@ -141,7 +141,8 @@ Contrast, checked with the WCAG formula on the real pairs:
 | Code (`font-mono`)       | JetBrains Mono                               | `src/fonts/JetBrainsMono-Variable.woff2`, 28 KB, not preloaded | Addresses, hashes, mints. Latin only         |
 
 All three are self-hosted with `next/font/local`, so the build never calls Google Fonts. Both
-text faces cover Kazakh (Ә Ғ Қ Ң Ө Ұ Ү Һ І) and ₸. Manrope and JetBrains Mono were checked and
+text faces cover the nine Kazakh-specific letters (U+04D8, U+0492, U+049A, U+04A2, U+04E8, U+04B0,
+U+04AE, U+04BA, U+0406) and ₸. Manrope and JetBrains Mono were checked and
 lack Kazakh glyphs, so Manrope is out and mono never carries prose.
 
 Scale: 16 px base, ratio 1.25 (`--type-ratio`), rounded to the 4 px grid.
@@ -167,7 +168,7 @@ capped at 65ch.
 Numbers are formatted with `Intl.NumberFormat` in the `ru-KZ` locale for Russian and Kazakh
 and `en-US` for English, with the narrow currency symbol, so Russian and Kazakh read
 "1 250 000 ₸" and English reads "₸1,250,000". Kazakh dates are spelled from the CLDR pattern in
-`lib/format.ts` ("2026 ж. 7 сәу."), because desktop Chrome has no Kazakh formatting data
+`lib/format.ts` (year, the abbreviation of "year", day, abbreviated month), because desktop Chrome has no Kazakh formatting data
 (decision 19).
 v1 devnet data is in SOL; v2 moves prices to the tenge stablecoin (tKZT on devnet).
 
