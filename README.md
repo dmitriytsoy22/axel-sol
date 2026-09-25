@@ -1,482 +1,367 @@
-<div align="center">
-  <img src="docs/assets/hero_banner.png" alt="AXEL — RWA Taxi Tokenization on Solana" width="100%"/>
+# AXEL — Tokenized Taxi Cars on Solana
 
-  <br/>
-  <br/>
+[![CI](https://github.com/dmitriytsoy22/axel-sol/actions/workflows/ci.yml/badge.svg)](https://github.com/dmitriytsoy22/axel-sol/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-14F195.svg)](LICENSE)
+[![Solana](https://img.shields.io/badge/Solana-devnet-9945FF)](https://explorer.solana.com/address/DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M?cluster=devnet)
+[![Colosseum](https://img.shields.io/badge/Colosseum-Crypto%20World%27s%20Fair%202026-14F195)](https://colosseum.com/arena/projects/axel-1)
 
-  <h1>🚕 AXEL — RWA Taxi Tokenization on Solana</h1>
+> Fractional ownership of taxi cars on Solana: each car is a Token-2022 mint, shares are sold only to whitelisted wallets, and the car's revenue is paid out pro-rata by an Anchor program.
 
-  <p><strong>Fully on-chain Real-World Asset platform for tokenizing taxi vehicles<br/>and distributing passive income to fractional owners.</strong></p>
-
-  <br/>
-
-  <!-- Shields / Badges -->
-  <p>
-    <a href="https://solana.com"><img src="https://img.shields.io/badge/Blockchain-Solana-14F195?style=for-the-badge&logo=solana&logoColor=white" alt="Solana"/></a>
-    <a href="https://spl.solana.com/token-2022"><img src="https://img.shields.io/badge/Token_Standard-Token--2022-9945FF?style=for-the-badge&logo=solana&logoColor=white" alt="Token-2022"/></a>
-    <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Frontend-Next.js_14-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js"/></a>
-    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/Language-TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/></a>
-    <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Styling-Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS"/></a>
-    <a href="https://docs.sumsub.com/"><img src="https://img.shields.io/badge/KYC-Sumsub-0A2540?style=for-the-badge" alt="Sumsub KYC"/></a>
-  </p>
-
-  <p>
-    <img src="https://img.shields.io/badge/Status-MVP_in_Development-FF9F0A?style=flat-square" alt="Status"/>
-    <img src="https://img.shields.io/badge/Tests-Vitest_(80%25_Coverage)-34C759?style=flat-square" alt="Tests"/>
-    <img src="https://img.shields.io/badge/i18n-🇷🇺_🇬🇧_🇰🇿-blue?style=flat-square" alt="i18n"/>
-    <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License"/>
-  </p>
-</div>
+[Docs](docs/) · [Architecture](docs/architecture.md) · [Colosseum Project](https://colosseum.com/arena/projects/axel-1) · [Devnet Program](https://explorer.solana.com/address/DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M?cluster=devnet)
 
 ---
 
-## 📋 Table of Contents
-
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-- [Architecture](#-architecture)
-- [Token-2022 Extensions](#-token-2022-extensions)
-- [On-Chain Entities (PDAs)](#-on-chain-entities-pdas)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Getting Started](#-getting-started)
-- [Environment Variables](#-environment-variables)
-- [Available Scripts](#-available-scripts)
-- [Design System](#-design-system)
-- [Internationalization (i18n)](#-internationalization-i18n)
-- [Security](#-security)
-- [Team](#-team)
-- [Contributing](#-contributing)
-- [License](#-license)
+![AXEL catalog showing two tokenized Toyota Camry projects read live from Solana devnet](assets/hero.png)
 
 ---
 
-## 📖 Overview
+## Built for Colosseum Crypto World's Fair 2026
 
-**AXEL** is a cutting-edge platform that democratizes investments in real-world assets on the Solana blockchain. Our MVP focuses on the tokenization of a **single physical taxi vehicle** — by purchasing tokens, investors become fractional owners of the asset and receive a proportional share of income generated from its daily operation via Yandex Pro.
+| Name | Role | GitHub | Based in |
+|------|------|--------|----------|
+| Dmitriy Tsoy | Founder, frontend & product | [@dmitriytsoy22](https://github.com/dmitriytsoy22) | Almaty, Kazakhstan |
 
-<br/>
-
-> [!IMPORTANT]
-> **The Golden Architecture Rule:**
-> _State is exclusively on-chain._ The frontend reads data directly from Solana RPCs, while a minimal Node.js backend handles only non-browser compatible operations: KYC webhooks and Oracle data signing.
-> **No database. No server state. The blockchain is the single source of truth.**
-
-<br/>
-
-<div align="center">
-  <img src="docs/assets/dashboard_mockup.png" alt="AXEL Dashboard — Premium Fintech Experience" width="90%" style="border-radius: 12px;"/>
-  <br/>
-  <em>Premium fintech dashboard: token tracking, live telemetry, and direct SOL claiming.</em>
-</div>
+AXEL existed before the hackathon. See [Prior Work and Hackathon Scope](#prior-work-and-hackathon-scope) for what was built when and by whom.
 
 ---
 
-## ✨ Key Features
+## Problem and Solution
 
-| Feature | Description |
-| :--- | :--- |
-| 💸 **Token-2022 Compliance** | Uses modern Solana Token Extensions (Transfer Hooks, Freeze Authority, Permanent Delegate, Metadata) for protocol-level compliance without breaking composability |
-| 🔒 **On-Chain Whitelist** | Transfer Hooks prevent non-KYC'd wallets from interacting with tokens — enforced at the protocol level |
-| 🚖 **Live Telemetry Oracle** | Real daily revenue and mileage from Yandex Pro API, pushed to Solana via a signed oracle with SHA-256 proof |
-| 📊 **On-Chain Dividends** | Transparent `Profit = Revenue − Expenses − Reserve` calculation. Investors claim SOL directly on-chain per period |
-| 🚫 **Zero Database** | Frontend reads directly from Program Derived Addresses (PDAs) — no traditional backend state |
-| 🌍 **Multilingual** | Full i18n support: Russian 🇷🇺, English 🇬🇧, Kazakh 🇰🇿 via `next-intl` |
-| 🎨 **Apple-Inspired Design** | Minimalist design system inspired by Apple HIG — Inter font, 8px grid, single Cyan accent |
-| ⚡ **Security First** | CSP headers, multisig authorities, oracle key isolation, wallet-based identity (SIWS) |
+### 1. Access to cash-flowing assets
+- **Problem:** A taxi earns money every day, but earning from one means buying and running the whole car. There is no simple way to hold a small, transferable share of one specific vehicle.
+- **AXEL:** `initialize_project` creates one Token-2022 mint per car with 0 decimals, so one token is one whole share. The share cap is `car_cost / price_per_share`. Whitelisted wallets buy shares for SOL with `buy_tokens`, which mints them on demand up to that cap. Once every share is sold, the admin can call `revoke_mint_authority` to remove the mint authority for good.
 
----
+### 2. Trust in reported income
+- **Problem:** Co-investors in a car usually see only the income the owner chooses to report.
+- **AXEL:** Every deposit, every claim and the share count behind each payout are public program accounts. A backend oracle aggregates the car's daily Yandex Fleet orders (revenue, mileage, trips), hashes them with SHA-256 and writes the hash on-chain with `record_telemetry`. Only the project's registered oracle key can write it, once per day. Anyone holding the same figures can recompute the hash.
+- **Gaps:** the admin chooses the deposited amount, and the program does not check it against telemetry. The backend's `record_telemetry` transaction currently fails, so no telemetry hash is on devnet yet.
 
-## 🏗 Architecture
+### 3. Compliance and KYC on every transfer
+- **Problem:** A plain SPL token can be sent to anyone. Shares of a real asset need an allow-list of holders, enforced on every transfer and not only at the first sale.
+- **AXEL:**
+  - `buy_tokens` requires an approved `WhitelistEntry` PDA for the buyer.
+  - The mint uses `DefaultAccountState = Frozen`, so every new token account starts frozen. The program, as freeze authority, thaws the buyer's account inside `buy_tokens`.
+  - A separate `transfer_hook` program runs on every `transfer_checked` and rejects the transfer unless the owners of both the source and the destination accounts are whitelisted.
+  - A Sumsub webhook on the backend whitelists a wallet after a `GREEN` KYC review.
+- **Gap:** `add_to_whitelist` does not check who signs yet, so the on-chain gate is only as strong as that fix.
 
-AXEL relies on **minimal centralization**, shifting business logic natively to Solana Smart Contracts. The backend exists only as a secure proxy for two external systems.
+### 4. Fair payouts
+- **Problem:** Splitting revenue among many small holders off-chain means trusting whoever does the math and sends the money.
+- **AXEL:** `deposit_revenue` moves SOL into a revenue vault PDA and records a `RevenuePeriod` with `token_supply_snapshot` = shares sold at that moment. `claim_revenue` pays `balance × deposited / snapshot` (u128 math, rounded down) from the vault, which only the program can sign for. A `ClaimRecord` PDA per period and wallet blocks a second claim.
+- **Gap:** the payout uses the claimant's current balance, so shares bought or transferred after a deposit can still claim that period.
 
-```mermaid
-graph TD
-    classDef frontend fill:#1D1D1F,stroke:#06B6D4,stroke-width:2px,color:#fff
-    classDef solana fill:#14F195,stroke:#9945FF,stroke-width:2px,color:#000
-    classDef backend fill:#9945FF,stroke:#14F195,stroke-width:2px,color:#fff
-    classDef api fill:#2C2C2E,stroke:#6E6E73,stroke-width:1px,color:#fff
-
-    F(["Next.js Frontend"]):::frontend -- "Reads PDAs via RPC" --> S[["Solana Programs"]]:::solana
-    F -- "Sends signed TXs" --> S
-    F -- "GET /telemetry/latest" --> B("Minimal Backend"):::backend
-
-    B -- "record_telemetry" --> S
-    Y["Yandex Pro API"]:::api -- "Cron daily fetch" --> B
-
-    K["Sumsub KYC"]:::api -- "POST /kyc/webhook" --> B
-    B -- "add_to_whitelist + unfreeze" --> S
-```
-
-### What the Backend Does (and Nothing More)
-
-| ✅ Backend Handles | ❌ Backend Does NOT Handle |
-| :--- | :--- |
-| Yandex Pro API cron + oracle signing | User data / investment records |
-| KYC webhook receiver (1 endpoint) | Investment validation (on-chain) |
-| Telemetry read endpoint (1 endpoint) | Payout tracking (on-chain PDAs) |
-| | Auth / sessions / JWT |
-| | Reporting / analytics |
-
-> **Total backend endpoints: 3** — `GET /health`, `GET /telemetry/latest/:project_id`, `POST /kyc/webhook`
+All open gaps are listed in [Status and Known Limitations](#status-and-known-limitations).
 
 ---
 
-## 🪙 Token-2022 Extensions
+## Why Solana
 
-All extensions are configured **at mint initialization** — once created, they are immutable.
-
-| Extension | Level | Purpose in AXEL |
-| :--- | :---: | :--- |
-| **Transfer Hook** | Mint | Every token transfer triggers whitelist verification for both sender and receiver. Non-KYC wallets are rejected at the protocol level |
-| **Default Account State (Frozen)** | Mint | Newly created token accounts start frozen. Unfreezing requires KYC approval via Freeze Authority |
-| **Permanent Delegate** | Mint | Enables regulatory clawbacks and refunds when hardcaps/softcaps are breached |
-| **Transfer Fee** | Mint | 1% secondary market fee auto-routed to a reserve fund |
-| **Metadata Pointer** | Mint | Points to the mint itself for on-chain metadata storage |
-| **Token Metadata** | Mint | Stores car VIN, make, model, year, and valuation directly on-chain |
-| **Memo Transfer** | Account | All transfers include a memo — creating an on-chain audit trail |
+- **Token-2022 extensions natively.** One `initialize_project` instruction configures six mint extensions: TransferHook, DefaultAccountState, PermanentDelegate, TransferFeeConfig (1%), MetadataPointer and TokenMetadata. The compliance rules and the car's VIN, make, model, year and valuation live in the token itself, with no custom token program.
+- **Transfer-hook composability.** Token-2022 invokes the hook on every `transfer_checked`, whichever wallet or program moves the shares. The whitelist check is part of the token, not of the AXEL UI.
+- **Low fees for per-period claims.** Each holder claims each period in a transaction of its own, or several periods at once with "Claim all". A claim costs the 5,000-lamport base fee plus rent for a 10-byte `ClaimRecord`.
+- **Wallet adapter.** Solana Wallet Adapter connects Phantom and Solflare. The frontend reads program accounts directly over RPC with the Anchor IDL, so there is no database.
 
 ---
 
-## 📦 On-Chain Entities (PDAs)
+## Summary of Features
 
-All program state lives in Program Derived Addresses, readable by anyone:
+**Investor**
+- Catalog of every project read from the `axel` program, with Token-2022 metadata and an Active / Paused / Closed filter
+- Asset page: VIN, sale progress, price, remaining shares, Solana Explorer links for the mint and the revenue vault, and a buy flow (`buy_tokens`)
+- Dashboard: holdings, revenue periods with claimed / claimable status, per-period claim and "Claim all" (several `claim_revenue` instructions in one transaction)
+- Payout history across all holdings
+
+**Admin**
+- `/admin` panel, shown only to the admin wallet of the first project: metrics, whitelist manager (add / remove), revenue deposit form (gross − expenses − reserve, in SOL), pause / resume / close
+- `npm run init-project` creates a project: a Token-2022 mint with six extensions and metadata, plus its `ProjectState`
+- `update_price` and `revoke_mint_authority` are available on-chain; they have no UI yet
+
+**Oracle and KYC backend (NestJS, no database)**
+- `GET /health`, `GET /telemetry/latest/:projectId`, `POST /kyc/webhook`
+- Daily cron that fetches the previous day's completed Yandex Fleet orders for the car's licence plate, aggregates revenue, mileage and trips, hashes them with SHA-256 and signs `record_telemetry` with the oracle key
+- KYC webhook: verifies the Sumsub HMAC-SHA256 signature (skipped if `SUMSUB_WEBHOOK_SECRET` is unset), and on `applicantReviewed` + `GREEN` signs `add_to_whitelist` for the wallet in `externalUserId`
+
+**Frontend**
+- Next.js 14 App Router; transactions are built from the vendored IDL (`frontend/src/lib/solana/idl/`)
+- English (default), Russian and Kazakh via `next-intl`: `/`, `/ru/…`, `/kk/…`
+- Security headers: Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy, Permissions-Policy
+- Vitest unit suite: 31 files, 105 tests, run in CI
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| On-chain programs | Rust 1.89.0 · Anchor 0.32.1 (`anchor-lang`, `anchor-spl`) · `spl-token-2022` 8 · `spl-transfer-hook-interface` 0.9 · `spl-tlv-account-resolution` 0.9 · `spl-token-metadata-interface` 0.7 |
+| Token standard | SPL Token-2022: TransferHook, DefaultAccountState, PermanentDelegate, TransferFeeConfig, MetadataPointer, TokenMetadata |
+| Program tests | `node:test` + `tsx` · `@coral-xyz/anchor` · `@solana/spl-token` 0.4 against a local validator (12 files, 49 tests) |
+| Client SDK | Codama (`npm run generate` → `sdk/generated`) |
+| Frontend | Next.js 14.2 · React 18.3 · TypeScript 5 · Tailwind CSS 3.4 · `@coral-xyz/anchor` 0.32.1 · `@solana/web3.js` 1.98 · `@solana/spl-token` 0.4.14 · Solana Wallet Adapter (Phantom, Solflare) · `next-intl` 4.8 · React Hook Form 7 + Zod 3 |
+| Frontend tests | Vitest 3.2 · Testing Library · jsdom |
+| Backend | NestJS 11 · `@nestjs/schedule` 5 · `@nestjs/config` 4 · `@solana/web3.js` 1.98 · `@coral-xyz/anchor` 0.32.1 |
+| External services | Yandex Fleet API (telemetry source) · Sumsub (KYC webhook) |
+| CI | GitHub Actions: frontend lint, typecheck, unit tests and build; backend build |
+| AI tools | Claude Code (coding assistant) · Google Stitch (UI drafts) |
+
+---
+
+## Architecture
 
 ```
-ProjectState (PDA: ["project", asset_id])
-  ├── admin, mint, escrow_vault, revenue_vault
-  ├── token_supply, price_per_share
-  ├── min_raise, max_raise, sol_raised
-  ├── deadline (Unix timestamp)
-  └── status: Fundraising | Finalized | Active | Paused | Closed
-
-InvestorRecord (PDA: ["investor", project, wallet])
-  ├── sol_invested
-  └── tokens_received
-
-RevenuePeriod (PDA: ["revenue", project, period_index])
-  ├── total_deposited, token_supply_snapshot
-  └── deposited_at
-
-ClaimRecord (PDA: ["claim", revenue_period, wallet])
-  └── claimed: bool  (prevents double-claim)
-
-WhitelistEntry (PDA: ["whitelist", wallet])
-  └── approved: bool  (read by Transfer Hook on every transfer)
-
-TelemetryRecord (PDA: ["telemetry", project, date_unix_day])
-  ├── data_hash: SHA-256 of Yandex Pro payload
-  ├── oracle_pubkey
-  └── recorded_at
+            Investor / admin wallet (Phantom or Solflare, devnet)
+                                  │ signs transactions
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ Frontend · Next.js 14                                     frontend/ │
+│ catalog · asset page · dashboard · payouts · admin panel            │
+│ reads program accounts over RPC with the vendored Anchor IDL        │
+└───────────┬───────────────────────────────────────┬─────────────────┘
+            │ RPC reads + signed transactions       │ GET /telemetry/latest/:mint
+            ▼                                       ▼
+┌─────────────────────────────────┐    ┌─────────────────────────────────┐
+│ Solana devnet                   │    │ Backend · NestJS 11    backend/ │
+│                                 │    │ no database                     │
+│ axel program · 12 instructions  │◄───┤ telemetry cron    (oracle key)  │◄── Yandex Fleet API
+│   ProjectState  RevenuePeriod   │ tx │ KYC webhook       (admin key)   │◄── Sumsub webhook
+│   ClaimRecord   WhitelistEntry  │    └─────────────────────────────────┘
+│   TelemetryRecord · vault PDA   │
+│                                 │
+│ Token-2022 mint (one per car)   │
+│   6 extensions, VIN metadata    │
+│          │ on transfer_checked  │
+│          ▼                      │
+│ transfer_hook program           │
+│   both owners whitelisted?      │
+└─────────────────────────────────┘
 ```
 
-### On-Chain Instructions
+**Flow**
 
-```
-initialize_project    start_raise        invest
-finalize_raise        refund             deposit_revenue
-claim_revenue         pause_project      resume_project
-close_project         add_to_whitelist   remove_from_whitelist
-record_telemetry      update_oracle
-```
+1. **`initialize_project`** (admin, via `npm run init-project`): creates the Token-2022 mint (0 decimals, six extensions, metadata with VIN, make, model, year and valuation) and the `ProjectState` PDA. The mint and freeze authorities are that PDA. No shares exist yet.
+2. **KYC webhook:** Sumsub posts `applicantReviewed` with `GREEN` to `POST /kyc/webhook`. The backend checks the HMAC signature and reads the wallet from `externalUserId`.
+3. **Whitelist:** the backend (or the admin panel) calls `add_to_whitelist(wallet)`, which creates `WhitelistEntry { approved: true }` at `["whitelist", wallet]`.
+4. **`buy_tokens(n)`:** requires the buyer's approved `WhitelistEntry`. It sends `n × price_per_share` lamports to the admin. On a first purchase it creates the buyer's token account and thaws it (accounts start frozen), then mints `n` shares.
+5. **`deposit_revenue(period, amount)`** (admin): moves `amount` lamports into the revenue vault PDA and creates a `RevenuePeriod` with `token_supply_snapshot` = shares sold at that moment.
+6. **`claim_revenue(period)`** (holder): pays `balance × total_deposited / snapshot` from the vault and creates a `ClaimRecord` that blocks a second claim.
+7. **Holder-to-holder transfers:** Token-2022 calls `transfer_hook` on every `transfer_checked`. The hook requires an approved `WhitelistEntry` for both owners, and Token-2022 withholds a 1% transfer fee, in shares.
+8. **`record_telemetry(date, hash)`** (oracle, daily cron): stores the SHA-256 hash of the day's Yandex Fleet figures in a `TelemetryRecord` PDA, one per project per day.
+
+Full breakdown with every PDA seed, instruction precondition and account layout: [docs/architecture.md](docs/architecture.md). HTTP endpoints and the instruction reference: [docs/api.md](docs/api.md).
 
 ---
 
-## 🛠 Tech Stack
+## On-chain Deployment (Solana devnet)
 
-### Frontend
+| Account | Address | Details |
+|---------|---------|---------|
+| `axel` program | [`DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M`](https://explorer.solana.com/address/DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M?cluster=devnet) | 12 instructions, 5 account types |
+| `transfer_hook` program | [`5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ`](https://explorer.solana.com/address/5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ?cluster=devnet) | Whitelist check on every share transfer |
+| Project 1 · `ProjectState` | [`FcETyegc5PindjcQ67dLUkzfg2XSFpJ5s2XHLj2ANEMR`](https://explorer.solana.com/address/FcETyegc5PindjcQ67dLUkzfg2XSFpJ5s2XHLj2ANEMR?cluster=devnet) | Active · 7 / 100 shares sold · 0.1 SOL per share · 1 revenue period |
+| Project 1 · mint | [`CEBjRiHfzycVPjXmD4xJbsg7gCQokyzEAigfEQbZqFK8`](https://explorer.solana.com/address/CEBjRiHfzycVPjXmD4xJbsg7gCQokyzEAigfEQbZqFK8?cluster=devnet) | Token-2022, 0 decimals, 6 extensions, 1% transfer fee |
+| Project 2 · `ProjectState` | [`BfTeR9NTwrgh9Z24vEK339yoZfVKbpmtXgNH9zKyQnyG`](https://explorer.solana.com/address/BfTeR9NTwrgh9Z24vEK339yoZfVKbpmtXgNH9zKyQnyG?cluster=devnet) | Active · 13 / 100 shares sold · 0.1 SOL per share · 1 revenue period |
+| Project 2 · mint | [`Aj9qpbVQexrpp6HZojWuyq3s4W7ymTRpQ7uudZgz37YU`](https://explorer.solana.com/address/Aj9qpbVQexrpp6HZojWuyq3s4W7ymTRpQ7uudZgz37YU?cluster=devnet) | Token-2022, 0 decimals, 6 extensions, 1% transfer fee |
 
-| Technology | Version | Purpose |
-| :--- | :---: | :--- |
-| **Next.js** | 14.x | React framework with App Router, SSR, and API routes |
-| **TypeScript** | 5.x | Type safety across the entire codebase |
-| **Tailwind CSS** | 3.x | Utility-first CSS with custom AXEL design tokens |
-| **@solana/web3.js** | 1.98.x | Direct Solana RPC reads and transaction construction |
-| **@solana/wallet-adapter** | latest | Phantom & Backpack wallet integration |
-| **next-intl** | 4.x | Full i18n support (RU/EN/KK) |
-| **Lucide React** | 1.x | Minimalist icon set (outlined, 1.5px stroke) |
-| **React Hook Form + Zod** | latest | Type-safe forms with schema validation |
-| **Vitest** | 3.x | Unit and component testing (80% coverage threshold) |
+Both projects were created by `scripts/init-project.ts` and carry its **test metadata**: "Axel Taxi #001", Toyota Camry 2023, VIN `XTA210990Y2856777`, valuation 10 SOL. They are not backed by a real vehicle.
 
-### Backend (Minimal)
+Project 1's full lifecycle on devnet, recorded on 2026-04-07 (before the hackathon):
 
-| Technology | Purpose |
-| :--- | :--- |
-| **NestJS** | Oracle cron + KYC webhook (no DB, no ORM) |
-| **@solana/web3.js** | On-chain instruction calls |
-| **Pino** | Structured logging with correlation IDs |
-| **Sentry** | Error tracking and alerting |
+| Step | Transaction |
+|------|-------------|
+| `initialize_project` | [`3z8Lmn…7wnegL`](https://explorer.solana.com/tx/3z8LmnXpmZc6tsJGt7j8kpXXQYN2LDZjJHNghJHzYdaivY8t3wTzLN5qV3qVKXFG3gW5ydGixStoCmtVX87wnegL?cluster=devnet) |
+| `add_to_whitelist` | [`3QDYsv…Fg27ne`](https://explorer.solana.com/tx/3QDYsvxtxBRv5SSnt2HujVHyb6vGxuUy6VxEjiUNV6YYQqvRAaaGab84G97prBhriuFa6TiMnuAUu3UsrmFg27ne?cluster=devnet) |
+| `buy_tokens` (creates, thaws and mints to the buyer's account) | [`3aDuzJ…W4LSD1`](https://explorer.solana.com/tx/3aDuzJzDPuDnxR7XRsXwKyymXcA1sBuUNr4ssMjbD2S1PnzQmRFdiTTbtcJ7x4myAZmwmM5scuf5ZjpXDXW4LSD1?cluster=devnet) |
+| `deposit_revenue` | [`bGgP9V…t3MMmS`](https://explorer.solana.com/tx/bGgP9VLqUjiFjrxm5MiRitG3mWGx3fcfTvrFzJKnWs8th8uy7zDyidvQ3D4iTPBDhEKmMHYAnDViHpBd9t3MMmS?cluster=devnet) |
+| `claim_revenue` | [`2A6UKZ…PRAchf`](https://explorer.solana.com/tx/2A6UKZp1i6LFyjv8gNSy1Qgej12me6C4Juq9nuMsn7s3YHpKRkfa8Pjdy3dj6qmdgJoiiSQzqg1CfLTnfEPRAchf?cluster=devnet) |
 
-### On-Chain
+No `TelemetryRecord` exists on devnet yet, and no holder-to-holder transfer has been made (see below).
 
-| Technology | Purpose |
-| :--- | :--- |
-| **Anchor (Rust)** | Solana program framework |
-| **Token-2022** | Token Extensions for RWA compliance |
-| **Squads Multisig** | Multi-signature authority management |
+### Status and Known Limitations
+
+AXEL is an MVP on **devnet only**. The programs are **not audited**, and there is no mainnet deployment. The most important open issues, all from reading the code (full list of 11: [docs/architecture.md](docs/architecture.md#known-limitations)):
+
+- `add_to_whitelist` and `remove_from_whitelist` accept **any signer**, so the KYC gate is not enforced on-chain until they are restricted to an authorized key.
+- `claim_revenue` pays on the **current** balance, so shares bought or transferred after a deposit can claim that period again.
+- Neither devnet mint has the hook's `ExtraAccountMetaList`, so holder-to-holder transfers fail today. Primary sales are mints, not transfers, so they are unaffected.
+- The backend's `record_telemetry` transaction passes one account too many and fails. Without Yandex Fleet credentials the backend serves simulated telemetry, and does not mark it as simulated.
+- The dashboard telemetry widget and the KYC prompt are not connected to the backend or to Sumsub yet.
+- Some asset-page values are illustrative, not on-chain: the car specs (class, engine, colour) and the Revenue Projection defaults.
+
+Security reports: [SECURITY.md](SECURITY.md).
 
 ---
 
-## 📂 Project Structure
+## Screenshots
+
+Both screenshots show live devnet data in the English locale.
+
+| Catalog | Asset page |
+|---------|------------|
+| ![Catalog with both devnet projects, sale progress and price per share](assets/screenshots/01-catalog.png) | ![Asset page for mint Aj9q…37YU with VIN, 13 of 100 shares sold and Explorer links](assets/screenshots/02-asset-detail.png) |
+
+---
+
+## Quick Start
+
+**Prerequisites**
+- Node.js 22 LTS and npm. The frontend and backend need Node >= 20.19 (CI uses Node 20); the root program tests need Node >= 21.
+- Phantom or Solflare switched to **Devnet**, for anything that signs a transaction. Browsing needs no wallet.
+- For the programs only: Rust 1.89.0 (pinned in `rust-toolchain.toml`), Anchor CLI 0.32.1, and the Solana (Agave) CLI 2.3.x, tested with 2.3.13. `Cargo.lock` needs Cargo 1.85+ inside the SBF toolchain, so platform-tools v1.52 is pinned in the root `Cargo.toml` (`[workspace.metadata.solana]`).
+
+```bash
+git clone https://github.com/dmitriytsoy22/axel-sol.git
+cd axel-sol
+```
+
+Each block below starts from the repository root.
+
+**Frontend** (reads the live devnet programs; the IDL is vendored, so no Anchor toolchain is needed)
+
+```bash
+cd frontend
+cp .env.local.example .env.local   # devnet RPC and program ID are prefilled
+npm ci
+npm run dev                         # http://localhost:3000
+```
+
+Checks, as run in CI: `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`.
+
+Buying shares requires a wallet with an approved `WhitelistEntry` on devnet. A public demo path for judges is planned (see below).
+
+**Backend** (optional: telemetry oracle and KYC webhook)
+
+```bash
+cd backend
+cp .env.example .env                # every variable is documented in the file
+npm ci
+npm run start:dev                   # watch mode; or: npm run build && npm run start:prod
+curl http://localhost:3001/health   # {"status":"ok","rpc":"connected","oracle":"not_configured"}
+```
+
+Without Yandex Fleet credentials the telemetry job uses simulated data. Without `ORACLE_KEYPAIR_PATH` and `ADMIN_KEYPAIR_PATH` it sends no transactions.
+
+**Programs**
+
+```bash
+npm ci
+npm run build                               # anchor build → target/deploy, target/idl, target/types
+anchor test --provider.cluster localnet     # starts a local validator with both programs, runs the test script
+```
+
+`npm test` runs `node --import tsx/esm --test tests/**/*.ts` against a validator at `http://127.0.0.1:8899`. `Anchor.toml` sets the provider cluster to devnet, so always pass `--provider.cluster localnet`. To create a project on a cluster: `npm run init-project -- --cluster devnet` (admin = `~/.config/solana/id.json`). Program builds and tests are not in CI yet. With the toolchain above, `anchor build` and `anchor test --provider.cluster localnet` pass locally (49 tests).
+
+More detail: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## Repository Structure
 
 ```
 axel-sol/
-├── docs/
-│   ├── assets/                     # Hero banner, dashboard mockup
-│   ├── development_plan.md         # Full team development plan
-│   ├── plan_frontend.md            # Frontend-specific user stories
-│   ├── plan_backend.md             # Backend-specific user stories
-│   ├── plan_onchain.md             # On-chain developer plan
-│   └── rwa_taxi_tokenization_spec.md  # Technical specification (RU)
-│
+├── programs/
+│   ├── axel/src/
+│   │   ├── lib.rs                  # program entry, 12 instructions
+│   │   ├── errors.rs               # AxelError
+│   │   ├── state/                  # ProjectState, RevenuePeriod, ClaimRecord, WhitelistEntry, TelemetryRecord
+│   │   └── instructions/
+│   │       ├── admin/              # initialize_project, whitelist, deposit_revenue, pause_resume,
+│   │       │                       # update_price, revoke_mint_authority, close_project
+│   │       ├── investor/           # buy_tokens, claim_revenue
+│   │       └── oracle/             # record_telemetry
+│   └── transfer-hook/src/lib.rs    # execute, fallback, initialize_extra_account_meta_list
+├── tests/                          # 12 node:test files for both programs (local validator)
+├── scripts/                        # init-project.ts, generate-clients.ts, last-project.json
+├── sdk/generated/                  # Codama TypeScript client (stale, see docs/api.md)
+├── migrations/deploy.ts            # Anchor scaffold, unused
+├── backend/src/                    # NestJS: health, kyc, telemetry, yandex, solana modules
 ├── frontend/
-│   ├── src/
-│   │   ├── app/
-│   │   │   └── [locale]/           # i18n routing (ru/en/kk)
-│   │   │       ├── page.tsx        # Car catalog (home page)
-│   │   │       ├── assets/         # Asset detail page
-│   │   │       ├── dashboard/      # Investor dashboard
-│   │   │       ├── payouts/        # Payout history
-│   │   │       └── admin/          # Admin panel
-│   │   │
-│   │   ├── components/
-│   │   │   ├── admin/              # Revenue deposit, project controls
-│   │   │   ├── asset/              # Asset detail cards
-│   │   │   ├── catalog/            # Asset cards, catalog grid
-│   │   │   ├── dashboard/          # Portfolio, telemetry widget
-│   │   │   ├── invest/             # Investment flow forms
-│   │   │   ├── kyc/                # KYC status components
-│   │   │   ├── layout/             # Navbar, Footer, constants
-│   │   │   ├── payouts/            # Payout history table
-│   │   │   ├── shared/             # RpcErrorBoundary, common
-│   │   │   ├── ui/                 # Design system primitives
-│   │   │   └── wallet/             # Wallet connection UI
-│   │   │
-│   │   ├── hooks/                  # Custom React hooks
-│   │   │   ├── useInvest.tsx       # Investment transaction
-│   │   │   ├── useClaim.ts         # Revenue claim transaction
-│   │   │   ├── useDashboard.ts     # Dashboard data aggregation
-│   │   │   ├── useProjectState.ts  # On-chain project reads
-│   │   │   ├── useTelemetry.ts     # Backend telemetry API
-│   │   │   ├── useWhitelistStatus.ts  # KYC/whitelist check
-│   │   │   └── useAdminAccess.ts   # Admin wallet verification
-│   │   │
-│   │   ├── lib/
-│   │   │   ├── solana/             # RPC helpers
-│   │   │   │   ├── connection.ts   # RPC connection with retry
-│   │   │   │   ├── pda.ts          # PDA derivation helpers
-│   │   │   │   ├── readers.ts      # On-chain data deserialization
-│   │   │   │   ├── instructions.ts # TX construction
-│   │   │   │   └── errors.ts       # Error code mapping
-│   │   │   ├── api/                # Telemetry API client
-│   │   │   └── security/           # Input sanitization
-│   │   │
-│   │   ├── providers/              # WalletProvider (Phantom/Backpack)
-│   │   ├── types/                  # TypeScript interfaces
-│   │   ├── styles/                 # Global CSS
-│   │   └── i18n/                   # i18n routing config
-│   │
-│   ├── messages/                   # Translation files
-│   │   ├── ru.json                 # 🇷🇺 Russian
-│   │   ├── en.json                 # 🇬🇧 English
-│   │   └── kk.json                 # 🇰🇿 Kazakh
-│   │
-│   ├── DESIGN_SYSTEM.md            # Apple-inspired design system docs
-│   ├── design-tokens.json          # Design tokens (colors, spacing, type)
-│   ├── tailwind.config.ts          # Tailwind with AXEL design tokens
-│   ├── vitest.config.ts            # Test config (80% coverage)
-│   └── package.json
-│
-└── README.md
+│   ├── src/app/[locale]/           # /, /assets/[id], /dashboard, /payouts, /admin
+│   ├── src/components/             # admin, asset, catalog, dashboard, invest, kyc, layout, payouts, ui, wallet
+│   ├── src/hooks/                  # chain reads and transaction hooks
+│   ├── src/lib/solana/             # connection, PDAs, readers, instruction builders, idl/ (vendored)
+│   └── messages/                   # en.json, ru.json, kk.json
+├── docs/                           # product, architecture, api, roadmap; planning/ and ru/ (historical)
+├── assets/                         # logo, hero, screenshots
+├── .github/workflows/ci.yml        # frontend and backend CI
+├── Anchor.toml · Cargo.toml · rust-toolchain.toml · package.json
+└── LICENSE · CONTRIBUTING.md · SECURITY.md
 ```
 
 ---
 
-## 🚀 Getting Started
+## Prior Work and Hackathon Scope
 
-### Prerequisites
+AXEL was started before Crypto World's Fair. Only work done during the event is judged, so the boundary is marked in git with the tag **`pre-hackathon`** (commit `cd2c12c`, 2026-04-07).
 
-- **Node.js** ≥ 18.x
-- **npm** ≥ 9.x
-- A Solana wallet browser extension ([Phantom](https://phantom.app/) or [Backpack](https://www.backpack.app/))
+**Before the hackathon (Mar 28 – Apr 7, 2026)**
+- Written by two people:
+  - Dmitriy Tsoy: frontend, 36 commits.
+  - Andrey S ([@ndrkbrg](https://github.com/ndrkbrg)): Anchor programs, backend and chain integration, 22 commits.
+- Scope: the specification and plans, both Anchor programs and their integration tests, the devnet deployment with the two test projects above, the NestJS backend, and the Next.js frontend wired to the program.
+- An AXEL project draft was created on Colosseum for the Frontier hackathon (spring 2026). It was never submitted.
+- `main` has no commits between 2026-04-07 and 2026-09-24.
 
-### Installation
+**During Crypto World's Fair (from Sep 14, 2026)**
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/your-org/axel-sol.git
-cd axel-sol
+Everything after the tag: [`pre-hackathon...main`](https://github.com/dmitriytsoy22/axel-sol/compare/pre-hackathon...main).
 
-# 2. Install frontend dependencies
-cd frontend
-npm install
+Done so far:
+- Vendored the program IDL into `frontend/src/lib/solana/idl/`, so a fresh clone builds without `anchor build`, and fixed the Content-Security-Policy for local development.
+- Brought the frontend unit suite to green (31 files, 105 tests). Five stale test files were rewritten against the current code, and a leftover 800 ms mock delay was removed from `useTelemetry`.
+- Added real CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+- Wrote the English documentation: [product](docs/product.md), [architecture](docs/architecture.md), [API](docs/api.md), [roadmap](docs/roadmap.md). The historical plans moved to [docs/planning/](docs/planning/) and the Russian overview to [docs/ru/](docs/ru/).
+- Added repository assets (logo, hero image, screenshots of the live devnet data), [LICENSE](LICENSE), [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
+- Cleaned up the env examples and removed a committed local tool-settings file and a duplicate image.
+- Pinned the SBF platform-tools in `Cargo.toml` so `anchor build` works with the current lockfile, and re-ran the program test suite on a local validator (49 tests pass).
+- Added missing asset-page translations (EN / RU / KK).
+- Rewrote this README to match the code.
 
-# 3. Configure environment
-cp .env.local.example .env.local
-# Edit .env.local with your Solana RPC URL and Program ID
-
-# 4. Start development server
-npm run dev
-```
-
-The app will be available at **http://localhost:3000**.
-
----
-
-## 🔑 Environment Variables
-
-Create `frontend/.env.local` from the example file:
-
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `NEXT_PUBLIC_SOLANA_RPC_URL` | Solana RPC endpoint (Helius / QuickNode / public) | `https://api.devnet.solana.com` |
-| `NEXT_PUBLIC_SOLANA_NETWORK` | Network: `devnet` \| `mainnet-beta` | `devnet` |
-| `NEXT_PUBLIC_PROGRAM_ID` | Deployed `rwa-taxi` program ID | — |
-| `NEXT_PUBLIC_TELEMETRY_API_URL` | Minimal backend URL | `http://localhost:3001` |
-| `NEXT_PUBLIC_KYC_URL` | Sumsub KYC form URL | — |
+In progress during the hackathon (**planned, not done yet**):
+- [ ] Public frontend deployment with a judge demo path (a whitelisted devnet test wallet)
+- [ ] End-to-end devnet demo with Explorer links: whitelist → buy → deposit → claim → transfer
+- [ ] AXEL v2 programs under new program IDs: whitelist restricted to a KYC authority, claim accounting that is safe against transfers and late buys, escrowed fundraising with refunds, stablecoin payments
 
 ---
 
-## 📜 Available Scripts
+## Roadmap
 
-Run from the `frontend/` directory:
+- [x] `axel` Anchor program with 12 instructions: project setup, whitelist, direct sale, revenue deposit and claim, pause / resume / close, telemetry, price update, mint-authority revoke
+- [x] Token-2022 share mint with six extensions and on-chain car metadata
+- [x] `transfer_hook` program that checks both owners against the whitelist
+- [x] Program integration tests (12 files, 49 tests, local validator)
+- [x] Both programs on devnet; two test projects that each went through whitelist → buy → deposit → claim
+- [x] NestJS backend: health, telemetry endpoint, KYC webhook, Yandex Fleet cron
+- [x] Next.js frontend: catalog, asset page and buy, dashboard with claim, payouts, admin panel, EN / RU / KK
+- [x] Vendored IDL, green frontend unit suite, CI, English docs
+- [ ] Public deployment and judge demo path
+- [ ] End-to-end devnet demo, including a holder-to-holder transfer
+- [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key
+- [ ] Revenue claims that ignore shares bought or transferred after a deposit
+- [ ] Create the hook's `ExtraAccountMetaList` during project setup
+- [ ] Fix the backend's `record_telemetry` transaction and flag simulated telemetry
+- [ ] Connect KYC and the telemetry widget in the UI
+- [ ] Program build and tests in CI
+- [ ] Independent security audit, multisig authorities, mainnet
 
-| Command | Description |
-| :--- | :--- |
-| `npm run dev` | Start Next.js development server |
-| `npm run build` | Build production bundle |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npm run format` | Format code with Prettier |
-| `npm run test` | Run tests with Vitest |
-| `npm run test:cov` | Run tests with coverage report (80% threshold) |
-
----
-
-## 🎨 Design System
-
-AXEL uses a **minimalist Apple-inspired design system** — typography and spacing are the primary design tools.
-
-> _"If an element doesn't help the user make a decision — remove it."_
-
-### Design Principles
-
-| # | Principle | In Practice |
-| :---: | :--- | :--- |
-| 1 | **Content-first** | Typography = 80% of design. Color = accent, not decoration |
-| 2 | **Breathing room** | Generous whitespace. Sections breathe. Nothing cramped |
-| 3 | **One color, one purpose** | Cyan `#06B6D4` = "take action". Everything else is grayscale |
-| 4 | **Quiet confidence** | No animations for animations' sake. Smoothness = respect |
-| 5 | **Reduce, then reduce again** | No borders where shadows work. No gradients. No glow |
-
-### Color Palette
-
-```
-Brand Cyan          #06B6D4  ██  Primary CTA, links, active states
-                    #0891B2  ██  Hover
-                    #0E7490  ██  Active / pressed
-
-Apple System Colors
-  Success           #34C759  ██  Active, confirmed, profit
-  Warning           #FF9F0A  ██  Fundraising, pending
-  Error             #FF3B30  ██  Failed TX, errors
-  Info              #007AFF  ██  Informational tooltips
-
-Neutrals (Light)
-  Background        #FFFFFF  ██
-  Secondary bg      #F5F5F7  ██  Apple's signature gray
-  Text primary      #1D1D1F  ██  Apple's near-black
-  Text secondary    #6E6E73  ██
-```
-
-### Typography
-
-- **Primary:** `Inter` (closest free analog to SF Pro)
-- **Monospace:** `JetBrains Mono` (wallet addresses, SOL amounts)
-- **Body size:** `17px` (Apple's standard, prevents iOS zoom)
-- **Scale:** Display (56px) → Caption (11px), following Apple HIG
-
-### Benchmarks
-
-Apple.com · Linear.app · Stripe.com
-
-> 📄 Full design system documentation: [`frontend/DESIGN_SYSTEM.md`](frontend/DESIGN_SYSTEM.md)
-> 📐 Design tokens: [`frontend/design-tokens.json`](frontend/design-tokens.json)
+Full roadmap: [docs/roadmap.md](docs/roadmap.md)
 
 ---
 
-## 🌍 Internationalization (i18n)
+## Resources
 
-Full multilingual support via [`next-intl`](https://next-intl-docs.vercel.app/):
-
-| Language | File | Status |
-| :---: | :--- | :---: |
-| 🇷🇺 Russian | `messages/ru.json` | ✅ Complete |
-| 🇬🇧 English | `messages/en.json` | ✅ Complete |
-| 🇰🇿 Kazakh | `messages/kk.json` | ✅ Complete |
-
-Routes are locale-prefixed: `/ru/dashboard`, `/en/admin`, `/kk/payouts`.
+- [Documentation index](docs/README.md)
+- [Colosseum project page](https://colosseum.com/arena/projects/axel-1)
+- [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md)
+- Logo: [assets/logo.png](assets/logo.png) · [assets/logo-wordmark.png](assets/logo-wordmark.png)
 
 ---
 
-## 🔒 Security
+## Acknowledgements
 
-| Layer | Measure |
-| :--- | :--- |
-| **On-Chain** | Transfer Hooks enforce whitelist on every token transfer |
-| **On-Chain** | Default Account State (Frozen) — tokens locked until KYC |
-| **On-Chain** | Permanent Delegate — regulatory clawback capability |
-| **On-Chain** | Multisig (Squads) for all privileged authorities |
-| **Backend** | Oracle keypair isolated in Secrets Manager |
-| **Backend** | Sumsub webhook signature verification |
-| **Backend** | Startup fails fast if secrets missing |
-| **Frontend** | Content-Security-Policy headers configured |
-| **Frontend** | X-Frame-Options: DENY, X-Content-Type-Options: nosniff |
-| **Frontend** | Wallet address validation before all on-chain calls |
-| **Frontend** | No inline scripts, strict Referrer-Policy |
-| **Auth** | Sign-In with Solana (SIWS) — no JWT, no server sessions |
+- **Andrey S ([@ndrkbrg](https://github.com/ndrkbrg))** wrote the Anchor programs, the NestJS backend and the chain integration of the frontend before the hackathon.
 
 ---
 
-## 👥 Team
+## License
 
-| Role | Handle | Responsibility |
-| :--- | :--- | :--- |
-| **Frontend** | `dimagonedone` | Next.js, Wallet Adapter, direct RPC reads, design system |
-| **On-Chain** | `ndrkbrg` | Anchor/Rust, Token-2022, Transfer Hook, deployment |
-| **Backend** | `russh` | NestJS minimal — oracle cron + KYC webhook only |
-
----
-
-## 🤝 Contributing
-
-We welcome contributions from the community! Here's how you can help:
-
-1. **Fork** the repository
-2. **Create** a feature branch: `git checkout -b feature/awesome-feature`
-3. **Commit** your changes: `git commit -m 'feat: add awesome feature'`
-4. **Push** to the branch: `git push origin feature/awesome-feature`
-5. **Open** a Pull Request
-
-Please read our documentation in `docs/` before contributing to understand the architecture and conventions.
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-  <br/>
-  <img src="https://img.shields.io/badge/Built_on-Solana-14F195?style=for-the-badge&logo=solana&logoColor=white" alt="Built on Solana"/>
-  <br/>
-  <br/>
-  <strong>Make real-world assets liquid, transparent, and accessible.</strong>
-  <br/>
-  <sub>Built with ❤️ for the future of RWA on Solana.</sub>
-  <br/>
-  <br/>
-</div>
+MIT — see [LICENSE](LICENSE)
