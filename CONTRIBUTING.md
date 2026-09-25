@@ -138,7 +138,7 @@ Program IDs (from `Anchor.toml`):
 
 1. Branch from `main`.
 2. Keep changes focused. Run the checks for the parts you touched (see above).
-3. Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
+3. Write each commit message as one short line of plain English that says what changed, e.g. `Add escrowed share sales`. No type prefixes and no body.
 4. Never commit secrets, keypair JSON files, or `.env` / `.env.local` files.
 5. Open the pull request against `main` and describe how you tested it.
 
