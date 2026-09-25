@@ -2,6 +2,7 @@ import { useTranslations } from 'next-intl';
 import { ArrowUpRight } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { connectionConfig, getExplorerUrl } from '@/lib/solana/connection';
+import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
 import { Logo } from './Logo';
 import { DOCS_URL, NAV_LINKS, REPO_URL } from './constants';
 
@@ -75,7 +76,7 @@ const Footer = (): JSX.Element => {
 
         <div className="mt-12 flex flex-col gap-2 border-t border-border pt-6 text-small text-subtle-foreground sm:flex-row sm:justify-between sm:gap-8">
           <p>{t('copyright', { year: new Date().getFullYear() })}</p>
-          <p>{t('networkNote')}</p>
+          {ON_TEST_NETWORK && <p>{t('networkNote', { network: NETWORK_NAME })}</p>}
         </div>
       </div>
     </footer>

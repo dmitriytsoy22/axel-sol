@@ -4,10 +4,11 @@ import React, { useEffect, useId, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
-import { CircleAlert, Loader2 } from 'lucide-react';
+import { CircleAlert, CircleCheck, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import type { Holding } from '@/hooks/usePositions';
+import { useRecipientCheck } from '@/hooks/useRecipientCheck';
 import { useTransferShares } from '@/hooks/useTransferShares';
 import { formatCount } from '@/lib/format';
 import { isValidSolanaAddress } from '@/lib/security/sanitize';
@@ -57,6 +58,18 @@ export function TransferModal({
   if (trimmed && !isValidSolanaAddress(trimmed)) recipientError = t('invalidAddress');
   else if (trimmed && publicKey && trimmed === publicKey.toBase58())
     recipientError = t('selfTransfer');
+  const recipientKey = trimmed && !recipientError ? new PublicKey(trimmed) : null;
+  const { check, isLoading: checking } = useRecipientCheck(holding?.project ?? null, recipientKey);
+  // The transfer hook would refuse this wallet; say why before anything is signed.
+  if (!recipientError && check && check.eligibility !== 'eligible') {
+    recipientError = t(`recipient_${check.eligibility}`);
+  }
+  let recipientOk: string | null = null;
+  if (!recipientError && check) {
+    recipientOk = t(check.hasPosition ? 'recipientHolds' : 'recipientOpens');
+  } else if (!recipientError && checking) {
+    recipientOk = t('recipientChecking');
+  }
 
   let amountError: string | null = null;
   if (amount.trim() && (shares === null || shares === 0n)) amountError = t('wholeShares');
@@ -64,7 +77,9 @@ export function TransferModal({
     amountError = t('tooMany', { count: formatCount(held, locale) });
 
   const busy = status !== 'idle' && status !== 'success' && status !== 'error';
-  const canSend = Boolean(trimmed && shares && !recipientError && !amountError && !busy);
+  const canSend = Boolean(
+    trimmed && shares && !recipientError && !amountError && !busy && !checking,
+  );
 
   const handleSend = async () => {
     if (!holding || !shares || !canSend) return;
@@ -100,9 +115,24 @@ export function TransferModal({
             />
             <p
               id={`${formId}-to-hint`}
-              className={`mt-2 text-small ${recipientError ? 'text-destructive' : 'text-muted-foreground'}`}
+              aria-live="polite"
+              className={`mt-2 flex items-start gap-1.5 text-small ${recipientError ? 'text-destructive' : check ? 'text-success' : 'text-muted-foreground'}`}
             >
-              {recipientError ?? t('recipientHint')}
+              {recipientError && (
+                <CircleAlert
+                  aria-hidden="true"
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                  strokeWidth={1.75}
+                />
+              )}
+              {!recipientError && check && (
+                <CircleCheck
+                  aria-hidden="true"
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                  strokeWidth={1.75}
+                />
+              )}
+              {recipientError ?? recipientOk ?? t('recipientHint')}
             </p>
           </div>
 

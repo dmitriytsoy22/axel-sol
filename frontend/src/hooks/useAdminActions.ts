@@ -9,6 +9,7 @@ import {
   finalizeRaiseInstruction,
   manageProjectInstruction,
   setInvestorInstruction,
+  setProjectRolesInstruction,
 } from '@/lib/solana/instructions';
 import { kycRecord, type KycDecision, type KycRole } from '@/lib/solana/kyc';
 import { COMPUTE_UNITS } from '@/lib/solana/transaction';
@@ -66,7 +67,20 @@ export function useProjectAdmin() {
     [send, t],
   );
 
-  return { status, error, run, finalize, activate, reset };
+  /** Replaces the car's operator, oracle or both; null keeps the current one. */
+  const setRoles = useCallback(
+    (project: Project, operator: PublicKey | null, oracle: PublicKey | null) =>
+      send(
+        async (admin) => ({
+          instructions: [await setProjectRolesInstruction({ project, admin, operator, oracle })],
+          computeUnits: COMPUTE_UNITS.stateChange,
+        }),
+        { successTitle: t('setRolesDone'), failureTitle: t('setRolesFailed') },
+      ),
+    [send, t],
+  );
+
+  return { status, error, run, finalize, activate, setRoles, reset };
 }
 
 /** Approving or revoking a wallet in the KYC registry, signed by the KYC or demo KYC key. */

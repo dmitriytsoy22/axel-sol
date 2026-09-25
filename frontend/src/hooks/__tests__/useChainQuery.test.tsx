@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConnectionContext } from '@solana/wallet-adapter-react';
 import type { Connection } from '@solana/web3.js';
 import { FixtureConnection } from '@/lib/solana/__tests__/fixtures/chain';
@@ -78,5 +78,32 @@ describe('useChainQuery', () => {
 
     await act(async () => reads.b.resolve('data of b'));
     expect(result.current.data).toBe('data of b');
+  });
+
+  describe('with a refresh interval', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    });
+
+    it('reads again on its interval while the page is visible, and not while it is hidden', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+      let reads = 0;
+      const { result } = renderHook(
+        () => useChainQuery('balance', async () => (reads += 1), { refreshMs: 15_000 }),
+        { wrapper },
+      );
+      await act(async () => undefined);
+      expect(result.current.data).toBe(1);
+      const firstRead = result.current.updatedAt;
+
+      await act(async () => vi.advanceTimersByTime(15_000));
+      expect(result.current.data).toBe(2);
+      expect(result.current.updatedAt).toBeGreaterThan(firstRead ?? Infinity);
+
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      await act(async () => vi.advanceTimersByTime(45_000));
+      expect(reads).toBe(2);
+    });
   });
 });

@@ -8,6 +8,7 @@ import {
   decodeInvestor,
   decodePosition,
   decodeProject,
+  decodeRecoveryRequest,
   decodeRevenuePeriod,
   discriminator,
   OFFSETS,
@@ -16,6 +17,7 @@ import {
   type InvestorAccount,
   type PositionAccount,
   type ProjectAccount,
+  type RecoveryRequestAccount,
   type RevenuePeriodAccount,
 } from './accounts';
 import { PROGRAM_ID } from './connection';
@@ -41,7 +43,8 @@ function programAccounts(
   });
 }
 
-async function multipleAccounts(
+/** Accounts at `addresses`, in their order; null where nothing exists. */
+export async function fetchAccountInfos(
   connection: Connection,
   addresses: PublicKey[],
 ): Promise<(AccountInfo<Buffer> | null)[]> {
@@ -62,7 +65,7 @@ function uniqueKeys(keys: PublicKey[]): PublicKey[] {
 /** Adds the car from the share mint's metadata and the payment token's decimals and symbol. */
 async function withTokens(connection: Connection, accounts: ProjectAccount[]): Promise<Project[]> {
   const mints = uniqueKeys(accounts.flatMap((a) => [a.shareMint, a.paymentMint]));
-  const infos = await multipleAccounts(connection, mints);
+  const infos = await fetchAccountInfos(connection, mints);
   const byMint = new Map(mints.map((mint, i) => [mint.toBase58(), infos[i]]));
   const mintAccount = (mint: PublicKey): AccountInfo<Buffer> => {
     const info = byMint.get(mint.toBase58());
@@ -124,6 +127,23 @@ export async function fetchPositions(
   return accounts.map(({ pubkey, account }) => decodePosition(pubkey, account.data));
 }
 
+/** Every position in `project`, including emptied ones. */
+export async function fetchProjectPositions(
+  connection: Connection,
+  project: PublicKey,
+): Promise<PositionAccount[]> {
+  const accounts = await programAccounts(connection, 'position', [
+    memcmp(OFFSETS.positionProject, project.toBuffer()),
+  ]);
+  return accounts.map(({ pubkey, account }) => decodePosition(pubkey, account.data));
+}
+
+/** Every position of every project. */
+export async function fetchAllPositions(connection: Connection): Promise<PositionAccount[]> {
+  const accounts = await programAccounts(connection, 'position');
+  return accounts.map(({ pubkey, account }) => decodePosition(pubkey, account.data));
+}
+
 export async function fetchPosition(
   connection: Connection,
   project: PublicKey,
@@ -145,6 +165,33 @@ export async function fetchRevenuePeriods(
   return accounts
     .map(({ pubkey, account }) => decodeRevenuePeriod(pubkey, account.data))
     .sort((a, b) => a.index - b.index);
+}
+
+/**
+ * Pending recoveries, oldest first: of every wallet, or only those that would move
+ * `fromOwner`'s shares, which is how a holder finds a request to veto.
+ */
+export async function fetchRecoveryRequests(
+  connection: Connection,
+  fromOwner?: PublicKey,
+): Promise<RecoveryRequestAccount[]> {
+  const accounts = await programAccounts(
+    connection,
+    'recoveryRequest',
+    fromOwner ? [memcmp(OFFSETS.recoveryFromOwner, fromOwner.toBuffer())] : [],
+  );
+  return accounts
+    .map(({ pubkey, account }) => decodeRecoveryRequest(pubkey, account.data))
+    .sort((a, b) => a.proposedAt - b.proposedAt || a.eta - b.eta);
+}
+
+/** Balance of a token account of either token program; null when it does not exist. */
+export async function fetchTokenAmount(
+  connection: Connection,
+  tokenAccount: PublicKey,
+): Promise<bigint | null> {
+  const info = await connection.getAccountInfo(tokenAccount, 'confirmed');
+  return info ? tokenAccountBalance(tokenAccount, info) : null;
 }
 
 /** Balance of a token account of either token program; zero when it does not exist. */

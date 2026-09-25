@@ -126,6 +126,22 @@ export interface RevenuePeriodAccount {
   depositedAt: number;
 }
 
+/** A pending move of a lost wallet's shares to the same holder's new wallet. */
+export interface RecoveryRequestAccount {
+  address: PublicKey;
+  project: PublicKey;
+  fromOwner: PublicKey;
+  toOwner: PublicKey;
+  shares: bigint;
+  /** Hex SHA-256 of the off-chain case file. */
+  reasonHash: string;
+  /** The admin that proposed it; the rent goes back to this key. */
+  proposer: PublicKey;
+  proposedAt: number;
+  /** Earliest execution; the old wallet can veto until then. */
+  eta: number;
+}
+
 /** Account sizes, discriminator included; fixed by `state/layout_tests.rs`. */
 export const ACCOUNT_SIZE = {
   config: 358,
@@ -141,6 +157,8 @@ export const OFFSETS = {
   positionProject: 8,
   positionOwner: 40,
   periodProject: 8,
+  recoveryProject: 8,
+  recoveryFromOwner: 40,
 } as const;
 
 /** The 8-byte Anchor discriminator an account of `name` starts with. */
@@ -275,6 +293,21 @@ export function decodeRevenuePeriod(address: PublicKey, data: Buffer): RevenuePe
     telemetryHead: hex(raw.telemetryHead),
     kind: variant<RevenueKind>(raw.kind),
     depositedAt: seconds(raw.depositedAt),
+  };
+}
+
+export function decodeRecoveryRequest(address: PublicKey, data: Buffer): RecoveryRequestAccount {
+  const raw = decode('recoveryRequest', data);
+  return {
+    address,
+    project: raw.project,
+    fromOwner: raw.fromOwner,
+    toOwner: raw.toOwner,
+    shares: big(raw.shares),
+    reasonHash: hex(raw.reasonHash),
+    proposer: raw.proposer,
+    proposedAt: seconds(raw.proposedAt),
+    eta: seconds(raw.eta),
   };
 }
 

@@ -135,6 +135,7 @@ The `axel` program ID is hardcoded in `kyc.service.ts` and `telemetry-cron.servi
 | `NEXT_PUBLIC_PAYMENT_MINT_SYMBOLS` | `lib/solana/tokens.ts` | Unset. `<mint>:<symbol>,<mint>:<symbol>` names payment mints without on-chain metadata. A Token-2022 mint's own metadata symbol wins, Circle's USDC is known by address, anything else shows its short address. |
 | `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts`, `next.config.mjs` | Unset: the car page says trip data is not connected and makes no request. Set: the backend's base URL; the widget asks `/telemetry/latest/<share mint>` every minute. The backend does not enable CORS yet, so it must share the frontend's origin or add CORS. |
 | `NEXT_PUBLIC_INDEXER_URL` | `lib/api/indexer.ts`, `next.config.mjs` | Unset: payout history comes from the chain. Set: from the [indexer API](#indexer-api-read-by-the-frontend). |
+| `NEXT_PUBLIC_PUBLISHED_DATA_URL` | `lib/api/published.ts`, `next.config.mjs` | `/demo-data` on test networks (the seed's files in `frontend/public/demo-data`), unset on mainnet. The base of the [published car data](#published-car-data-read-by-verify) the asset page's "Check the car's data yourself" hashes. An absolute URL's origin is added to the CSP, and that server must allow CORS. |
 
 ## Indexer API (read by the frontend)
 
@@ -170,6 +171,49 @@ interface PayoutHistory {
 ```
 
 `periods` holds the deposits of every project in which the wallet held shares when the deposit was made. Amounts are strings because they can exceed 2^53. Projects the chain does not know are left out; any other answer is shown as a failed read with a retry.
+
+## Published Car Data (read by "Verify")
+
+The chain keeps fingerprints of each car's off-chain records: the telemetry hash chain head (`Project.telemetry_head`, `telemetry_count`, `last_telemetry_date`), each deposit's `report_hash` and `telemetry_head` snapshot (`RevenuePeriod`), and the purchase papers' `acquisition_doc_hash`. The asset page downloads the published records and recomputes every fingerprint in the browser (`lib/verify/`). The layout is the one `scripts/seed-devnet/publish.ts` writes; the backend should publish the same one for real cars.
+
+```
+GET <base>/<share mint>/index.json
+GET <base>/<share mint>/<file>          every file named by the index
+```
+
+`index.json` (fields the frontend reads; the seed writes more):
+```ts
+interface CarIndex {
+  mint: string;                 // must equal the share mint in the URL
+  data_origin?: string;         // "devnet-demo-seed" marks fictional demo data
+  telemetry: {
+    months: Array<{ month: string; file: string }>;   // oldest first, e.g. "telemetry/2026-06.json"
+  };
+  reports: Array<{ id: string; file: string; period_index: number | null }>;
+  acquisition: { file: string } | null;
+}
+```
+
+A month file:
+```ts
+interface TelemetryMonth {
+  days: Array<{
+    record: object;       // the raw daily record; it must carry "date": "YYYY-MM-DD"
+    data_hash?: string;   // hex SHA-256 of the record's RFC 8785 canonical JSON
+    head?: string;        // hex chain head after this day
+  }>;
+}
+```
+
+The check, in order:
+1. Every `record` is canonicalized (RFC 8785) and hashed with SHA-256; a stated `data_hash` must match.
+2. Days must be real calendar days in strictly increasing order.
+3. The chain starts from 32 zero bytes and steps `head = SHA-256(head ‖ date as u32 little-endian ‖ data_hash)`, as `record_telemetry` does; a stated `head` must match.
+4. After `telemetry_count` days the rebuilt head and last date must equal the project's. More published days than on-chain is reported as ahead; fewer, as not finished.
+5. Each report file with a `period_index` is hashed the same way and compared with that period's `report_hash`; each period's `telemetry_head` is looked up among the rebuilt heads.
+6. After activation, the acquisition file is compared with `acquisition_doc_hash`.
+
+File paths in the index must be relative `.json` paths inside the car's folder. A missing index (404) is reported as "nothing published".
 
 ## Program Reference: `axel`
 

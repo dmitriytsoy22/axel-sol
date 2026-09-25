@@ -10,6 +10,7 @@ export const TKZT: PaymentToken = {
   tokenProgram: TOKEN_2022_PROGRAM_ID,
   decimals: 6,
   symbol: 'tKZT',
+  issuer: { canFreeze: false, canSeize: false, canPause: false },
 };
 
 /** 10 000 tKZT in base units, the seed's share price. */

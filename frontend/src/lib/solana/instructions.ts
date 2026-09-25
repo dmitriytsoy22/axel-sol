@@ -5,7 +5,13 @@ import {
   createTransferCheckedInstruction,
   TOKEN_2022_PROGRAM_ID,
 } from '@solana/spl-token';
-import type { InvestorStatus, KycProvider, ProjectAccount, RevenueKind } from './accounts';
+import type {
+  InvestorStatus,
+  KycProvider,
+  ProjectAccount,
+  RecoveryRequestAccount,
+  RevenueKind,
+} from './accounts';
 import { PROGRAM_ID } from './connection';
 import {
   configAddress,
@@ -14,6 +20,8 @@ import {
   paymentAccountAddress,
   periodAddress,
   positionAddress,
+  projectAddress,
+  recoveryAddress,
   shareAccountAddress,
 } from './pda';
 import { program } from './program';
@@ -413,6 +421,90 @@ export function setInvestorInstruction(args: {
       config: configAddress(),
       investor: investorAddress(args.wallet),
       systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+}
+
+/* ── Recovery ─────────────────────────────────────────── */
+
+/**
+ * The admin proposes moving `shares` of a lost wallet to the same holder's new, verified
+ * wallet. `reasonHash` is the hex SHA-256 of the case file. The old wallet can veto until
+ * the config's recovery delay has passed.
+ */
+export function proposeRecoveryInstruction(args: {
+  project: Pick<ProjectKeys, 'address'>;
+  admin: PublicKey;
+  fromOwner: PublicKey;
+  toOwner: PublicKey;
+  shares: bigint;
+  reasonHash: string;
+}): Promise<TransactionInstruction> {
+  const { project, fromOwner, toOwner } = args;
+  return program.methods
+    .proposeRecovery(u64(args.shares), bytes32(args.reasonHash))
+    .accountsStrict({
+      admin: args.admin,
+      config: configAddress(),
+      project: project.address,
+      fromOwner,
+      fromInvestor: investorAddress(fromOwner),
+      fromPosition: positionAddress(project.address, fromOwner),
+      toOwner,
+      toInvestor: investorAddress(toOwner),
+      request: recoveryAddress(project.address, fromOwner),
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+}
+
+/** A veto by the old wallet before the delay ends, or a withdrawal by the admin at any time. */
+export function cancelRecoveryInstruction(args: {
+  request: Pick<RecoveryRequestAccount, 'address' | 'proposer'>;
+  authority: PublicKey;
+}): Promise<TransactionInstruction> {
+  return program.methods
+    .cancelRecovery()
+    .accountsStrict({
+      authority: args.authority,
+      config: configAddress(),
+      request: args.request.address,
+      proposer: args.request.proposer,
+    })
+    .instruction();
+}
+
+/**
+ * Runs a recovery whose delay has passed; anyone may send it. The shares are burned from
+ * the old wallet and minted to the new one, whose position and share account are opened
+ * if needed, and the old wallet's unclaimed revenue moves with them.
+ */
+export function executeRecoveryInstruction(args: {
+  request: Pick<RecoveryRequestAccount, 'project' | 'fromOwner' | 'toOwner' | 'proposer'>;
+  shareMint: PublicKey;
+  executor: PublicKey;
+}): Promise<TransactionInstruction> {
+  const { request, shareMint } = args;
+  const project = projectAddress(shareMint);
+  return program.methods
+    .executeRecovery()
+    .accountsStrict({
+      executor: args.executor,
+      config: configAddress(),
+      project,
+      request: recoveryAddress(project, request.fromOwner),
+      proposer: request.proposer,
+      shareMint,
+      fromOwner: request.fromOwner,
+      fromInvestor: investorAddress(request.fromOwner),
+      fromPosition: positionAddress(project, request.fromOwner),
+      fromShareAccount: shareAccountAddress(request.fromOwner, shareMint),
+      toOwner: request.toOwner,
+      toInvestor: investorAddress(request.toOwner),
+      toPosition: positionAddress(project, request.toOwner),
+      toShareAccount: shareAccountAddress(request.toOwner, shareMint),
+      shareTokenProgram: TOKEN_2022_PROGRAM_ID,
+      ...programs,
     })
     .instruction();
 }

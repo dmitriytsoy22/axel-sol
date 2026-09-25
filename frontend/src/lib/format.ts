@@ -118,6 +118,15 @@ export function formatDate(unixSeconds: number, locale: string): string {
   }).format(date);
 }
 
+/** A moment's time of day, to the second: "2:32:05 PM", "14:32:05". */
+export function formatTime(ms: number, locale: string): string {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(ms));
+}
+
 /** A day the program stores as YYYYMMDD, written like any other date. */
 export function formatDay(yyyymmdd: number, locale: string): string {
   const year = Math.floor(yyyymmdd / 10_000);
@@ -129,4 +138,17 @@ export function formatDay(yyyymmdd: number, locale: string): string {
 
 export function shortAddress(address: string): string {
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
+}
+
+export type DurationUnit = 'days' | 'hours' | 'minutes' | 'seconds';
+
+/**
+ * A duration in its largest whole unit, for a message such as "{count} days": the program's
+ * windows and delays are whole days, hours or minutes, and anything else stays in seconds.
+ */
+export function durationParts(seconds: number): { unit: DurationUnit; count: number } {
+  if (seconds > 0 && seconds % 86_400 === 0) return { unit: 'days', count: seconds / 86_400 };
+  if (seconds > 0 && seconds % 3_600 === 0) return { unit: 'hours', count: seconds / 3_600 };
+  if (seconds > 0 && seconds % 60 === 0) return { unit: 'minutes', count: seconds / 60 };
+  return { unit: 'seconds', count: seconds };
 }

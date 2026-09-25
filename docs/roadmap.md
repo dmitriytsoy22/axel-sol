@@ -32,6 +32,7 @@ Done:
 - [x] English documentation: [product](product.md), [architecture](architecture.md), [API](api.md), this roadmap. The Russian overview moved to [ru/](ru/) and the planning documents to [planning/](planning/).
 - [x] Replaced the stale v1 Codama output with a client generated for the v2 program in `sdk/axel-v2` ([v2.md](v2.md))
 - [x] Moved the frontend to the v2 program: client, hooks, amounts in the payment token, the six project states, KYC records, escrowed buys, refunds, claims, transfers and a role-based console ([architecture.md](architecture.md#frontend))
+- [x] Frontend v2 screens: soft-cap marker, live escrow, state timeline, refund dialog, in-browser verification of telemetry and reports, Proof of solvency, recovery flows (proposal, veto, execution), console split by role, demo data banner
 
 Next steps. Each one addresses a limitation listed in [architecture.md](architecture.md#known-limitations):
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key (program upgrade)
@@ -42,7 +43,7 @@ Next steps. Each one addresses a limitation listed in [architecture.md](architec
 - [ ] Enable CORS on the backend for the telemetry widget (the frontend side reads `NEXT_PUBLIC_TELEMETRY_API_URL`)
 - [ ] Add a KYC flow to the UI (Sumsub with `externalUserId` = wallet)
 - [ ] Serve the indexer API the frontend reads payout history from ([api.md](api.md#indexer-api-read-by-the-frontend)), and prepare oracle-co-signed deposits in the backend
-- [ ] Recovery flows in the frontend: the admin's proposal, the owner's veto alert, execution
+- [ ] Publish real cars' telemetry, income reports and purchase papers from the backend in the layout the frontend verifies ([api.md](api.md#published-car-data-read-by-verify))
 - [ ] Public frontend deployment and a documented devnet demo path for judges (a whitelisted test wallet)
 - [ ] Recorded end-to-end devnet run with Explorer links: whitelist → buy → deposit → claim → transfer
 

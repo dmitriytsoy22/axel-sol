@@ -15,7 +15,7 @@ export const NavDesktopLinks = (): JSX.Element => {
           key={href}
           href={href}
           aria-current={isActiveLink(pathname, href) ? 'page' : undefined}
-          className="relative inline-flex min-h-11 items-center rounded-control px-3 text-small font-medium text-muted-foreground no-underline transition-colors duration-fast ease-move hover:text-foreground aria-[current=page]:text-foreground after:absolute after:inset-x-3 after:bottom-2 after:h-0.5 after:rounded-pill after:bg-brand after:opacity-0 aria-[current=page]:after:opacity-100"
+          className="relative inline-flex min-h-11 items-center rounded-control px-2 text-small font-medium text-muted-foreground no-underline transition-colors duration-fast ease-move hover:text-foreground aria-[current=page]:text-foreground after:absolute after:inset-x-2 after:bottom-2 lg:px-3 lg:after:inset-x-3 after:h-0.5 after:rounded-pill after:bg-brand after:opacity-0 aria-[current=page]:after:opacity-100"
         >
           {tNav(labelKey)}
         </Link>

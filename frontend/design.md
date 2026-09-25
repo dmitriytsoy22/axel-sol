@@ -237,7 +237,7 @@ product rule, never a placeholder.
 
 - **Shell (built, stage 2):** a 64 px bar. On the home page it sits transparent on the hero in
   the ink theme and turns into a solid paper bar after 16 px of scroll; every other page gets the
-  paper bar from the start. Left: logo, then Cars · Portfolio · Payouts with a brand-cyan
+  paper bar from the start. Left: logo, then Cars · Portfolio · Payouts · Solvency with a brand-cyan
   underline on the current page (`aria-current`). Right: network pill ("Solana Devnet", its dot
   shows the RPC state and any state but "connected" is spelled out), language menu (click, not
   hover; Escape and outside click close it), "Connect wallet" as an outline button, since the
@@ -274,6 +274,18 @@ product rule, never a placeholder.
   is not connected yet). Below `md` the purchase button moves to a fixed bottom bar with the
   price and a 48 px button; DOM order is the mobile order (photo, panel, details). The page
   keeps showing the car while it re-reads after a purchase.
+  **v2 screens (frontend stage 2):** the panel's bar is `asset/RaiseProgress`, a track with a
+  2 px tick at the soft cap and the goal in words under it ("Goal: 1,173", "Goal of 1,173 met");
+  raising cards in the catalog use the same bar at `sm`. While the escrow holds money
+  (raising, funded, failed) the panel shows `asset/EscrowBalance`, the escrow's token balance
+  read every 15 s with a green "Live" dot and "sold × price: exactly what buyers paid" under
+  it. A raise whose outcome is certain gets an outline "Settle the raise" button for any
+  connected wallet. The details column now opens with `asset/StateTimeline` (a vertical list
+  of milestones: filled check = done, ringed dot = current, hollow = next, amber cross =
+  missed; amber ring while paused) and adds, after the payout history, "Check the car's data
+  yourself" (`asset/VerifyData`): four figures from the project account, one outline
+  "Verify in this browser" button, then a verdict line with a check, amber triangle or red
+  cross, the rebuilt and on-chain heads in mono, and one pill row per deposit.
 - **Dashboard (built, stage 3):** page header (overline, serif H1, a lead that names the
   connected wallet) → a ruled summary card with three equal figures (value at current price,
   shares held "in N cars", not claimed yet) → holdings table (car with thumbnail, shares and
@@ -282,7 +294,11 @@ product rule, never a placeholder.
   "Claim all" (the page's one primary action) only when something is claimable. Disconnected:
   a two-part panel (why a wallet is needed + "Connect wallet", and what the page shows once
   connected). Empty: "This wallet holds no shares yet" with "Browse the cars". Loading keeps the
-  summary labels with placeholder values. Error: retry.
+  summary labels with placeholder values. Error: retry. A pending recovery of the wallet's shares
+  is the first block: an amber panel naming the car, the shares and the new wallet, with a red
+  outline "Veto the recovery" until the delay ends. A refund opens a dialog (amount, shares
+  burned, destination account) before the wallet is asked. The send dialog checks the
+  recipient while the address is typed and says in green or red what the hook will do.
 - **Payouts (built, stage 3):** page header → the same ruled summary (claimed so far, not
   claimed yet, payouts) → a sortable ledger (payout, date, paid in, your share, your amount,
   status, record link; stacked label/value rows below `sm`). Disconnected, loading, empty and
@@ -295,6 +311,25 @@ product rule, never a placeholder.
   and approved wallets on the left, car status on the right (pause or resume, and a close action
   that asks for confirmation inline before sending). Disconnected and wrong-wallet visitors stay
   on the page with an explanation instead of being redirected home.
+- **Proof of solvency (`/solvency`, frontend stage 2):** page header with "Check now" and the
+  time of the last check → a verdict panel (green, or red naming how many cars fail) → three
+  ruled totals (income vaults, owed to holders now, raise escrows) → "What is checked", four
+  numbered rule cards → one card per car, failing cars first and open, passing cars folded
+  into a `<details>` whose summary is the car, its state and a "Passes" pill. An open card
+  has four rows (income vault, raise escrow, shares, revenue checkpoints), each with the rule
+  in words, "Holds" and "Owes" figures, a pill and the account link. It reads again every
+  30 s while the tab is visible.
+- **Console by role (frontend stage 2):** a paper strip under the bar says which wallet is
+  signed in and, for a wallet with several keys, switches roles with a segmented control
+  (`role="tablist"`). Platform admin: the ink car header, then car status, operator and
+  oracle, and share recovery (propose, run, withdraw) in 8 columns beside a sticky
+  protocol-config ledger. Operator: the ink header over a deposits card (open or closed pill,
+  paid in, claimed, live income vault, both keys) and the car's payout history. KYC: a page
+  header over the registry card, which shows the wallet's current record before approve and
+  revoke, and stops the demo key before a record it may not change.
+- **Demo banner (frontend stage 2):** on every test network, a cyan accent strip under the bar
+  ("Solana devnet demo data, generated by scripts/seed-devnet. …") with a link to the seed's
+  README; on the home page the hero carries the same words, since the bar sits over it there.
 - **Shared states:** `ui/Notice` (empty, error, not found), `wallet/ConnectWalletPanel`
   (disconnected), `ui/SummaryStats` (ruled figures with placeholders), `ui/Pill` (status dot +
   word; `Badge` maps project status onto it), `layout/PageHeader`. Modal is a paper dialog and a
@@ -398,10 +433,30 @@ product rule, never a placeholder.
     "public" and "payout" at 1440 px. Browsers without support keep the normal wrap.
     ← anti-slop "typographic dirt".
 
+23. **Verification runs in the reader's browser.** The asset page does not say "verified" on
+    the backend's word: it downloads the published records, canonicalizes them (RFC 8785),
+    hashes them with WebCrypto and rebuilds the chain the program keeps. A result names the
+    first day that disagrees, and a chain that is only partly published says "can't finish"
+    instead of passing. ← review rubric "stress states", decision 10.
+24. **Solvency is rechecked before it accuses.** The page reads accounts in several RPC calls,
+    so a claim landing between them can make a sound car look short; a failing read is
+    repeated once and only then shown in red. ← color "red for errors only", decision 9.
+25. **Refunds do what they say in one step.** A raise that failed but was never settled would
+    make the refund button fail; the refund transaction settles it first, and the dialog says
+    so. Settling a raise is also offered to anyone, since the program allows it. ← decision 15.
+26. **Money figures that move are read live and say so.** The escrow and income vault
+    balances refresh every 15 s behind a "Live" dot; the numbers still appear exact and
+    static (decision on count-up tickers stands).
+27. **The console shows each key only its own tools.** One page per role instead of one page
+    with everything, so an operator never sees admin actions greyed out and a KYC key never
+    scrolls past a car it cannot manage. ← review rubric "hierarchy".
+28. **Long lists fold what passes.** With 24 cars the solvency page would be 13 000 px on a
+    phone; passing cars fold to one line with their verdict, failing ones stay open.
+
 ## Constraints
 
-- Presentation only. `src/hooks/` and `src/lib/solana/` belong to the v2 integration and are
-  not changed by design work.
+- Presentation only. `src/hooks/`, `src/lib/solana/` and `src/lib/verify/` belong to the v2
+  integration and are not changed by design work.
 - Brand: the name AXEL, near-black and the cyan `#06B6D4` stay.
 - Live data: the frontend reads `axel_v2`, which is not on devnet yet; locally it reads the
   fixture market (`npm --prefix tests-v2 run fixture-validator`). The UI never shows made-up
@@ -443,3 +498,10 @@ product rule, never a placeholder.
   from a table at 640–767 px, bottom bar over the footer, payout amounts aligned on phones,
   browser-independent Kazakh numbers and dates, balanced headings. Decisions 19–22 added; the
   reveal gate moved to `lib/revealGate.ts` with tests that keep the WKWebView opacity bug out.
+- 2026-09-25: Frontend stage 2, v2 screens. Raise progress with a soft-cap marker, live escrow
+  balance, state timeline, public settle, refund dialog that settles first, purchase dialog
+  with escrow, refund and issuer disclosure, live recipient check, recovery veto alert,
+  in-browser verification of telemetry, reports and purchase papers, the Proof of solvency
+  page, the console split by role, the demo banner, and catalog filters by city and class.
+  Checked at 390 and 1440 px in EN / RU / KK against a seeded local validator. Decisions
+  23–28 added.

@@ -1,17 +1,23 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { Loader2 } from 'lucide-react';
 import type { PositionAccount } from '@/lib/solana/accounts';
 import type { Project } from '@/types/project';
-import { ProgressBar } from '@/components/ui/ProgressBar';
+import { Button } from '@/components/ui/Button';
 import { RefundButton } from '@/components/dashboard/RefundButton';
+import { useProjectAdmin } from '@/hooks/useAdminActions';
 import { Link } from '@/i18n/routing';
 import { formatCount, formatDate, formatPercent, formatTokenAmount } from '@/lib/format';
+import { finalizeOutcome, isRefundable } from '@/lib/solana/lifecycle';
+import { holdsEscrow } from '@/lib/solana/solvency';
 import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
 import { CountdownTimer } from './CountdownTimer';
+import { EscrowBalance } from './EscrowBalance';
 import { InvestButton } from './InvestButton';
+import { RaiseProgress } from './RaiseProgress';
 import type { Approval, SaleState } from './saleState';
 
 interface InvestPanelProps {
@@ -20,8 +26,9 @@ interface InvestPanelProps {
   approval: Approval;
   /** The connected wallet's position in this car, if it has one. */
   position: PositionAccount | null;
+  now: number;
   onBuy: () => void;
-  /** Runs after a refund, to read the project and position again. */
+  /** Runs after a refund or a settlement, to read the project and position again. */
   onChanged: () => void;
 }
 
@@ -45,21 +52,66 @@ const APPROVAL_HELPER: Record<Exclude<Approval, 'checking'>, string> = {
 };
 
 /** Why the action is what it is, in one sentence under the button. */
-function helperKey(saleState: SaleState, connected: boolean, approval: Approval): string | null {
+function helperKey(
+  saleState: SaleState,
+  connected: boolean,
+  approval: Approval,
+  activationMissed: boolean,
+): string | null {
+  if (activationMissed) return 'helperActivationMissed';
   if (saleState !== 'open') return STATE_HELPER[saleState];
   if (!connected) return 'helperConnect';
   return approval === 'checking' ? null : APPROVAL_HELPER[approval];
 }
 
+/** Settling a raise whose outcome is certain; the program lets anyone do it. */
+function SettleRaise({
+  project,
+  now,
+  onSettled,
+}: {
+  project: Project;
+  now: number;
+  onSettled: () => void;
+}) {
+  const t = useTranslations('Asset');
+  const { connected } = useWallet();
+  const { finalize } = useProjectAdmin();
+  const [busy, setBusy] = useState(false);
+  const outcome = finalizeOutcome(project, now);
+  if (!outcome || !connected) return null;
+
+  const settle = async () => {
+    setBusy(true);
+    const signature = await finalize(project);
+    setBusy(false);
+    if (signature) onSettled();
+  };
+
+  return (
+    <div className="mt-4 flex flex-col gap-2">
+      <Button variant="outline" onClick={settle} disabled={busy} className="w-full">
+        {busy && <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />}
+        {t('settleRaise')}
+      </Button>
+      <p className="text-small text-muted-foreground">
+        {t(outcome === 'funded' ? 'settleToFunded' : 'settleToFailed')}
+      </p>
+    </div>
+  );
+}
+
 /*
- * Price, how much of the raise is sold, and the purchase action. From md the button lives
- * here; below md it moves to the sticky bar at the bottom of the screen.
+ * Price, how much of the raise is sold against its goal, where the money sits, and the
+ * purchase action. From md the button lives here; below md it moves to the sticky bar at the
+ * bottom of the screen.
  */
 export function InvestPanel({
   project,
   saleState,
   approval,
   position,
+  now,
   onBuy,
   onChanged,
 }: InvestPanelProps): JSX.Element {
@@ -67,9 +119,9 @@ export function InvestPanel({
   const locale = useLocale();
   const { connected } = useWallet();
 
-  const sold = Number(project.sharesSold);
-  const total = Number(project.totalShares);
-  const helper = helperKey(saleState, connected, approval);
+  const activationMissed =
+    project.status === 'funded' && finalizeOutcome(project, now) === 'failed';
+  const helper = helperKey(saleState, connected, approval, activationMissed);
   const heldShares = position?.shares ?? 0n;
 
   return (
@@ -87,7 +139,7 @@ export function InvestPanel({
       </p>
 
       <div className="mt-6">
-        <div className="mb-2 flex items-baseline justify-between gap-4 text-small">
+        <div className="mb-3 flex items-baseline justify-between gap-4 text-small">
           <span className="text-muted-foreground">
             {t('sharesSold', {
               sold: formatCount(project.sharesSold, locale),
@@ -95,26 +147,24 @@ export function InvestPanel({
             })}
           </span>
           <span className="font-medium tabular-nums text-foreground">
-            {formatPercent(sold, total, locale)}
+            {formatPercent(Number(project.sharesSold), Number(project.totalShares), locale)}
           </span>
         </div>
-        <ProgressBar
-          progress={total > 0 ? (sold / total) * 100 : 0}
-          label={t('soldProgressLabel')}
-        />
-        {(saleState === 'open' || saleState === 'ended') && (
-          <p className="mt-2 text-small text-muted-foreground">
-            {t('softCapNote', { count: formatCount(project.softCapShares, locale) })}
-          </p>
-        )}
+        <RaiseProgress project={project} />
       </div>
 
       {saleState === 'open' && (
-        <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <span className="text-small text-muted-foreground">
             {t('raiseClosesIn', { date: formatDate(project.raiseDeadline, locale) })}
           </span>
           <CountdownTimer deadline={project.raiseDeadline} />
+        </div>
+      )}
+
+      {holdsEscrow(project.status) && (
+        <div className="mt-6">
+          <EscrowBalance project={project} />
         </div>
       )}
 
@@ -126,6 +176,7 @@ export function InvestPanel({
           {t(helper, { date: formatDate(project.activationDeadline, locale) })}
         </p>
       )}
+      <SettleRaise project={project} now={now} onSettled={onChanged} />
 
       {heldShares > 0n && (
         <div className="mt-6 flex flex-col gap-3 border-t border-border pt-4">
@@ -138,7 +189,7 @@ export function InvestPanel({
               {t('toPortfolio')}
             </Link>
           </p>
-          {saleState === 'failed' && (
+          {isRefundable(project, now) && (
             <RefundButton project={project} shares={heldShares} onRefunded={onChanged} />
           )}
         </div>

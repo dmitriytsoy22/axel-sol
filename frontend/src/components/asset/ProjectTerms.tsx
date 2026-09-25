@@ -1,8 +1,11 @@
+'use client';
+
 import React, { ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { PublicKey } from '@solana/web3.js';
 import type { Project } from '@/types/project';
 import { ExplorerLink } from '@/components/ui/ExplorerLink';
+import { useHolderCount } from '@/hooks/useHolderCount';
 import { formatBps, formatCount, formatDate, formatNumber, formatTokenAmount } from '@/lib/format';
 
 interface ProjectTermsProps {
@@ -22,6 +25,8 @@ function Row({ label, children }: { label: string; children: ReactNode }): JSX.E
 export function ProjectTerms({ project }: ProjectTermsProps): JSX.Element {
   const t = useTranslations('Asset');
   const locale = useLocale();
+  const { holders } = useHolderCount(project);
+  const dataOrigin = project.car.fields.data_origin;
   const srLabel = t('openInExplorer');
   const link = (address: PublicKey) => (
     <ExplorerLink address={address.toBase58()} srLabel={srLabel} />
@@ -45,6 +50,7 @@ export function ProjectTerms({ project }: ProjectTermsProps): JSX.Element {
           <Row label={t('raiseFee')}>{formatBps(project.raiseFeeBps, locale)}</Row>
           <Row label={t('revenueFee')}>{formatBps(project.revenueFeeBps, locale)}</Row>
           <Row label={t('payoutsMade')}>{formatNumber(project.periodCount, locale)}</Row>
+          <Row label={t('holders')}>{holders === null ? '—' : formatNumber(holders, locale)}</Row>
         </dl>
         <dl className="divide-y divide-border border-t border-border md:border-l md:border-t-0">
           <Row label={t('shareToken')}>{link(project.shareMint)}</Row>
@@ -59,6 +65,11 @@ export function ProjectTerms({ project }: ProjectTermsProps): JSX.Element {
           <Row label={t('operator')}>{link(project.operator)}</Row>
           <Row label={t('oracle')}>{link(project.oracle)}</Row>
           <Row label={t('payoutSplit')}>{t('payoutSplitValue')}</Row>
+          {dataOrigin && (
+            <Row label={t('dataOrigin')}>
+              {dataOrigin === 'devnet-demo-seed' ? t('dataOriginDemo') : dataOrigin}
+            </Row>
+          )}
         </dl>
       </div>
     </section>

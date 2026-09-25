@@ -12,6 +12,7 @@ export const SEEDS = {
   escrow: 'escrow',
   revenue: 'revenue',
   extraAccountMetas: 'extra-account-metas',
+  recovery: 'recovery',
 } as const;
 
 function find(prefix: string, ...seeds: Uint8Array[]): PublicKey {
@@ -50,6 +51,11 @@ export function escrowAddress(project: PublicKey): PublicKey {
 
 export function revenueAddress(project: PublicKey): PublicKey {
   return find(SEEDS.revenue, project.toBuffer());
+}
+
+/** The pending recovery of `fromOwner`'s shares in `project`; one per wallet and project. */
+export function recoveryAddress(project: PublicKey, fromOwner: PublicKey): PublicKey {
+  return find(SEEDS.recovery, project.toBuffer(), fromOwner.toBuffer());
 }
 
 /** The share mint's transfer hook validation account. */

@@ -76,6 +76,9 @@ describe('TransferModal', () => {
   it('sends shares to a holder with the hook accounts listed in the transfer itself', async () => {
     const { sent, onTransferred, onClose } = await renderModal();
     await fill(bob.toBase58(), '2');
+    expect(
+      await screen.findByText('Verified. This wallet already holds shares of this car.'),
+    ).toBeInTheDocument();
     await userEvent.click(send());
 
     expect(await screen.findByText('Shares sent')).toBeInTheDocument();
@@ -91,6 +94,11 @@ describe('TransferModal', () => {
   it('onboards a verified recipient without a position in the same transaction', async () => {
     const { sent } = await renderModal();
     await fill(verifiedNewcomer.toBase58(), '1');
+    expect(
+      await screen.findByText(
+        "Verified. It's their first share of this car, so the transfer also opens their position.",
+      ),
+    ).toBeInTheDocument();
     await userEvent.click(send());
 
     expect(await screen.findByText('Shares sent')).toBeInTheDocument();
@@ -101,15 +109,14 @@ describe('TransferModal', () => {
     expect(limit(sent[0])).toBe(200_000);
   });
 
-  it('stops before signing when the recipient never passed KYC', async () => {
+  it('reads the recipient from Solana and refuses one that never passed KYC', async () => {
     const { sent, onTransferred } = await renderModal();
     await fill(stranger.toBase58(), '1');
-    await userEvent.click(send());
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "The recipient hasn't passed KYC for this car, so it can't receive shares.",
-    );
-    expect(screen.getByText('Transfer failed')).toBeInTheDocument();
+    expect(
+      await screen.findByText("This wallet hasn't passed KYC, so it can't receive shares."),
+    ).toBeInTheDocument();
+    expect(send()).toBeDisabled();
     expect(sent).toEqual([]);
     expect(onTransferred).not.toHaveBeenCalled();
   });

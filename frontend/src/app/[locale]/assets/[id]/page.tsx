@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { RotateCw } from 'lucide-react';
+import { ArrowRight, RotateCw } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { useInvestor } from '@/hooks/useInvestor';
 import { usePosition } from '@/hooks/usePosition';
@@ -18,7 +18,9 @@ import { MobileInvestBar } from '@/components/asset/MobileInvestBar';
 import { ProjectTerms } from '@/components/asset/ProjectTerms';
 import { CarPayouts } from '@/components/asset/CarPayouts';
 import { PayoutCalculator } from '@/components/asset/PayoutCalculator';
+import { StateTimeline } from '@/components/asset/StateTimeline';
 import { TelemetryWidget } from '@/components/asset/TelemetryWidget';
+import { VerifyData } from '@/components/asset/VerifyData';
 import { approvalOf, saleStateOf } from '@/components/asset/saleState';
 import { InvestModal } from '@/components/invest/InvestModal';
 import { Button, buttonClasses } from '@/components/ui/Button';
@@ -91,16 +93,28 @@ function AssetDetails({ project, onChanged }: { project: Project; onChanged: () 
               saleState={saleState}
               approval={approval}
               position={position}
+              now={now}
               onBuy={openInvest}
               onChanged={refresh}
             />
           </div>
         </div>
         <div className="flex flex-col gap-16 md:col-span-12 lg:col-span-7">
-          <ProjectTerms project={project} />
+          <StateTimeline project={project} saleState={saleState} />
+          <div className="flex flex-col gap-4">
+            <ProjectTerms project={project} />
+            <Link
+              href={`/solvency#${project.shareMint.toBase58()}`}
+              className="inline-flex min-h-11 items-center gap-1 self-start text-small font-medium text-primary underline-offset-4 hover:underline"
+            >
+              {tAsset('solvencyLink')}
+              <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+            </Link>
+          </div>
           <CarPayouts project={project} />
-          <PayoutCalculator project={project} />
+          <VerifyData project={project} />
           <TelemetryWidget projectId={project.shareMint.toBase58()} />
+          <PayoutCalculator project={project} />
         </div>
       </div>
 

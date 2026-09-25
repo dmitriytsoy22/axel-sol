@@ -18,6 +18,7 @@ import { NETWORK_NAME } from '@/lib/network';
 import { PortfolioSummary } from './PortfolioSummary';
 import { HoldingsTable } from './HoldingsTable';
 import { ClaimAllButton } from './ClaimAllButton';
+import { RecoveryAlerts } from './RecoveryAlerts';
 import { TransferModal } from './TransferModal';
 
 function DashboardSkeleton({ summaryLabels }: { summaryLabels: string[] }): JSX.Element {
@@ -78,6 +79,7 @@ export function DashboardView(): JSX.Element {
   } else {
     body = (
       <div data-testid="dashboard-view" className="flex flex-col gap-12 md:gap-16">
+        <RecoveryAlerts projects={holdings.map(({ project }) => project)} onChanged={refetch} />
         <PortfolioSummary summary={summary} carCount={holdings.length} />
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-border bg-muted px-5 py-4">
           <p className="max-w-[60ch] text-body text-muted-foreground">

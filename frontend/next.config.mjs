@@ -4,7 +4,8 @@ const withNextIntl = createNextIntlPlugin();
 
 /*
  * The browser talks to the Solana RPC node (HTTP and its websocket) and, when configured, to
- * the AXEL backend's telemetry and indexer APIs, so every configured origin is allowed.
+ * the AXEL backend's telemetry and indexer APIs and to where the cars' data is published, so
+ * every configured origin is allowed.
  */
 function configuredOrigins() {
   const origins = [];
@@ -13,8 +14,13 @@ function configuredOrigins() {
     const url = new URL(rpc);
     origins.push(url.origin, `${url.protocol === 'https:' ? 'wss:' : 'ws:'}//${url.host}`);
   }
-  for (const api of [process.env.NEXT_PUBLIC_TELEMETRY_API_URL, process.env.NEXT_PUBLIC_INDEXER_URL]) {
-    if (api) origins.push(new URL(api).origin);
+  for (const api of [
+    process.env.NEXT_PUBLIC_TELEMETRY_API_URL,
+    process.env.NEXT_PUBLIC_INDEXER_URL,
+    process.env.NEXT_PUBLIC_PUBLISHED_DATA_URL,
+  ]) {
+    // A path such as /demo-data is on this origin and already allowed by 'self'.
+    if (api && /^https?:\/\//.test(api)) origins.push(new URL(api).origin);
   }
   return origins;
 }

@@ -28,6 +28,14 @@ export const COMPUTE_UNITS = {
   activate: 150_000,
   /** set_investor: creates or rewrites one small account. */
   setInvestor: 40_000,
+  /** finalize_raise followed by refund in one transaction. */
+  finalizeAndRefund: 100_000,
+  /** propose_recovery: creates the request account. */
+  proposeRecovery: 60_000,
+  /** cancel_recovery: closes the request account. */
+  cancelRecovery: 40_000,
+  /** execute_recovery: 66k–86k when it opens the new position; 120k test bound. */
+  executeRecovery: 150_000,
 } as const;
 
 /**

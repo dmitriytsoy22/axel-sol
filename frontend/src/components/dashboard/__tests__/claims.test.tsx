@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { WalletSignTransactionError } from '@solana/wallet-adapter-base';
@@ -141,11 +141,38 @@ describe('RefundButton', () => {
 
     // Five shares at 10 000 tKZT.
     await userEvent.click(screen.getByRole('button', { name: 'Get 50,000 tKZT back' }));
+    const dialog = screen.getByRole('dialog', { name: 'Get your money back' });
+    expect(within(dialog).getByText('You get back').nextSibling).toHaveTextContent('50,000 tKZT');
+    expect(sent).toEqual([]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm refund' }));
 
     expect(await screen.findByText('Refund received')).toBeInTheDocument();
+    expect(screen.getByText('50,000 tKZT is back in your wallet.')).toBeInTheDocument();
     expect(onRefunded).toHaveBeenCalledTimes(1);
     const [refund] = axelInstructions(sent[0]);
     expect(refund.data).toEqual(instructionDiscriminator('refund'));
     expect(refund.keys[0].pubkey.equals(refunder)).toBe(true);
+  });
+
+  it('settles a raise that ran out below its goal in the same transaction as the refund', async () => {
+    const project = makeProject({
+      raiseDeadline: 1_700_000_000,
+      sharesSold: 10n,
+      softCapShares: 60n,
+    });
+    const sent = renderWith(
+      new FixtureNode(),
+      alice,
+      <RefundButton project={project} shares={2n} onRefunded={vi.fn()} />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Get 20,000 tKZT back' }));
+    expect(screen.getByText(/the same transaction settles it first/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm refund' }));
+
+    expect(await screen.findByText('Refund received')).toBeInTheDocument();
+    expect(axelInstructions(sent[0]).map((instruction) => instruction.data.subarray(0, 8))).toEqual(
+      [instructionDiscriminator('finalize_raise'), instructionDiscriminator('refund')],
+    );
   });
 });

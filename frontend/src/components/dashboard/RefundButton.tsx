@@ -1,13 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Loader2 } from 'lucide-react';
-import { useRefund } from '@/hooks/useRefund';
 import { Button } from '@/components/ui/Button';
 import { formatTokenAmount } from '@/lib/format';
 import { sharesValue } from '@/lib/solana/math';
 import type { Project } from '@/types/project';
+import { RefundDialog } from './RefundDialog';
 
 interface RefundButtonProps {
   project: Project;
@@ -17,7 +16,7 @@ interface RefundButtonProps {
   className?: string;
 }
 
-/** Takes back the full price of the wallet's shares in a failed raise. */
+/** Opens the refund of a failed raise, naming the amount that comes back. */
 export function RefundButton({
   project,
   shares,
@@ -26,28 +25,25 @@ export function RefundButton({
 }: RefundButtonProps): JSX.Element {
   const t = useTranslations('Dashboard');
   const locale = useLocale();
-  const { status, refund } = useRefund();
-  const busy = status !== 'idle' && status !== 'success' && status !== 'error';
+  const [open, setOpen] = useState(false);
   const amount = formatTokenAmount(
     sharesValue(shares, project.pricePerShare),
     project.payment,
     locale,
   );
 
-  const handleClick = async () => {
-    if (await refund(project)) onRefunded();
-  };
-
   return (
-    <Button
-      variant="secondary"
-      size="sm"
-      onClick={handleClick}
-      disabled={busy}
-      className={className}
-    >
-      {busy && <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />}
-      {busy ? t('refunding') : t('refund', { amount })}
-    </Button>
+    <>
+      <Button variant="secondary" size="sm" onClick={() => setOpen(true)} className={className}>
+        {t('refund', { amount })}
+      </Button>
+      <RefundDialog
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        project={project}
+        shares={shares}
+        onRefunded={onRefunded}
+      />
+    </>
   );
 }

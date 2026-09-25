@@ -26,6 +26,7 @@ function renderCard(project: Project) {
 describe('AssetCard', () => {
   it('shows the price, the raise and the payouts in the payment token', () => {
     const project = makeProject({
+      status: 'operating',
       sharesSold: 50n,
       totalShares: 100n,
       pricePerShare: 10_000_000_000n,
@@ -39,6 +40,18 @@ describe('AssetCard', () => {
     expect(screen.getByText('50% sold')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveStyle('width: 50%');
     expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('shows a running raise against its goal and its deadline', () => {
+    renderCard(makeProject({ status: 'fundraising', sharesSold: 30n, softCapShares: 60n }));
+
+    expect(screen.getByRole('progressbar', { name: 'Shares sold' })).toHaveAttribute(
+      'aria-valuetext',
+      '30 of 100 shares sold. The raise succeeds at 60.',
+    );
+    expect(screen.getByText('Goal: 60')).toBeInTheDocument();
+    expect(screen.getByTestId('soft-cap-marker')).toHaveStyle('left: 60%');
+    expect(screen.getByText('Raise closes').nextSibling).toHaveTextContent('Oct 15, 2026');
   });
 
   it('links to the car by its share mint and invites a purchase while the raise runs', () => {

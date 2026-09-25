@@ -3,9 +3,11 @@ import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight } from 'lucide-react';
 import type { Project } from '@/types/project';
+import { RaiseProgress } from '@/components/asset/RaiseProgress';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Link } from '@/i18n/routing';
-import { formatNumber, formatPercent, formatTokenAmount } from '@/lib/format';
+import { formatDate, formatNumber, formatPercent, formatTokenAmount } from '@/lib/format';
+import { holdsEscrow } from '@/lib/solana/solvency';
 import { sharesValue } from '@/lib/solana/math';
 import { carTitle } from '@/lib/solana/tokens';
 import { ProjectStatusBadge } from './ProjectStatusBadge';
@@ -67,12 +69,21 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
               {formatTokenAmount(project.pricePerShare, payment, locale)}
             </dd>
           </div>
-          <div className="flex flex-col-reverse justify-end gap-1">
-            <dt className="text-small text-muted-foreground">{t('payoutPeriods')}</dt>
-            <dd className="text-title font-semibold tabular-nums text-foreground">
-              {formatNumber(project.periodCount, locale)}
-            </dd>
-          </div>
+          {project.status === 'fundraising' ? (
+            <div className="flex flex-col-reverse justify-end gap-1">
+              <dt className="text-small text-muted-foreground">{t('raiseCloses')}</dt>
+              <dd className="whitespace-nowrap text-title font-semibold tabular-nums text-foreground">
+                {formatDate(project.raiseDeadline, locale)}
+              </dd>
+            </div>
+          ) : (
+            <div className="flex flex-col-reverse justify-end gap-1">
+              <dt className="text-small text-muted-foreground">{t('payoutPeriods')}</dt>
+              <dd className="text-title font-semibold tabular-nums text-foreground">
+                {formatNumber(project.periodCount, locale)}
+              </dd>
+            </div>
+          )}
         </dl>
 
         <div className="mt-5">
@@ -80,7 +91,7 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
             <span className="text-muted-foreground">
               {t('percentSold', { percent: formatPercent(sold, total, locale) })}
             </span>
-            <span className="whitespace-nowrap font-medium tabular-nums text-foreground">
+            <span className="text-right font-medium tabular-nums text-foreground">
               {t('raisedOf', {
                 raised: formatTokenAmount(
                   sharesValue(project.sharesSold, project.pricePerShare),
@@ -97,7 +108,12 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
               })}
             </span>
           </div>
-          <ProgressBar progress={progress} label={t('raised')} />
+          {/* While the raise decides the car's fate, the bar shows where it succeeds. */}
+          {holdsEscrow(project.status) ? (
+            <RaiseProgress project={project} size="sm" />
+          ) : (
+            <ProgressBar progress={progress} label={t('raised')} />
+          )}
         </div>
 
         <span className="mt-auto flex items-center gap-1 pt-6 text-small font-medium text-primary">

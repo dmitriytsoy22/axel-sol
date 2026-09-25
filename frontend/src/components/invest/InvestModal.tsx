@@ -2,14 +2,15 @@
 
 import React, { useEffect, useId, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { CircleAlert } from 'lucide-react';
+import { CircleAlert, Coins, LockKeyhole, Undo2 } from 'lucide-react';
+import { ExplorerLink } from '@/components/ui/ExplorerLink';
 import { Modal } from '@/components/ui/Modal';
 import { Button, buttonClasses } from '@/components/ui/Button';
 import { TransactionStatus } from '@/components/ui/TransactionStatus';
 import { usePaymentBalance } from '@/hooks/usePaymentBalance';
 import { useRaise } from '@/hooks/useRaise';
 import { Link } from '@/i18n/routing';
-import { formatDate, formatTokenAmount } from '@/lib/format';
+import { durationParts, formatCount, formatDate, formatTokenAmount } from '@/lib/format';
 import { ON_TEST_NETWORK } from '@/lib/network';
 import { carTitle } from '@/lib/solana/tokens';
 import type { Project } from '@/types/project';
@@ -34,6 +35,7 @@ export function InvestModal({
   onPurchased,
 }: InvestModalProps): JSX.Element {
   const t = useTranslations('InvestModal');
+  const tCommon = useTranslations('Common');
   const locale = useLocale();
   const inputId = useId();
   const { status, error, buy, reset } = useRaise();
@@ -74,6 +76,31 @@ export function InvestModal({
   };
 
   const shownError = validationError ?? (status === 'error' ? error : null);
+  const activation = durationParts(project.activationWindow);
+  const issuerPowers = (['canFreeze', 'canSeize', 'canPause'] as const).filter(
+    (power) => token.issuer[power],
+  );
+  const safeguards = [
+    {
+      icon: Coins,
+      text: t('stablecoin', { symbol: token.symbol }),
+    },
+    {
+      icon: LockKeyhole,
+      text: t('escrow'),
+      extra: (
+        <ExplorerLink address={project.escrowVault.toBase58()} srLabel={t('openInExplorer')} />
+      ),
+    },
+    {
+      icon: Undo2,
+      text: t('refundRule', {
+        goal: formatCount(project.softCapShares, locale),
+        date: formatDate(project.raiseDeadline, locale),
+        window: tCommon(`duration_${activation.unit}`, { count: activation.count }),
+      }),
+    },
+  ];
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('title')} closeLabel={t('close')}>
@@ -164,14 +191,42 @@ export function InvestModal({
             </span>
           </div>
 
+          <section
+            aria-labelledby={`${inputId}-safeguards`}
+            className="rounded-control bg-muted p-4"
+          >
+            <h3 id={`${inputId}-safeguards`} className="text-small font-semibold text-foreground">
+              {t('safeguardsTitle')}
+            </h3>
+            <ul className="mt-3 flex flex-col gap-3">
+              {safeguards.map(({ icon: Icon, text, extra }) => (
+                <li key={text} className="flex gap-3 text-small text-muted-foreground">
+                  <Icon
+                    aria-hidden="true"
+                    className="mt-0.5 h-4 w-4 shrink-0 text-foreground"
+                    strokeWidth={1.75}
+                  />
+                  <span>
+                    {text} {extra}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {issuerPowers.length > 0 && (
+              <p className="mt-3 border-t border-border pt-3 text-small text-muted-foreground">
+                {t('issuerRisk', {
+                  symbol: token.symbol,
+                  powers: issuerPowers.map((power) => t(`issuer_${power}`)).join(', '),
+                })}
+              </p>
+            )}
+          </section>
+
           <Button size="lg" onClick={handleBuy} disabled={!canBuy} className="w-full">
             {t('confirmInvest')}
           </Button>
 
-          <p className="text-small text-muted-foreground">
-            {t('note', { date: formatDate(project.raiseDeadline, locale) })}{' '}
-            {ON_TEST_NETWORK && t('devnetNote')}
-          </p>
+          {ON_TEST_NETWORK && <p className="text-small text-muted-foreground">{t('devnetNote')}</p>}
         </div>
       )}
     </Modal>

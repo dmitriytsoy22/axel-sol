@@ -2,6 +2,7 @@ import type { AccountInfo, PublicKey } from '@solana/web3.js';
 import {
   ExtensionType,
   getExtensionData,
+  getExtensionTypes,
   TOKEN_2022_PROGRAM_ID,
   unpackAccount,
   unpackMint,
@@ -15,6 +16,20 @@ export interface PaymentToken {
   decimals: number;
   /** "tKZT", "USDC"; the short mint address when the mint names no symbol. */
   symbol: string;
+  /**
+   * What the token's issuer can do to any account of it, vaults included. The program
+   * accepts these mints (docs/v2.md, payment mints) and the app discloses them.
+   */
+  issuer: IssuerPowers;
+}
+
+export interface IssuerPowers {
+  /** A freeze authority: can freeze any account, the car's vaults too. */
+  canFreeze: boolean;
+  /** Token-2022 permanent delegate: can move or burn tokens from any account. */
+  canSeize: boolean;
+  /** Token-2022 pausable: can stop every transfer of the token. */
+  canPause: boolean;
 }
 
 /** The car behind a project, as its share mint's token metadata describes it. */
@@ -101,13 +116,24 @@ export function paymentToken(
   configuredSymbols: Record<string, string> = CONFIGURED_SYMBOLS,
 ): PaymentToken {
   const mint = unpackMint(address, account, account.owner);
+  const extensions = getExtensionTypes(mint.tlvData);
   const key = address.toBase58();
   const symbol =
     readTokenMetadata(address, account)?.symbol ||
     configuredSymbols[key] ||
     WELL_KNOWN_SYMBOLS[key] ||
     `${key.slice(0, 4)}…${key.slice(-4)}`;
-  return { mint: address, tokenProgram: account.owner, decimals: mint.decimals, symbol };
+  return {
+    mint: address,
+    tokenProgram: account.owner,
+    decimals: mint.decimals,
+    symbol,
+    issuer: {
+      canFreeze: mint.freezeAuthority !== null,
+      canSeize: extensions.includes(ExtensionType.PermanentDelegate),
+      canPause: extensions.includes(ExtensionType.PausableConfig),
+    },
+  };
 }
 
 /** The balance of a token account of either token program; zero when it does not exist. */

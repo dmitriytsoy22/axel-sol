@@ -50,6 +50,7 @@ AXEL tokenizes taxi cars on Solana. Each car is a project with its own Token-202
    - The backend fetches the previous day's Yandex orders for the car's licence plate and hashes the daily figures.
    - It records the hash in a `TelemetryRecord` PDA.
    - Anyone with the same figures can recompute the hash and compare.
+   - v2 keeps one hash chain per car instead of a PDA per day. The asset page's "Check the car's data yourself" downloads the published daily records and reports and recomputes the chain and every report hash in the browser; the Proof of solvency page checks every vault against what the program owes.
 
 ## Business Model (as implemented)
 

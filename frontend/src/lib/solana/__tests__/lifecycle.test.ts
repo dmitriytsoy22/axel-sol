@@ -1,7 +1,15 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { PROJECT_STATUSES, type ProjectStatus } from '../accounts';
-import { canActivate, canClaim, canFinalize, canRefund, canTransfer } from '../lifecycle';
+import {
+  canActivate,
+  canClaim,
+  canFinalize,
+  canRefund,
+  canTransfer,
+  finalizeOutcome,
+  isRefundable,
+} from '../lifecycle';
 
 const NOW = 1_800_000_000;
 const raise = {
@@ -56,5 +64,41 @@ describe('canActivate', () => {
 
     expect([canActivate(funded, NOW), canActivate(funded, NOW + 1)]).toEqual([true, false]);
     expect(canActivate({ ...raise, activationDeadline: NOW }, NOW)).toBe(false);
+  });
+});
+
+describe('finalizeOutcome', () => {
+  it.each([
+    ['a running raise', raise, null],
+    ['a sold-out raise before its deadline', { ...raise, sharesSold: 100n }, 'funded'],
+    [
+      'a raise past its deadline at its soft cap',
+      { ...raise, sharesSold: 60n, raiseDeadline: NOW },
+      'funded',
+    ],
+    ['a raise past its deadline below its soft cap', { ...raise, raiseDeadline: NOW }, 'failed'],
+    [
+      'a funded raise past its activation deadline',
+      { ...raise, status: 'funded' as const, activationDeadline: NOW - 1 },
+      'failed',
+    ],
+  ])('settles %s as %s', (_case, project, expected) => {
+    expect(finalizeOutcome(project, NOW)).toBe(expected);
+  });
+});
+
+describe('isRefundable', () => {
+  it('opens refunds for a failed raise and for one that settling would fail', () => {
+    expect(isRefundable({ ...raise, status: 'failed' }, NOW)).toBe(true);
+    expect(isRefundable({ ...raise, raiseDeadline: NOW }, NOW)).toBe(true);
+    expect(isRefundable({ ...raise, status: 'funded', activationDeadline: NOW - 1 }, NOW)).toBe(
+      true,
+    );
+  });
+
+  it('keeps refunds closed while the raise can still succeed or already did', () => {
+    expect(isRefundable(raise, NOW)).toBe(false);
+    expect(isRefundable({ ...raise, sharesSold: 60n, raiseDeadline: NOW }, NOW)).toBe(false);
+    expect(isRefundable({ ...raise, status: 'operating' }, NOW)).toBe(false);
   });
 });

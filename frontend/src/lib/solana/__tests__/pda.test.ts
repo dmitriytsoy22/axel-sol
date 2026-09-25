@@ -44,6 +44,7 @@ describe('PDA seeds', () => {
       escrow: idlSeed('ESCROW_SEED'),
       revenue: idlSeed('REVENUE_SEED'),
       extraAccountMetas: idlSeed('EXTRA_ACCOUNT_METAS_SEED'),
+      recovery: idlSeed('RECOVERY_SEED'),
     });
   });
 

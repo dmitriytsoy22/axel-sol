@@ -1,30 +1,73 @@
 'use client';
 
 import React, { useId, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { PublicKey } from '@solana/web3.js';
+import { useLocale, useTranslations } from 'next-intl';
 import { CircleCheck, Loader2 } from 'lucide-react';
 import { useSetInvestor } from '@/hooks/useAdminActions';
+import { useInvestorOf } from '@/hooks/useInvestor';
+import { useUnixNow } from '@/hooks/useUnixNow';
 import { Button } from '@/components/ui/Button';
-import { shortAddress } from '@/lib/format';
+import { Pill, type PillTone } from '@/components/ui/Pill';
+import { formatDate, shortAddress } from '@/lib/format';
+import { INVESTOR_FLAGS, type InvestorAccount, type InvestorStatus } from '@/lib/solana/accounts';
 import type { KycDecision, KycRole } from '@/lib/solana/kyc';
+import { parseWallet, textInputClass } from './inputs';
 
 interface InvestorManagerProps {
   /** The key the connected wallet holds: production KYC, or the scoped devnet demo key. */
   role: KycRole;
 }
 
-function parseWallet(text: string): PublicKey | null {
-  try {
-    return text ? new PublicKey(text) : null;
-  } catch {
-    return null;
+const STATUS_TONE: Record<InvestorStatus, PillTone> = {
+  active: 'success',
+  revoked: 'neutral',
+  frozen: 'danger',
+  none: 'neutral',
+};
+
+/** Why the demo key cannot touch a record, as `set_investor` would refuse it; null if it can. */
+function demoRefusal(investor: InvestorAccount | null): string | null {
+  if (!investor) return null;
+  if (investor.status === 'frozen') return 'demoCantFrozen';
+  return (investor.flags & INVESTOR_FLAGS.demo) === 0 ? 'demoCantFull' : null;
+}
+
+function RecordSummary({ investor, now }: { investor: InvestorAccount | null; now: number }) {
+  const t = useTranslations('Admin');
+  const locale = useLocale();
+  if (!investor) {
+    return <p className="text-small text-muted-foreground">{t('recordNone')}</p>;
   }
+  const expired = investor.status === 'active' && investor.expiresAt <= now;
+  const flags = (Object.keys(INVESTOR_FLAGS) as (keyof typeof INVESTOR_FLAGS)[]).filter(
+    (flag) => (investor.flags & INVESTOR_FLAGS[flag]) !== 0,
+  );
+  return (
+    <dl className="grid gap-x-6 gap-y-2 text-small sm:grid-cols-[auto_1fr]">
+      <dt className="text-muted-foreground">{t('recordStatus')}</dt>
+      <dd className="flex flex-wrap gap-2">
+        <Pill tone={expired ? 'warning' : STATUS_TONE[investor.status]}>
+          {t(expired ? 'status_expired' : `status_${investor.status}`)}
+        </Pill>
+        {flags.map((flag) => (
+          <Pill key={flag} tone="info">
+            {t(`flag_${flag}`)}
+          </Pill>
+        ))}
+      </dd>
+      <dt className="text-muted-foreground">{t('recordExpires')}</dt>
+      <dd className="tabular-nums text-foreground">{formatDate(investor.expiresAt, locale)}</dd>
+      <dt className="text-muted-foreground">{t('recordProvider')}</dt>
+      <dd className="text-foreground">{t(`provider_${investor.provider}`)}</dd>
+      <dt className="text-muted-foreground">{t('recordUpdated')}</dt>
+      <dd className="tabular-nums text-foreground">{formatDate(investor.updatedAt, locale)}</dd>
+    </dl>
+  );
 }
 
 /**
- * Writes a wallet's record in the program's KYC registry. The program checks the record on
- * every purchase and every share transfer.
+ * Looks a wallet up in the program's KYC registry and writes its record. The program checks
+ * the record on every purchase and every share transfer.
  */
 export function InvestorManager({ role }: InvestorManagerProps) {
   const t = useTranslations('Admin');
@@ -36,8 +79,12 @@ export function InvestorManager({ role }: InvestorManagerProps) {
 
   const trimmed = address.trim();
   const wallet = parseWallet(trimmed);
+  const record = useInvestorOf(wallet);
   const showInvalid = trimmed.length > 0 && !wallet;
   const busy = status !== 'idle' && status !== 'success' && status !== 'error';
+  const refusal =
+    role === 'demo' && wallet && !record.isLoading ? demoRefusal(record.investor) : null;
+  const now = useUnixNow();
 
   const handle = async (decision: KycDecision) => {
     if (!wallet) return;
@@ -52,7 +99,7 @@ export function InvestorManager({ role }: InvestorManagerProps) {
           ? t('approvedResult', { address: short })
           : t('revokedResult', { address: short }),
       );
-      setAddress('');
+      record.refetch();
     }
   };
 
@@ -75,50 +122,22 @@ export function InvestorManager({ role }: InvestorManagerProps) {
         <label htmlFor={inputId} className="text-small font-medium text-foreground">
           {t('walletAddress')}
         </label>
-        <div className="mt-2 flex flex-col gap-3 sm:flex-row">
-          <input
-            id={inputId}
-            type="text"
-            value={address}
-            onChange={(e) => {
-              setAddress(e.target.value);
-              setResult(null);
-            }}
-            placeholder={t('walletPlaceholder')}
-            autoComplete="off"
-            spellCheck={false}
-            disabled={busy}
-            aria-invalid={showInvalid}
-            aria-describedby={hintId}
-            className="h-12 w-full min-w-0 rounded-control border border-input bg-card px-4 font-mono text-body text-foreground placeholder:font-sans placeholder:text-subtle-foreground transition-colors duration-fast ease-move focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-50 aria-[invalid=true]:border-destructive sm:flex-1"
-          />
-          <div className="flex gap-3">
-            <Button
-              size="lg"
-              onClick={() => handle('approve')}
-              disabled={busy || !wallet}
-              className="flex-1 sm:flex-none"
-            >
-              {active === 'approve' && (
-                <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
-              )}
-              {t('kycApprove')}
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => handle('revoke')}
-              disabled={busy || !wallet}
-              className="flex-1 sm:flex-none"
-            >
-              {active === 'revoke' && (
-                <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
-              )}
-              {t('kycRevoke')}
-            </Button>
-          </div>
-        </div>
-
+        <input
+          id={inputId}
+          type="text"
+          value={address}
+          onChange={(e) => {
+            setAddress(e.target.value);
+            setResult(null);
+          }}
+          placeholder={t('walletPlaceholder')}
+          autoComplete="off"
+          spellCheck={false}
+          disabled={busy}
+          aria-invalid={showInvalid}
+          aria-describedby={hintId}
+          className={`${textInputClass} mt-2`}
+        />
         <div id={hintId} aria-live="polite" className="mt-2 text-small">
           {showInvalid && <p className="text-destructive">{t('invalidAddress')}</p>}
           {result && (
@@ -127,6 +146,47 @@ export function InvestorManager({ role }: InvestorManagerProps) {
               {result}
             </p>
           )}
+        </div>
+
+        {wallet && (
+          <div className="mt-4 rounded-control bg-muted p-4">
+            <h3 className="text-small font-semibold text-foreground">{t('recordTitle')}</h3>
+            <div className="mt-3">
+              {record.isLoading ? (
+                <p className="text-small text-muted-foreground">{t('recordLoading')}</p>
+              ) : record.error ? (
+                <p className="text-small text-muted-foreground">{t('recordError')}</p>
+              ) : (
+                <RecordSummary investor={record.investor} now={now} />
+              )}
+            </div>
+          </div>
+        )}
+
+        {refusal && <p className="mt-3 text-small text-muted-foreground">{t(refusal)}</p>}
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button
+            size="lg"
+            onClick={() => handle('approve')}
+            disabled={busy || !wallet || refusal !== null}
+          >
+            {active === 'approve' && (
+              <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
+            )}
+            {t('kycApprove')}
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => handle('revoke')}
+            disabled={busy || !wallet || refusal !== null}
+          >
+            {active === 'revoke' && (
+              <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
+            )}
+            {t('kycRevoke')}
+          </Button>
         </div>
       </div>
     </section>

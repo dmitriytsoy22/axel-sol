@@ -8,7 +8,8 @@ import { Button, buttonClasses } from '@/components/ui/Button';
 import type { Holding } from '@/hooks/usePositions';
 import { Link } from '@/i18n/routing';
 import { formatCount, formatPercent, formatTokenAmount } from '@/lib/format';
-import { canClaim, canRefund, canTransfer } from '@/lib/solana/lifecycle';
+import { useUnixNow } from '@/hooks/useUnixNow';
+import { canClaim, canTransfer, isRefundable } from '@/lib/solana/lifecycle';
 import { sharesValue } from '@/lib/solana/math';
 import { carTitle } from '@/lib/solana/tokens';
 import { ClaimButton } from './ClaimButton';
@@ -43,13 +44,14 @@ function Actions({
   onTransfer,
 }: { holding: Holding } & Omit<HoldingsTableProps, 'holdings'>) {
   const t = useTranslations('Dashboard');
+  const now = useUnixNow();
   const { project, position, pending } = holding;
   return (
     <span className="flex flex-wrap justify-end gap-2">
       {pending > 0n && canClaim(project.status) && (
         <ClaimButton project={project} onClaimed={onChanged} />
       )}
-      {position.shares > 0n && canRefund(project.status) && (
+      {position.shares > 0n && isRefundable(project, now) && (
         <RefundButton project={project} shares={position.shares} onRefunded={onChanged} />
       )}
       {position.shares > 0n && canTransfer(project.status) && (

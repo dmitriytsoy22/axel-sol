@@ -17,7 +17,7 @@ AXEL has four parts:
                                    ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │ Frontend — Next.js 14 (frontend/)                                │
-│ catalog · asset page · dashboard · payouts · admin panel         │
+│ catalog · asset page · dashboard · payouts · solvency · admin    │
 │ reads accounts over JSON-RPC, builds transactions from the IDL   │
 └───────┬───────────────────────────────────────────┬──────────────┘
         │ RPC reads + wallet-signed transactions    │ HTTP GET /telemetry/latest/:mint
@@ -269,22 +269,27 @@ It uses:
 
 | Route | What it does | Chain access |
 |---|---|---|
-| `/` | Landing page: figures from the chain (value sold per payment token), the catalog with a filter over the six project states, how it works, Explorer links, risks | `getProgramAccounts` for `Project`, one `getMultipleAccounts` for the share mints' metadata and the payment mints |
-| `/assets/[id]` | Asset page, `id` = share mint: state, price, raise progress with the soft cap and a countdown, terms (fees, deadline, escrow, operator, oracle, payment token), the buy action, the wallet's shares with a refund for a failed raise, deposit history, payout calculator, telemetry | `Project`, the wallet's `Investor` and `Position`, `RevenuePeriod`s; `buy_shares`, `refund` |
-| `/dashboard` | Portfolio: value, shares, what a claim pays now; per car claim, refund, or send shares; claim all | `Position`s by owner, `Project`s; `claim` (up to four per transaction), `refund`, `open_position` + hooked `transfer_checked` |
+| `/` | Landing page: figures from the chain (value sold per payment token), the catalog with filters by state, city and class (each shown once the cars differ in it), how it works, Explorer links, risks | `getProgramAccounts` for `Project`, one `getMultipleAccounts` for the share mints' metadata and the payment mints |
+| `/assets/[id]` | Asset page, `id` = share mint: state, price, raise progress with a soft-cap marker, the deadline, the escrow balance read live, a timeline of the state machine, terms and holder count, the buy action, the wallet's shares with a refund for a failed raise, a public "settle the raise" once its outcome is certain, deposit history, "Check the car's data yourself", telemetry, payout calculator | `Project`, the escrow and income vault token accounts (every 15 s), the wallet's `Investor` and `Position`, the car's `Position`s, `RevenuePeriod`s; `buy_shares`, `refund` (with `finalize_raise` first when needed), `finalize_raise` |
+| `/dashboard` | Portfolio: a pending recovery of the wallet's shares with a veto, value, shares, what a claim pays now; per car claim, refund, or send shares; claim all | `RecoveryRequest`s by old owner, `Position`s by owner, `Project`s; `cancel_recovery`, `claim` (up to four per transaction), `refund`, `open_position` + hooked `transfer_checked` |
 | `/payouts` | Deposits of the wallet's cars and its claimed and claimable totals; with an indexer, its part of each deposit and its claims | `Position`s, `RevenuePeriod`s, or the [indexer API](api.md#indexer-api-read-by-the-frontend) |
-| `/admin` | Console for any role: the admin manages every car (settle, activate with the purchase documents' hash, cancel raise, pause, resume, close), an operator sees its cars, the KYC and demo KYC keys approve or revoke wallets | `Config`, `Project`s; `finalize_raise`, `activate_project`, `cancel_raise`, `pause_project`, `resume_project`, `close_project`, `set_investor` |
+| `/solvency` | Proof of solvency: for every car, the income vault against deposited minus claimed and what holders are owed now, the escrow against (sold − refunded) × price, the share supply against the ledger and the positions, and the revenue checkpoints; checked again every 30 s | Every `Project` and `Position`, then one `getMultipleAccounts` for each car's income vault, escrow and share mint |
+| `/admin` | Console split by the keys the wallet holds. **Platform admin:** each car's state (settle, activate with the purchase documents' hash, cancel raise, pause, resume, close), its operator and oracle, share recovery (propose, run, withdraw), and the config account. **Operator:** its cars' deposits, keys, live income vault and payout history. **KYC:** looks a wallet's record up, then approves or revokes it; the demo key is stopped before it touches a record it may not change | `Config`, `Project`s, `RecoveryRequest`s, `Investor`; `finalize_raise`, `activate_project`, `cancel_raise`, `pause_project`, `resume_project`, `close_project`, `set_project_roles`, `propose_recovery`, `execute_recovery`, `cancel_recovery`, `set_investor` |
 
 Details:
 
-- Access comes from the roles on-chain (`hooks/useAdminRoles.ts`): `Config.admin`, `Config.kyc_authority`, `Config.demo_kyc_authority` and each project's `operator`. `/admin` is not in the navigation bar.
-- The buy button reads the wallet's `Investor` record (`hooks/useInvestor.ts`) and judges it with the program's rule (`lib/solana/eligibility.ts`): active, not expired, and DEMO only where the project accepts it. Otherwise it names the reason.
+- Access comes from the roles on-chain (`hooks/useAdminRoles.ts`): `Config.admin`, `Config.kyc_authority`, `Config.demo_kyc_authority` and each project's `operator`. `/admin` is not in the navigation bar; a wallet with several roles switches between them with tabs.
+- On every test network a banner under the navigation bar says the data is the fictional demo seed of `scripts/seed-devnet`; on the home page the hero says it.
+- The buy button reads the wallet's `Investor` record (`hooks/useInvestor.ts`) and judges it with the program's rule (`lib/solana/eligibility.ts`): active, not expired, and DEMO only where the project accepts it. Otherwise it names the reason. The purchase dialog says where the money goes (escrow, refund rule) and discloses a payment token whose issuer can freeze, seize or pause.
 - Portfolio figures use `pendingRevenue`, the program's settle on BigInt, so "Ready to claim" is exactly what a claim pays.
-- A transfer checks the recipient's KYC before the wallet is asked to sign, and adds `open_position` when the recipient has no position yet.
+- A transfer reads the recipient's KYC record and position while the address is typed, refuses a wallet the hook would refuse, and adds `open_position` when the recipient has no position yet.
+- A refund opens a dialog with the amount, the shares burned and the only account it can go to. When a raise has failed but nobody settled it, the refund transaction runs `finalize_raise` first.
+- "Check the car's data yourself" (`components/asset/VerifyData.tsx`, `lib/verify/`) downloads the car's published files ([api.md](api.md#published-car-data-read-by-verify)), rebuilds the telemetry hash chain with the browser's WebCrypto over RFC 8785 canonical JSON, and compares it with the project's `telemetry_head`, `telemetry_count` and `last_telemetry_date`. It also checks every deposit's income report against its `report_hash`, finds the day each deposit's `telemetry_head` snapshot points to, and checks the purchase document against `acquisition_doc_hash`.
+- Proof of solvency (`lib/solana/solvency.ts`) reads the accounts in several RPC calls, so a transaction can land between them; a failed check is read again once before it is reported. The rule that every share account equals its position needs every token account of every share mint and is left to the seed's `verify-invariants` script.
 - Every transaction result is shown in a toast with an Explorer link. Failures are explained in the user's language: every `axel_v2` error code has a message in `messages/*.json` (`ProgramErrors`), and wallet refusals, missing SOL, expired blockhashes and RPC failures have their own (`TxErrors`).
-- Revenue deposits need the oracle's co-signature, which the console cannot produce; the backend is meant to prepare them. `create_project`, `set_project_roles` and the recovery flows have no UI yet.
+- Revenue deposits need the oracle's co-signature, which the console cannot produce; the backend is meant to prepare them. `create_project` has no UI yet.
 - Car photos are stock photos picked by make and model (`components/catalog/vehiclePhoto.ts`) and always marked "Illustrative photo": a share mint holds no photo of its car. Credits are in `public/images/CREDITS.md`. Design rules: [`frontend/design.md`](../frontend/design.md).
-- Security headers are set in `next.config.mjs`: a CSP whose `connect-src` allows the public Solana clusters, Helius, a local validator, and the configured RPC, telemetry and indexer origins; `X-Frame-Options: DENY`; `nosniff`; a Referrer-Policy; and a Permissions-Policy.
+- Security headers are set in `next.config.mjs`: a CSP whose `connect-src` allows the public Solana clusters, Helius, a local validator, and the configured RPC, telemetry, indexer and published-data origins; `X-Frame-Options: DENY`; `nosniff`; a Referrer-Policy; and a Permissions-Policy.
 
 ## Security Properties (as implemented)
 
