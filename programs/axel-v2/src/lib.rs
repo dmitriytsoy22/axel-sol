@@ -155,6 +155,28 @@ pub mod axel_v2 {
         ctx.accounts.close()
     }
 
+    /// Proposes moving `shares` of `from_owner`, a holder who lost its key, to its new wallet
+    /// `to_owner` once `config.recovery_delay` has passed. Admin only.
+    pub fn propose_recovery(
+        ctx: Context<ProposeRecovery>,
+        shares: u64,
+        reason_hash: [u8; 32],
+    ) -> Result<()> {
+        ctx.accounts.handle(shares, reason_hash, ctx.bumps.request)
+    }
+
+    /// Withdraws a pending recovery: the affected owner can veto it until its eta, the admin
+    /// can withdraw it until it is executed.
+    pub fn cancel_recovery(ctx: Context<CancelRecovery>) -> Result<()> {
+        ctx.accounts.handle()
+    }
+
+    /// Carries out a recovery after its delay: burns the shares of the old wallet, mints as
+    /// many to the new one and moves the unclaimed revenue with them. Anyone may call it.
+    pub fn execute_recovery(ctx: Context<ExecuteRecovery>) -> Result<()> {
+        ctx.accounts.handle(ctx.bumps.to_position)
+    }
+
     /// Transfer hook of the share mints, invoked by Token-2022 on every share transfer.
     /// Settles revenue for both owners, moves the shares in their positions and rejects
     /// the transfer unless both owners are eligible and the project is operating.

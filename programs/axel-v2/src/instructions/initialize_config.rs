@@ -18,6 +18,8 @@ pub struct InitializeConfigParams {
     pub min_raise_duration: i64,
     pub max_activation_window: i64,
     pub allowed_payment_mints: [Pubkey; 4],
+    /// Owner veto window of share recoveries in seconds; mainnet needs at least 72 hours.
+    pub recovery_delay: i64,
 }
 
 /// Only the program's upgrade authority can create the config, so nobody can front-run
@@ -64,7 +66,8 @@ impl InitializeConfig<'_> {
             paused: false,
             project_count: 0,
             bump,
-            _reserved: [0; 32],
+            recovery_delay: params.recovery_delay,
+            _reserved: [0; 24],
         });
         self.config.validate()?;
         emit!(ConfigUpdated::from(&*self.config));

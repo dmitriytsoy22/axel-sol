@@ -16,6 +16,8 @@ pub const ESCROW_SEED: &[u8] = b"escrow";
 pub const REVENUE_SEED: &[u8] = b"revenue";
 #[constant]
 pub const EXTRA_ACCOUNT_METAS_SEED: &[u8] = b"extra-account-metas";
+#[constant]
+pub const RECOVERY_SEED: &[u8] = b"recovery";
 
 #[constant]
 pub const BPS_DENOMINATOR: u16 = 10_000;
@@ -36,6 +38,15 @@ pub const MAX_JURISDICTION: u16 = 999;
 
 #[constant]
 pub const MAX_TELEMETRY_ENTRIES: u8 = 20;
+
+/// Shortest time the affected owner has to veto a share recovery. It rules out a seizure
+/// within one transaction and still fits a devnet demo. Mainnet must configure at least
+/// 72 hours and keep the admin role in a Squads multisig (see the program's README).
+#[constant]
+pub const MIN_RECOVERY_DELAY: i64 = 60 * 60;
+/// Longest recovery delay; it catches a delay given in milliseconds instead of seconds.
+#[constant]
+pub const MAX_RECOVERY_DELAY: i64 = 30 * 24 * 60 * 60;
 
 /// Shares are whole units.
 #[constant]

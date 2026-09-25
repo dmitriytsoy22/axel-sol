@@ -14,6 +14,7 @@ pub struct ConfigUpdated {
     pub max_activation_window: i64,
     pub allowed_payment_mints: [Pubkey; 4],
     pub paused: bool,
+    pub recovery_delay: i64,
 }
 
 impl From<&Config> for ConfigUpdated {
@@ -29,6 +30,7 @@ impl From<&Config> for ConfigUpdated {
             max_activation_window: config.max_activation_window,
             allowed_payment_mints: config.allowed_payment_mints,
             paused: config.paused,
+            recovery_delay: config.recovery_delay,
         }
     }
 }
@@ -194,4 +196,38 @@ pub struct ProjectClosed {
     pub project: Pubkey,
     /// Revenue deposited for holders and not yet claimed; it stays claimable.
     pub unclaimed: u64,
+}
+
+#[event]
+pub struct RecoveryProposed {
+    pub project: Pubkey,
+    pub from_owner: Pubkey,
+    pub to_owner: Pubkey,
+    pub shares: u64,
+    pub reason_hash: [u8; 32],
+    pub proposer: Pubkey,
+    /// Earliest execution time; the affected owner can veto until then.
+    pub eta: i64,
+}
+
+#[event]
+pub struct RecoveryCancelled {
+    pub project: Pubkey,
+    pub from_owner: Pubkey,
+    pub to_owner: Pubkey,
+    pub shares: u64,
+    /// The admin, or `from_owner` exercising its veto.
+    pub cancelled_by: Pubkey,
+}
+
+#[event]
+pub struct RecoveryExecuted {
+    pub project: Pubkey,
+    pub from_owner: Pubkey,
+    pub to_owner: Pubkey,
+    pub shares: u64,
+    /// Unclaimed revenue that moved along with the shares.
+    pub accrued_moved: u64,
+    pub reason_hash: [u8; 32],
+    pub executor: Pubkey,
 }

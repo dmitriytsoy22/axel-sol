@@ -22,6 +22,8 @@ import {
 import { configAddress, configPda } from "./helpers/pda";
 import { plain } from "./helpers/plain";
 
+const HOUR = 3_600n;
+
 function eventFields(config: InitializeConfigParams & { paused: boolean }) {
   return {
     admin: config.admin,
@@ -34,6 +36,7 @@ function eventFields(config: InitializeConfigParams & { paused: boolean }) {
     maxActivationWindow: config.maxActivationWindow,
     allowedPaymentMints: config.allowedPaymentMints,
     paused: config.paused,
+    recoveryDelay: config.recoveryDelay,
   };
 }
 
@@ -55,7 +58,7 @@ describe("initialize_config", () => {
         paused: false,
         projectCount: bn(0),
         bump,
-        reserved: new Array(32).fill(0),
+        reserved: new Array(24).fill(0),
       }),
     );
     assert.deepEqual(plain(expectEvent(result, "configUpdated")), plain(eventFields({ ...params, paused: false })));
@@ -119,6 +122,8 @@ describe("initialize_config", () => {
     ["a revenue fee above 20%", (p) => { p.revenueFeeBps = 2_001; }, "FeeTooHigh"],
     ["a zero minimum raise duration", (p) => { p.minRaiseDuration = bn(0); }, "InvalidDuration"],
     ["a negative activation window", (p) => { p.maxActivationWindow = bn(-1); }, "InvalidDuration"],
+    ["a recovery delay under one hour", (p) => { p.recoveryDelay = bn(HOUR - 1n); }, "InvalidRecoveryDelay"],
+    ["a recovery delay over 30 days", (p) => { p.recoveryDelay = bn(30n * DAY + 1n); }, "InvalidRecoveryDelay"],
     ["the default admin", (p) => { p.admin = PublicKey.default; }, "InvalidAddress"],
     ["the default KYC authority", (p) => { p.kycAuthority = PublicKey.default; }, "InvalidAddress"],
     ["the default treasury", (p) => { p.treasury = PublicKey.default; }, "InvalidAddress"],
@@ -165,6 +170,7 @@ describe("update_config", () => {
       maxActivationWindow: bn(30n * DAY),
       allowedPaymentMints: mints,
       paused: true,
+      recoveryDelay: bn(30n * DAY),
     };
 
     const result = expectOk(env.send([await updateConfigIx(roles.admin.publicKey, settings)], [roles.admin]));
@@ -209,6 +215,8 @@ describe("update_config", () => {
     ["a revenue fee above the cap", () => ({ revenueFeeBps: 2_001 }), "FeeTooHigh"],
     ["a zero minimum raise duration", () => ({ minRaiseDuration: bn(0) }), "InvalidDuration"],
     ["a zero activation window", () => ({ maxActivationWindow: bn(0) }), "InvalidDuration"],
+    ["a zero recovery delay", () => ({ recoveryDelay: bn(0) }), "InvalidRecoveryDelay"],
+    ["a recovery delay given in milliseconds", () => ({ recoveryDelay: bn(3n * DAY * 1_000n) }), "InvalidRecoveryDelay"],
     ["the default KYC authority", () => ({ kycAuthority: PublicKey.default }), "InvalidAddress"],
     ["the default treasury", () => ({ treasury: PublicKey.default }), "InvalidAddress"],
     ["a demo key equal to the KYC key", (r) => ({ demoKycAuthority: r.kyc.publicKey }), "DemoAuthorityConflict"],

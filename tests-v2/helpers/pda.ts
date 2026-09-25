@@ -38,6 +38,10 @@ export function periodAddress(project: PublicKey, index: number): [PublicKey, nu
   return find(Buffer.from("period"), project, le);
 }
 
+export function recoveryAddress(project: PublicKey, fromOwner: PublicKey): [PublicKey, number] {
+  return find(Buffer.from("recovery"), project, fromOwner);
+}
+
 export function extraAccountMetasAddress(shareMint: PublicKey): [PublicKey, number] {
   return find(Buffer.from("extra-account-metas"), shareMint);
 }
@@ -60,4 +64,8 @@ export function positionPda(project: PublicKey, owner: PublicKey): PublicKey {
 
 export function periodPda(project: PublicKey, index: number): PublicKey {
   return periodAddress(project, index)[0];
+}
+
+export function recoveryPda(project: PublicKey, fromOwner: PublicKey): PublicKey {
+  return recoveryAddress(project, fromOwner)[0];
 }

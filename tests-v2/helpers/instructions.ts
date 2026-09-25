@@ -11,6 +11,7 @@ import {
   periodPda,
   positionPda,
   projectPda,
+  recoveryPda,
   revenueAddress,
 } from "./pda";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, ata, TOKEN_2022_PROGRAM_ID } from "./tokens";
@@ -99,6 +100,7 @@ export function updateConfigIx(
     maxActivationWindow: null,
     allowedPaymentMints: null,
     paused: null,
+    recoveryDelay: null,
     ...changes,
   };
   return program.methods
@@ -392,6 +394,75 @@ export function closePositionIx(
       position,
       shareMint: project.shareMint,
       ownerShareAccount: ata(owner, project.shareMint, TOKEN_2022_PROGRAM_ID),
+      shareTokenProgram: TOKEN_2022_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+}
+
+/** The admin proposes moving `shares` of `fromOwner` to `toOwner` after the recovery delay. */
+export function proposeRecoveryIx(
+  project: ProjectRef,
+  accounts: { admin: PublicKey; fromOwner: PublicKey; toOwner: PublicKey },
+  shares: bigint,
+  reasonHash: number[],
+): Promise<TransactionInstruction> {
+  return program.methods
+    .proposeRecovery(bn(shares), reasonHash)
+    .accountsStrict({
+      admin: accounts.admin,
+      config: configPda(),
+      project: project.address,
+      fromOwner: accounts.fromOwner,
+      fromInvestor: investorPda(accounts.fromOwner),
+      fromPosition: positionPda(project.address, accounts.fromOwner),
+      toOwner: accounts.toOwner,
+      toInvestor: investorPda(accounts.toOwner),
+      request: recoveryPda(project.address, accounts.fromOwner),
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+}
+
+/** `authority` (the admin or the affected owner) withdraws the pending recovery of `fromOwner`. */
+export function cancelRecoveryIx(
+  project: ProjectRef,
+  accounts: { authority: PublicKey; fromOwner: PublicKey; proposer: PublicKey },
+): Promise<TransactionInstruction> {
+  return program.methods
+    .cancelRecovery()
+    .accountsStrict({
+      authority: accounts.authority,
+      config: configPda(),
+      request: recoveryPda(project.address, accounts.fromOwner),
+      proposer: accounts.proposer,
+    })
+    .instruction();
+}
+
+/** `executor` carries out the pending recovery of `fromOwner` to `toOwner`. */
+export function executeRecoveryIx(
+  project: ProjectRef,
+  accounts: { executor: PublicKey; fromOwner: PublicKey; toOwner: PublicKey; proposer: PublicKey; request?: PublicKey },
+): Promise<TransactionInstruction> {
+  return program.methods
+    .executeRecovery()
+    .accountsStrict({
+      executor: accounts.executor,
+      config: configPda(),
+      project: project.address,
+      request: accounts.request ?? recoveryPda(project.address, accounts.fromOwner),
+      proposer: accounts.proposer,
+      shareMint: project.shareMint,
+      fromOwner: accounts.fromOwner,
+      fromInvestor: investorPda(accounts.fromOwner),
+      fromPosition: positionPda(project.address, accounts.fromOwner),
+      fromShareAccount: ata(accounts.fromOwner, project.shareMint, TOKEN_2022_PROGRAM_ID),
+      toOwner: accounts.toOwner,
+      toInvestor: investorPda(accounts.toOwner),
+      toPosition: positionPda(project.address, accounts.toOwner),
+      toShareAccount: ata(accounts.toOwner, project.shareMint, TOKEN_2022_PROGRAM_ID),
       shareTokenProgram: TOKEN_2022_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,

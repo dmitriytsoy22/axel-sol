@@ -7,7 +7,7 @@ Issues and pull requests are welcome. For security problems, follow [SECURITY.md
 | Path | What it is |
 | :--- | :--- |
 | `programs/axel`, `programs/transfer-hook` | v1 Anchor programs, kept as legacy (Token-2022 mint, sale, revenue, whitelist, telemetry; transfer hook) |
-| `programs/axel-v2` | v2 Anchor program: escrowed raise, KYC registry, attested revenue deposits and claims, telemetry hash chain, transfer hook in one program |
+| `programs/axel-v2` | v2 Anchor program: escrowed raise, KYC registry, attested revenue deposits and claims, telemetry hash chain, time-locked share recovery, transfer hook in one program. Admin powers and mainnet requirements: [programs/axel-v2/README.md](programs/axel-v2/README.md) |
 | `tests/` | v1 program tests (`node:test`) run against a local validator at `http://127.0.0.1:8899` |
 | `tests-v2/` | v2 program tests (`node:test`) on LiteSVM, with their own `package.json` |
 | `scripts/` | `init-project.ts` (creates a project on a cluster), `generate-clients.ts` (Codama SDK into `sdk/generated`) |

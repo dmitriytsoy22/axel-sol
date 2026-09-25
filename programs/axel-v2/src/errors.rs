@@ -139,4 +139,18 @@ pub enum AxelError {
     EmptyTelemetryBatch,
     #[msg("Telemetry date must be a calendar date as YYYYMMDD")]
     InvalidTelemetryDate,
+
+    // Recovery
+    #[msg("Recovery delay must be between 1 hour and 30 days")]
+    InvalidRecoveryDelay,
+    #[msg("Recovery reason hash must not be empty")]
+    InvalidReasonHash,
+    #[msg("Recovery must move shares to a different wallet")]
+    RecoveryToSameOwner,
+    #[msg("Position holds fewer shares than the recovery moves")]
+    InsufficientShares,
+    #[msg("Recovery delay has not elapsed")]
+    RecoveryNotReady,
+    #[msg("The owner's veto window has closed")]
+    VetoWindowClosed,
 }

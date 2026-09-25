@@ -17,6 +17,7 @@ pub struct UpdateConfigParams {
     pub max_activation_window: Option<i64>,
     pub allowed_payment_mints: Option<[Pubkey; 4]>,
     pub paused: Option<bool>,
+    pub recovery_delay: Option<i64>,
 }
 
 #[derive(Accounts)]
@@ -61,6 +62,9 @@ impl UpdateConfig<'_> {
         }
         if let Some(paused) = params.paused {
             config.paused = paused;
+        }
+        if let Some(recovery_delay) = params.recovery_delay {
+            config.recovery_delay = recovery_delay;
         }
         config.validate()?;
         emit!(ConfigUpdated::from(&**config));

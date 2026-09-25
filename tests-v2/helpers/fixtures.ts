@@ -44,7 +44,13 @@ export function newRoles(env: TestEnv): Roles {
   };
 }
 
-/** Devnet-style settings: 60 s minimum raise, 7 day activation window, fees below the caps. */
+/** Owner veto window of share recoveries, the mainnet minimum. */
+export const RECOVERY_DELAY = 3n * DAY;
+
+/**
+ * Devnet-style settings: 60 s minimum raise, 7 day activation window, fees below the caps,
+ * and the 72 hour recovery delay mainnet requires.
+ */
 export function configParams(
   roles: Roles,
   paymentMint: PublicKey = Keypair.generate().publicKey,
@@ -59,6 +65,7 @@ export function configParams(
     minRaiseDuration: bn(60),
     maxActivationWindow: bn(7n * DAY),
     allowedPaymentMints: [paymentMint, PublicKey.default, PublicKey.default, PublicKey.default],
+    recoveryDelay: bn(RECOVERY_DELAY),
   };
 }
 

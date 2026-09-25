@@ -31,13 +31,15 @@ fn config_layout() {
         paused: true,
         project_count: 5,
         bump: 6,
-        _reserved: [0; 32],
+        recovery_delay: 7,
+        _reserved: [0; 24],
     };
     let data = serialize(&config);
     assert_eq!(Config::SPACE, 358);
     assert_eq!(data.len(), Config::SPACE);
     assert_eq!(&data[..8], Config::DISCRIMINATOR);
     assert_eq!(&data[8..40], key(1).as_ref());
+    assert_eq!(&data[326..334], &7i64.to_le_bytes(), "recovery_delay");
 }
 
 #[test]
@@ -160,6 +162,28 @@ fn revenue_period_layout() {
 }
 
 #[test]
+fn recovery_request_layout() {
+    let request = RecoveryRequest {
+        project: key(1),
+        from_owner: key(2),
+        to_owner: key(3),
+        shares: 4,
+        reason_hash: [5; 32],
+        proposer: key(6),
+        proposed_at: 7,
+        eta: 8,
+        bump: 9,
+    };
+    let data = serialize(&request);
+    assert_eq!(RecoveryRequest::SPACE, 193);
+    assert_eq!(data.len(), RecoveryRequest::SPACE);
+    assert_eq!(&data[8..40], key(1).as_ref(), "project at offset 8");
+    assert_eq!(&data[40..72], key(2).as_ref(), "from_owner at offset 40");
+    assert_eq!(&data[72..104], key(3).as_ref(), "to_owner at offset 72");
+    assert_eq!(&data[184..192], &8i64.to_le_bytes(), "eta");
+}
+
+#[test]
 fn position_settle_moves_checkpoint() {
     let mut position = Position {
         project: key(1),
@@ -193,12 +217,22 @@ fn config_validation() {
         paused: false,
         project_count: 0,
         bump: 255,
-        _reserved: [0; 32],
+        recovery_delay: 72 * 60 * 60,
+        _reserved: [0; 24],
     };
     valid.validate().unwrap();
     assert!(valid.is_payment_mint_allowed(&key(5)));
     assert!(!valid.is_payment_mint_allowed(&Pubkey::default()));
     assert!(!valid.demo_kyc_enabled());
+
+    for delay in [60 * 60, 30 * 24 * 60 * 60] {
+        Config {
+            recovery_delay: delay,
+            ..valid.clone()
+        }
+        .validate()
+        .unwrap();
+    }
 
     let rejects = |mutate: fn(&mut Config), error: crate::errors::AxelError| {
         let mut config = valid.clone();
@@ -212,6 +246,12 @@ fn config_validation() {
     rejects(|c| c.raise_fee_bps = 501, FeeTooHigh);
     rejects(|c| c.revenue_fee_bps = 2_001, FeeTooHigh);
     rejects(|c| c.min_raise_duration = 0, InvalidDuration);
+    rejects(|c| c.recovery_delay = 60 * 60 - 1, InvalidRecoveryDelay);
+    rejects(
+        |c| c.recovery_delay = 30 * 24 * 60 * 60 + 1,
+        InvalidRecoveryDelay,
+    );
+    rejects(|c| c.recovery_delay = -1, InvalidRecoveryDelay);
     rejects(|c| c.max_activation_window = -1, InvalidDuration);
     rejects(|c| c.admin = Pubkey::default(), InvalidAddress);
     rejects(|c| c.kyc_authority = Pubkey::default(), InvalidAddress);

@@ -55,6 +55,16 @@ pub fn shares_value(shares: u64, price_per_share: u64) -> MathResult<u64> {
     u64::try_from(value).map_err(|_| MathError::Overflow)
 }
 
+/// `floor(amount * part / whole)`: the part of `amount` that belongs to `part` of `whole`.
+/// Never more than `amount` while `part <= whole`, and exactly `amount` when they are equal.
+pub fn pro_rata(amount: u64, part: u64, whole: u64) -> MathResult<u64> {
+    if whole == 0 {
+        return Err(MathError::DivisionByZero);
+    }
+    let value = u128::from(amount) * u128::from(part) / u128::from(whole);
+    u64::try_from(value).map_err(|_| MathError::Overflow)
+}
+
 /// Accumulator growth from distributing `net` over `supply` shares: `floor(net * 2^64 / supply)`.
 pub fn acc_increment(net: u64, supply: u64) -> MathResult<u128> {
     if supply == 0 {
@@ -136,6 +146,18 @@ mod tests {
         assert_eq!(shares_value(1, u64::MAX), Ok(u64::MAX));
         assert_eq!(shares_value(2, u64::MAX), Err(MathError::Overflow));
         assert_eq!(shares_value(1 << 32, 1 << 32), Err(MathError::Overflow));
+    }
+
+    #[test]
+    fn pro_rata_floors_and_keeps_the_whole() {
+        assert_eq!(pro_rata(1_000, 50, 50), Ok(1_000));
+        assert_eq!(pro_rata(1_000, 20, 50), Ok(400));
+        assert_eq!(pro_rata(100, 1, 3), Ok(33));
+        assert_eq!(pro_rata(0, 7, 9), Ok(0));
+        assert_eq!(pro_rata(u64::MAX, u64::MAX, u64::MAX), Ok(u64::MAX));
+        assert_eq!(pro_rata(u64::MAX, u64::MAX - 1, u64::MAX), Ok(u64::MAX - 1));
+        assert_eq!(pro_rata(1, 0, 0), Err(MathError::DivisionByZero));
+        assert_eq!(pro_rata(u64::MAX, 2, 1), Err(MathError::Overflow));
     }
 
     #[test]
@@ -340,6 +362,17 @@ mod tests {
             let scaled = u128::from(amount) * u128::from(bps);
             prop_assert!(u128::from(fee) * 10_000 <= scaled);
             prop_assert!(scaled < (u128::from(fee) + 1) * 10_000);
+        }
+
+        /// Splitting accrued revenue between the two parts of a position never creates value.
+        #[test]
+        fn pro_rata_parts_never_exceed_the_amount(amount in any::<u64>(), whole in 1u64.., part in any::<u64>()) {
+            let part = part % whole + 1;
+            let moved = pro_rata(amount, part, whole).unwrap();
+            let kept = pro_rata(amount, whole - part, whole).unwrap();
+            prop_assert!(moved <= amount);
+            prop_assert!(u128::from(moved) + u128::from(kept) <= u128::from(amount));
+            prop_assert!(u128::from(amount) - u128::from(moved) - u128::from(kept) <= 1);
         }
 
         #[test]

@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 
-use crate::constants::{MAX_RAISE_FEE_BPS, MAX_REVENUE_FEE_BPS};
+use crate::constants::{
+    MAX_RAISE_FEE_BPS, MAX_RECOVERY_DELAY, MAX_REVENUE_FEE_BPS, MIN_RECOVERY_DELAY,
+};
 use crate::errors::AxelError;
 
 /// Global protocol settings, PDA `["config"]`.
@@ -22,11 +24,15 @@ pub struct Config {
     pub max_activation_window: i64,
     /// Stablecoins a project may use for payments; unused slots are default.
     pub allowed_payment_mints: [Pubkey; 4],
-    /// Blocks buys, transfers, deposits and activation. Never blocks claim or refund.
+    /// Blocks buys, transfers, deposits, activation and recoveries. Never blocks claims,
+    /// refunds or an owner's veto of a recovery.
     pub paused: bool,
     pub project_count: u64,
     pub bump: u8,
-    pub _reserved: [u8; 32],
+    /// Seconds between proposing and executing a share recovery, during which the affected
+    /// owner can veto it. A proposal keeps the delay it was made with.
+    pub recovery_delay: i64,
+    pub _reserved: [u8; 24],
 }
 
 impl Config {
@@ -64,6 +70,10 @@ impl Config {
         );
         require!(self.min_raise_duration > 0, AxelError::InvalidDuration);
         require!(self.max_activation_window > 0, AxelError::InvalidDuration);
+        require!(
+            (MIN_RECOVERY_DELAY..=MAX_RECOVERY_DELAY).contains(&self.recovery_delay),
+            AxelError::InvalidRecoveryDelay
+        );
         for (i, mint) in self.allowed_payment_mints.iter().enumerate() {
             if *mint != Pubkey::default() {
                 require!(
