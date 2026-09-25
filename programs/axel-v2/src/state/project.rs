@@ -12,7 +12,7 @@ pub struct Project {
     pub payment_token_program: Pubkey,
     /// Fleet operator: receives the raise on activation and deposits revenue.
     pub operator: Pubkey,
-    /// Signer of telemetry records.
+    /// Fleet reporting system: signs telemetry records and attests revenue deposits.
     pub oracle: Pubkey,
     /// PDA token account `["escrow", project]` holding the raise until activation or refund.
     pub escrow_vault: Pubkey,

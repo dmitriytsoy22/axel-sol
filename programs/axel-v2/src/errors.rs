@@ -129,4 +129,14 @@ pub enum AxelError {
     InvalidDocumentHash,
     #[msg("Vault holds less than the amount it owes")]
     VaultShortfall,
+
+    // Revenue and operations
+    #[msg("Revenue report hash must not be empty")]
+    InvalidReportHash,
+    #[msg("Revenue deposit must be co-signed by the project's oracle")]
+    InvalidAttestor,
+    #[msg("Telemetry batch is empty")]
+    EmptyTelemetryBatch,
+    #[msg("Telemetry date must be a calendar date as YYYYMMDD")]
+    InvalidTelemetryDate,
 }

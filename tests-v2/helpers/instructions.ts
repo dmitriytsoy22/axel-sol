@@ -8,6 +8,7 @@ import {
   escrowAddress,
   extraAccountMetasAddress,
   investorPda,
+  periodPda,
   positionPda,
   projectPda,
   revenueAddress,
@@ -21,6 +22,9 @@ export type InvestorStatus = IdlTypes<AxelV2>["investorStatus"];
 export type KycProvider = IdlTypes<AxelV2>["kycProvider"];
 export type CreateProjectParams = IdlTypes<AxelV2>["createProjectParams"];
 export type ProjectState = IdlTypes<AxelV2>["projectState"];
+export type DepositRevenueParams = IdlTypes<AxelV2>["depositRevenueParams"];
+export type RevenueKind = IdlTypes<AxelV2>["revenueKind"];
+export type TelemetryEntry = IdlTypes<AxelV2>["telemetryEntry"];
 
 export const InvestorStatus = {
   none: { none: {} },
@@ -48,6 +52,11 @@ export const ProjectState = {
   closed: { closed: {} },
 } satisfies Record<string, ProjectState>;
 
+export const RevenueKind = {
+  regular: { regular: {} },
+  final: { final: {} },
+} satisfies Record<string, RevenueKind>;
+
 /** Addresses of a created project that instruction builders need. */
 export interface ProjectRef {
   address: PublicKey;
@@ -55,6 +64,7 @@ export interface ProjectRef {
   paymentMint: PublicKey;
   paymentProgram: PublicKey;
   escrow: PublicKey;
+  revenue: PublicKey;
 }
 
 export function initializeConfigIx(
@@ -226,10 +236,104 @@ export function activateProjectIx(
     .instruction();
 }
 
+function manageAccounts(project: ProjectRef, admin: PublicKey) {
+  return { admin, config: configPda(), project: project.address };
+}
+
 export function cancelRaiseIx(project: ProjectRef, admin: PublicKey): Promise<TransactionInstruction> {
+  return program.methods.cancelRaise().accountsStrict(manageAccounts(project, admin)).instruction();
+}
+
+export function pauseProjectIx(project: ProjectRef, admin: PublicKey): Promise<TransactionInstruction> {
+  return program.methods.pauseProject().accountsStrict(manageAccounts(project, admin)).instruction();
+}
+
+export function resumeProjectIx(project: ProjectRef, admin: PublicKey): Promise<TransactionInstruction> {
+  return program.methods.resumeProject().accountsStrict(manageAccounts(project, admin)).instruction();
+}
+
+export function closeProjectIx(project: ProjectRef, admin: PublicKey): Promise<TransactionInstruction> {
+  return program.methods.closeProject().accountsStrict(manageAccounts(project, admin)).instruction();
+}
+
+/** `null` keeps the current role. */
+export function setProjectRolesIx(
+  project: ProjectRef,
+  admin: PublicKey,
+  roles: { operator?: PublicKey | null; oracle?: PublicKey | null },
+): Promise<TransactionInstruction> {
   return program.methods
-    .cancelRaise()
-    .accountsStrict({ admin, config: configPda(), project: project.address })
+    .setProjectRoles(roles.operator ?? null, roles.oracle ?? null)
+    .accountsStrict(manageAccounts(project, admin))
+    .instruction();
+}
+
+/** A deposit by `operator` co-signed by `oracle`; the period index is the project's next one. */
+export function depositRevenueIx(
+  project: ProjectRef,
+  accounts: {
+    operator: PublicKey;
+    oracle: PublicKey;
+    treasury: PublicKey;
+    periodIndex: number;
+    operatorPaymentAccount?: PublicKey;
+    revenueVault?: PublicKey;
+  },
+  params: DepositRevenueParams,
+): Promise<TransactionInstruction> {
+  return program.methods
+    .depositRevenue(params)
+    .accountsStrict({
+      operator: accounts.operator,
+      oracle: accounts.oracle,
+      config: configPda(),
+      project: project.address,
+      period: periodPda(project.address, accounts.periodIndex),
+      paymentMint: project.paymentMint,
+      operatorPaymentAccount:
+        accounts.operatorPaymentAccount ?? ata(accounts.operator, project.paymentMint, project.paymentProgram),
+      revenueVault: accounts.revenueVault ?? project.revenue,
+      treasury: accounts.treasury,
+      treasuryTokenAccount: ata(accounts.treasury, project.paymentMint, project.paymentProgram),
+      paymentTokenProgram: project.paymentProgram,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+}
+
+/** `claimer` triggers the payout of the revenue `owner` has earned in the project. */
+export function claimIx(
+  project: ProjectRef,
+  accounts: { claimer: PublicKey; owner: PublicKey; ownerPaymentAccount?: PublicKey; revenueVault?: PublicKey },
+): Promise<TransactionInstruction> {
+  return program.methods
+    .claim()
+    .accountsStrict({
+      claimer: accounts.claimer,
+      owner: accounts.owner,
+      investor: investorPda(accounts.owner),
+      project: project.address,
+      position: positionPda(project.address, accounts.owner),
+      paymentMint: project.paymentMint,
+      ownerPaymentAccount:
+        accounts.ownerPaymentAccount ?? ata(accounts.owner, project.paymentMint, project.paymentProgram),
+      revenueVault: accounts.revenueVault ?? project.revenue,
+      paymentTokenProgram: project.paymentProgram,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+}
+
+export function recordTelemetryIx(
+  project: ProjectRef,
+  oracle: PublicKey,
+  entries: TelemetryEntry[],
+): Promise<TransactionInstruction> {
+  return program.methods
+    .recordTelemetry(entries)
+    .accountsStrict({ oracle, project: project.address })
     .instruction();
 }
 

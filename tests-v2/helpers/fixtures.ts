@@ -4,17 +4,25 @@ import { expectOk } from "./assert";
 import {
   activateProjectIx,
   buySharesIx,
+  claimIx,
+  closeProjectIx,
   createProjectIx,
+  depositRevenueIx,
   initializeConfigIx,
   InvestorFlag,
   InvestorStatus,
   KycProvider,
+  openPositionIx,
+  pauseProjectIx,
+  RevenueKind,
   setInvestorIx,
+  transferSharesIx,
   type CreateProjectParams,
+  type DepositRevenueParams,
   type InitializeConfigParams,
   type ProjectRef,
 } from "./instructions";
-import { escrowAddress, projectPda } from "./pda";
+import { escrowAddress, projectPda, revenueAddress } from "./pda";
 import { createMint, mintTo, TOKEN_PROGRAM_ID, type MintExtension } from "./tokens";
 
 export const DAY = 86_400n;
@@ -137,6 +145,7 @@ export function projectRef(market: Market, shareMint: PublicKey): ProjectRef {
     paymentMint: market.paymentMint,
     paymentProgram: market.paymentProgram,
     escrow: escrowAddress(address)[0],
+    revenue: revenueAddress(address)[0],
   };
 }
 
@@ -258,6 +267,18 @@ export async function buy(market: Market, project: ProjectRef, owner: Keypair, s
   return market.env.send([ix], [owner]);
 }
 
+/** `from` sends shares to the canonical share account of `to` through the transfer hook. */
+export function transfer(market: Market, project: ProjectRef, from: Keypair, to: PublicKey, amount: bigint): TxResult {
+  return market.env.send([transferSharesIx(project, { from: from.publicKey, to }, amount)], [from]);
+}
+
+/** A verified wallet with an open position in the project, paid for by `payer`. */
+export async function onboard(market: Market, project: ProjectRef, payer: Keypair, flags = 0): Promise<Keypair> {
+  const wallet = await newInvestor(market, { flags });
+  expectOk(market.env.send([await openPositionIx(project, { payer: payer.publicKey, owner: wallet.publicKey })], [payer]));
+  return wallet;
+}
+
 /** Hash of the car's purchase documents that the admin publishes on activation. */
 export const DOC_HASH = Array.from({ length: 32 }, (_, i) => i + 1);
 
@@ -290,4 +311,77 @@ export async function operatingProject(
   }
   expectOk(await activate(market, project));
   return { project, holders };
+}
+
+/** SHA-256 of a period's P&L report as the operator publishes it. */
+export const REPORT_HASH = Array.from({ length: 32 }, (_, i) => 0xa0 ^ i);
+
+/** October 2026 as a regular period; any field can be overridden. */
+export function revenueParams(gross: bigint, overrides: Partial<DepositRevenueParams> = {}): DepositRevenueParams {
+  return {
+    gross: bn(gross),
+    periodStart: 20261001,
+    periodEnd: 20261031,
+    reportHash: REPORT_HASH,
+    kind: RevenueKind.regular,
+    ...overrides,
+  };
+}
+
+/** Platform fee and holders' share of a deposit, as the program splits it. */
+export function splitRevenue(gross: bigint, feeBps: number): { fee: bigint; net: bigint } {
+  const fee = (gross * BigInt(feeBps)) / 10_000n;
+  return { fee, net: gross - fee };
+}
+
+/** The smallest gross deposit that leaves exactly `net` for the holders after the fee. */
+export function grossForNet(net: bigint, feeBps: number): bigint {
+  // Each extra unit of gross adds 0 or 1 to the net, so every net is reached exactly.
+  let gross = (net * 10_000n) / (10_000n - BigInt(feeBps));
+  while (splitRevenue(gross, feeBps).net < net) {
+    gross += 1n;
+  }
+  return gross;
+}
+
+/** The operator deposits `gross` into the project's next period, co-signed by the oracle. */
+export async function deposit(
+  market: Market,
+  project: ProjectRef,
+  gross: bigint,
+  overrides: Partial<DepositRevenueParams> = {},
+): Promise<TxResult> {
+  const ix = await depositRevenueIx(
+    project,
+    {
+      operator: market.operator.publicKey,
+      oracle: market.oracle.publicKey,
+      treasury: market.roles.treasury.publicKey,
+      periodIndex: market.env.fetch("project", project.address).periodCount,
+    },
+    revenueParams(gross, overrides),
+  );
+  return market.env.send([ix], [market.operator, market.oracle]);
+}
+
+/** Deposits exactly `net` for the holders, i.e. moves the accumulator by `net / supply`. */
+export async function depositNet(market: Market, project: ProjectRef, net: bigint): Promise<TxResult> {
+  const feeBps = market.env.fetch("project", project.address).revenueFeeBps;
+  return deposit(market, project, grossForNet(net, feeBps));
+}
+
+/** `claimer` (the owner itself by default) claims what `owner` has earned. */
+export async function claim(market: Market, project: ProjectRef, owner: Keypair, claimer: Keypair = owner): Promise<TxResult> {
+  const ix = await claimIx(project, { claimer: claimer.publicKey, owner: owner.publicKey });
+  return market.env.send([ix], [claimer]);
+}
+
+export async function pauseProject(market: Market, project: ProjectRef): Promise<TxResult> {
+  const { admin } = market.roles;
+  return market.env.send([await pauseProjectIx(project, admin.publicKey)], [admin]);
+}
+
+export async function closeProject(market: Market, project: ProjectRef): Promise<TxResult> {
+  const { admin } = market.roles;
+  return market.env.send([await closeProjectIx(project, admin.publicKey)], [admin]);
 }

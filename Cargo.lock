@@ -320,6 +320,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "proptest",
+ "solana-sha256-hasher",
  "spl-discriminator",
  "spl-tlv-account-resolution 0.10.0",
  "spl-token-2022 8.0.1",

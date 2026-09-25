@@ -32,6 +32,12 @@ export function revenueAddress(project: PublicKey): [PublicKey, number] {
   return find(Buffer.from("revenue"), project);
 }
 
+export function periodAddress(project: PublicKey, index: number): [PublicKey, number] {
+  const le = Buffer.alloc(4);
+  le.writeUInt32LE(index);
+  return find(Buffer.from("period"), project, le);
+}
+
 export function extraAccountMetasAddress(shareMint: PublicKey): [PublicKey, number] {
   return find(Buffer.from("extra-account-metas"), shareMint);
 }
@@ -50,4 +56,8 @@ export function projectPda(shareMint: PublicKey): PublicKey {
 
 export function positionPda(project: PublicKey, owner: PublicKey): PublicKey {
   return positionAddress(project, owner)[0];
+}
+
+export function periodPda(project: PublicKey, index: number): PublicKey {
+  return periodAddress(project, index)[0];
 }

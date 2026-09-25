@@ -6,6 +6,7 @@ use spl_discriminator::SplDiscriminate;
 use spl_transfer_hook_interface::instruction::ExecuteInstruction;
 
 pub mod constants;
+pub mod dates;
 pub mod errors;
 pub mod events;
 pub mod hook;
@@ -14,6 +15,7 @@ pub mod math;
 pub mod payment_mint;
 pub mod share_account;
 pub mod state;
+pub mod telemetry;
 
 pub use instructions::*;
 
@@ -84,8 +86,8 @@ pub mod axel_v2 {
     }
 
     /// Fails a raise that has not been activated, opening refunds. Admin only.
-    pub fn cancel_raise(ctx: Context<CancelRaise>) -> Result<()> {
-        ctx.accounts.handle()
+    pub fn cancel_raise(ctx: Context<ManageProject>) -> Result<()> {
+        ctx.accounts.cancel_raise()
     }
 
     /// Burns the owner's shares of a failed raise and returns what they cost.
@@ -103,6 +105,54 @@ pub mod axel_v2 {
     /// Once the project is closed it also burns the shares left in the position.
     pub fn close_position(ctx: Context<ClosePosition>) -> Result<()> {
         ctx.accounts.handle()
+    }
+
+    /// The operator pays in one period's revenue, co-signed by the project's oracle as
+    /// attestor. The platform fee goes to the treasury, the rest to the holders pro rata.
+    pub fn deposit_revenue(
+        ctx: Context<DepositRevenue>,
+        params: DepositRevenueParams,
+    ) -> Result<()> {
+        ctx.accounts.handle(params, ctx.bumps.period)
+    }
+
+    /// Pays a position's unclaimed revenue to the owner's canonical payment account.
+    /// Anyone may trigger it for any owner.
+    pub fn claim(ctx: Context<Claim>) -> Result<()> {
+        ctx.accounts.handle()
+    }
+
+    /// Appends up to 20 daily records to the project's telemetry hash chain. Oracle only.
+    pub fn record_telemetry(
+        ctx: Context<RecordTelemetry>,
+        entries: Vec<TelemetryEntry>,
+    ) -> Result<()> {
+        ctx.accounts.handle(entries)
+    }
+
+    /// Pauses an operating project: no transfers or deposits, claims keep working. Admin only.
+    pub fn pause_project(ctx: Context<ManageProject>) -> Result<()> {
+        ctx.accounts.pause()
+    }
+
+    /// Resumes a paused project. Admin only.
+    pub fn resume_project(ctx: Context<ManageProject>) -> Result<()> {
+        ctx.accounts.resume()
+    }
+
+    /// Replaces the operator or the oracle of an operating or paused project. Admin only.
+    pub fn set_project_roles(
+        ctx: Context<ManageProject>,
+        operator: Option<Pubkey>,
+        oracle: Option<Pubkey>,
+    ) -> Result<()> {
+        ctx.accounts.set_roles(operator, oracle)
+    }
+
+    /// Closes an operating or paused project for good without moving any funds; revenue
+    /// stays claimable. Admin only.
+    pub fn close_project(ctx: Context<ManageProject>) -> Result<()> {
+        ctx.accounts.close()
     }
 
     /// Transfer hook of the share mints, invoked by Token-2022 on every share transfer.

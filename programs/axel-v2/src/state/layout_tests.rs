@@ -144,16 +144,19 @@ fn revenue_period_layout() {
         supply: 6,
         acc_after: 7,
         report_hash: [8; 32],
+        attestor: key(12),
         telemetry_head: [9; 32],
         kind: RevenueKind::Final,
         deposited_at: 10,
         bump: 11,
     };
     let data = serialize(&period);
-    assert_eq!(RevenuePeriod::SPACE, 174);
+    assert_eq!(RevenuePeriod::SPACE, 206);
     assert_eq!(data.len(), RevenuePeriod::SPACE);
-    assert_eq!(&data[8..40], key(1).as_ref());
+    assert_eq!(&data[8..40], key(1).as_ref(), "project at offset 8");
     assert_eq!(&data[40..44], &2u32.to_le_bytes());
+    assert_eq!(&data[132..164], key(12).as_ref(), "attestor");
+    assert_eq!(data[196], 1, "kind");
 }
 
 #[test]

@@ -6,20 +6,22 @@ import { eventsOf, expectError, expectEvent, expectOk } from "./helpers/assert";
 import { big, bn, type TxResult } from "./helpers/env";
 import {
   buy,
+  closeProject,
+  depositNet,
   INELIGIBLE_INVESTORS,
   marketEnv,
   newInvestor,
   openProject,
   operatingProject,
+  pauseProject,
+  transfer,
   type Market,
 } from "./helpers/fixtures";
 import {
   cancelRaiseIx,
   closePositionIx,
   openPositionIx,
-  ProjectState,
   refundIx,
-  transferSharesIx,
   type ProjectRef,
 } from "./helpers/instructions";
 import { assertInvariants } from "./helpers/invariants";
@@ -42,15 +44,12 @@ async function closePosition(market: Market, project: ProjectRef, owner: Keypair
   return market.env.send([await closePositionIx(project, owner.publicKey)], [owner]);
 }
 
-function transfer(market: Market, project: ProjectRef, from: Keypair, to: PublicKey, amount: bigint): TxResult {
-  return market.env.send([transferSharesIx(project, { from: from.publicKey, to }, amount)], [from]);
-}
 
 describe("open_position", () => {
   test("a sponsor onboards a verified wallet without its signature at the current accumulator", async () => {
     const market = await marketEnv();
     const { project } = await operatingProject(market);
-    await market.env.patch("project", project.address, { accPerShare: bn(7n * Q64) });
+    expectOk(await depositNet(market, project, 700n));
     const sponsor = market.env.newAccount();
     const wallet = await newInvestor(market);
     const walletLamports = market.env.balance(wallet.publicKey);
@@ -152,7 +151,7 @@ describe("open_position", () => {
       name: "paused",
       setup: async (market) => {
         const { project } = await operatingProject(market);
-        await market.env.patch("project", project.address, { state: ProjectState.paused });
+        expectOk(await pauseProject(market, project));
         return project;
       },
     },
@@ -160,7 +159,7 @@ describe("open_position", () => {
       name: "closed",
       setup: async (market) => {
         const { project } = await operatingProject(market);
-        await market.env.patch("project", project.address, { state: ProjectState.closed });
+        expectOk(await closeProject(market, project));
         return project;
       },
     },
@@ -211,15 +210,15 @@ describe("close_position", () => {
     assertInvariants(market.env, project, [bob.publicKey, carol.publicKey]);
   });
 
-  const running: Array<{ name: string; state: typeof ProjectState.operating | typeof ProjectState.paused }> = [
-    { name: "operating", state: ProjectState.operating },
-    { name: "paused", state: ProjectState.paused },
+  const running: Array<{ name: string; setup: (market: Market, project: ProjectRef) => Promise<void> }> = [
+    { name: "operating", setup: async () => {} },
+    { name: "paused", setup: async (market, project) => void expectOk(await pauseProject(market, project)) },
   ];
-  for (const { name, state } of running) {
+  for (const { name, setup } of running) {
     test(`a position that holds shares stays open while the project is ${name} (PositionNotEmpty)`, async () => {
       const market = await marketEnv();
       const { project, holders } = await operatingProject(market);
-      await market.env.patch("project", project.address, { state });
+      await setup(market, project);
 
       expectError(await closePosition(market, project, holders[0]), "PositionNotEmpty");
 
@@ -263,7 +262,7 @@ describe("close_position", () => {
     const market = await marketEnv();
     const { project, holders } = await operatingProject(market);
     const [alice, bob, carol] = holders;
-    await market.env.patch("project", project.address, { state: ProjectState.closed });
+    expectOk(await closeProject(market, project));
 
     const result = expectOk(await closePosition(market, project, alice));
 
@@ -278,8 +277,7 @@ describe("close_position", () => {
     const market = await marketEnv();
     const { project, holders } = await operatingProject(market);
     const [alice, bob] = holders;
-    // The accumulator moves the way a deposit of 2 base units per share would move it.
-    await market.env.patch("project", project.address, { accPerShare: bn(2n * Q64) });
+    expectOk(await depositNet(market, project, 200n));
     expectOk(transfer(market, project, alice, bob.publicKey, 50n));
     assert.equal(big(market.env.fetch("position", positionPda(project.address, alice.publicKey)).accrued), 100n);
 

@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
 import type { PublicKey } from "@solana/web3.js";
+import type BN from "bn.js";
 import { big, type TestEnv } from "./env";
 import type { ProjectRef } from "./instructions";
 import { positionPda } from "./pda";
 import { ata, readMint, TOKEN_2022_PROGRAM_ID, tokenBalance } from "./tokens";
 
+/** Revenue a position could claim right now: settled plus earned since its checkpoint. */
+export function pendingRevenue(position: { shares: BN; accCheckpoint: BN; accrued: BN }, acc: bigint): bigint {
+  return big(position.accrued) + ((big(position.shares) * (acc - big(position.accCheckpoint))) >> 64n);
+}
+
 /**
  * Checks the ledger invariants of the design against every open position of the project:
+ * I1 revenue owed to the holders <= deposited net - claimed <= revenue vault balance,
  * I2 share supply == sold - refunded - retired == sum of positions,
  * I3 each holder's share account balance == its position,
  * I4 escrow balance == (sold - refunded) * price while the escrow exists,
@@ -35,6 +42,12 @@ export function assertInvariants(env: TestEnv, project: ProjectRef, holders: Pub
       `I5: checkpoint of ${owner.toBase58()} <= accumulator`,
     );
   });
+  const acc = big(state.accPerShare);
+  const owed = positions.reduce((sum, position) => sum + pendingRevenue(position, acc), 0n);
+  const unclaimed = big(state.totalDepositedNet) - big(state.totalClaimed);
+  const vault = tokenBalance(env, project.revenue);
+  assert.ok(owed <= unclaimed, `I1: owed to holders ${owed} <= deposited - claimed ${unclaimed}`);
+  assert.ok(unclaimed <= vault, `I1: deposited - claimed ${unclaimed} <= revenue vault ${vault}`);
   if (env.exists(project.escrow)) {
     assert.equal(
       tokenBalance(env, project.escrow),

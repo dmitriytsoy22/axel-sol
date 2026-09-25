@@ -115,11 +115,15 @@ pub struct Refunded {
 pub struct RevenueDeposited {
     pub project: Pubkey,
     pub index: u32,
+    pub period_start: u32,
+    pub period_end: u32,
     pub gross: u64,
     pub fee: u64,
     pub net: u64,
     pub supply: u64,
     pub acc_after: u128,
+    pub report_hash: [u8; 32],
+    pub attestor: Pubkey,
     pub kind: RevenueKind,
 }
 
@@ -188,4 +192,6 @@ pub struct TelemetryRecorded {
 #[event]
 pub struct ProjectClosed {
     pub project: Pubkey,
+    /// Revenue deposited for holders and not yet claimed; it stays claimable.
+    pub unclaimed: u64,
 }

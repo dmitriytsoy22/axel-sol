@@ -23,12 +23,19 @@ import { big, bn, PROGRAM_ID, type TestEnv, type TxResult } from "./helpers/env"
 import {
   activate,
   buy,
+  closeProject,
+  deposit,
+  depositNet,
   INELIGIBLE_INVESTORS,
   marketEnv,
   newInvestor,
+  onboard,
   openProject,
   operatingProject,
+  pauseProject,
   setInvestorStatus,
+  splitRevenue,
+  transfer,
   type Market,
 } from "./helpers/fixtures";
 import {
@@ -46,6 +53,7 @@ import {
 import { assertInvariants } from "./helpers/invariants";
 import { extraAccountMetasAddress, investorAddress, investorPda, positionAddress, positionPda, projectPda } from "./helpers/pda";
 import { plain } from "./helpers/plain";
+import { prng } from "./helpers/random";
 import {
   ata,
   createAtaIx,
@@ -105,17 +113,6 @@ function ledger(market: Market, project: ProjectRef, owners: PublicKey[]): Array
   ]);
 }
 
-function transfer(market: Market, project: ProjectRef, from: Keypair, to: PublicKey, amount: bigint): TxResult {
-  return market.env.send([transferSharesIx(project, { from: from.publicKey, to }, amount)], [from]);
-}
-
-/** A verified wallet with an open position in the project, paid for by `payer`. */
-async function onboard(market: Market, project: ProjectRef, payer: Keypair, flags = 0): Promise<Keypair> {
-  const wallet = await newInvestor(market, { flags });
-  expectOk(market.env.send([await openPositionIx(project, { payer: payer.publicKey, owner: wallet.publicKey })], [payer]));
-  return wallet;
-}
-
 /** A share account of `owner` that is not its associated account; the mint creates it frozen. */
 function createSideAccount(market: Market, project: ProjectRef, owner: PublicKey, payer: Keypair): PublicKey {
   const account = Keypair.generate();
@@ -145,19 +142,6 @@ function forceThaw(env: TestEnv, address: PublicKey): void {
   const data = Buffer.from(account.data);
   data[TOKEN_ACCOUNT_STATE_OFFSET] = TOKEN_ACCOUNT_INITIALIZED;
   env.svm.setAccount(address, { ...account, data });
-}
-
-/** Deterministic pseudo-random numbers (mulberry32), so a failing sequence can be replayed. */
-function prng(seed: number): (below: bigint) => bigint {
-  let state = seed >>> 0;
-  const next32 = () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let x = state;
-    x = Math.imul(x ^ (x >>> 15), x | 1);
-    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-    return BigInt((x ^ (x >>> 14)) >>> 0);
-  };
-  return (below) => ((next32() << 32n) | next32()) % below;
 }
 
 describe("share transfers through the hook", () => {
@@ -195,13 +179,12 @@ describe("share transfers through the hook", () => {
     const market = await marketEnv();
     const { project, holders } = await operatingProject(market);
     const [alice, bob] = holders;
-    // The accumulator moves the way a deposit of 3 base units per share would move it.
-    await market.env.patch("project", project.address, { accPerShare: bn(3n * Q64) });
+    expectOk(await depositNet(market, project, 300n));
     const newcomer = await onboard(market, project, alice);
 
     expectOk(transfer(market, project, alice, bob.publicKey, 20n));
     expectOk(transfer(market, project, alice, newcomer.publicKey, 10n));
-    await market.env.patch("project", project.address, { accPerShare: bn(4n * Q64) });
+    expectOk(await depositNet(market, project, 100n));
     expectOk(transfer(market, project, bob, alice.publicKey, 0n));
 
     const settled = (owner: PublicKey) => {
@@ -537,9 +520,11 @@ describe("the ledger fails closed", () => {
     assert.deepEqual(ledger(market, project, [alice.publicKey]), [[50n, 50n]]);
   });
 
-  test("200 random transfers between moving accruals keep ledger, balances and every holder's revenue exact", async () => {
+  test("200 random transfers between deposits keep ledger, balances and every holder's revenue exact", async () => {
     const market = await marketEnv();
     const { project, holders } = await operatingProject(market, [40n, 25n, 15n, 12n, 8n]);
+    const { revenueFeeBps } = market.env.fetch("project", project.address);
+    mintTo(market.env, market.paymentMint, market.paymentProgram, market.issuer, market.operator.publicKey, 10n ** 13n);
     const wallets = [...holders, await onboard(market, project, holders[0]), await onboard(market, project, holders[0])];
     const owners = wallets.map((wallet) => wallet.publicKey);
     const model = wallets.map((wallet) => ({ shares: big(positionOf(market, project, wallet.publicKey).shares), checkpoint: 0n, accrued: 0n }));
@@ -553,10 +538,11 @@ describe("the ledger fails closed", () => {
     let distributed = 0n;
 
     for (let step = 0; step < steps; step++) {
-      const net = random(10_000_000_000n);
+      const gross = 1n + random(10_000_000_000n);
+      const { net } = splitRevenue(gross, revenueFeeBps);
       acc += (net << 64n) / 100n;
       distributed += net;
-      await market.env.patch("project", project.address, { accPerShare: bn(acc) });
+      expectOk(await deposit(market, project, gross));
       const senders = model.flatMap((holder, i) => (holder.shares > 0n ? [i] : []));
       const from = senders[Number(random(BigInt(senders.length)))];
       const to = (from + 1 + Number(random(BigInt(wallets.length - 1)))) % wallets.length;
@@ -633,7 +619,7 @@ describe("transfers outside Operating", () => {
       error: "InvalidState",
       setup: async (market) => {
         const { project, holders } = await operatingProject(market);
-        await market.env.patch("project", project.address, { state: ProjectState.paused });
+        expectOk(await pauseProject(market, project));
         return { project, from: holders[0], to: holders[1] };
       },
     },
@@ -642,7 +628,7 @@ describe("transfers outside Operating", () => {
       error: "InvalidState",
       setup: async (market) => {
         const { project, holders } = await operatingProject(market);
-        await market.env.patch("project", project.address, { state: ProjectState.closed });
+        expectOk(await closeProject(market, project));
         return { project, from: holders[0], to: holders[1] };
       },
     },

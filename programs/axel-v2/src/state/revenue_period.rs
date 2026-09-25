@@ -15,7 +15,11 @@ pub struct RevenuePeriod {
     /// Shares outstanding when the deposit was distributed.
     pub supply: u64,
     pub acc_after: u128,
+    /// SHA-256 of the period's P&L report, published off-chain.
     pub report_hash: [u8; 32],
+    /// Oracle key that co-signed the deposit, attesting the report.
+    pub attestor: Pubkey,
+    /// Project telemetry chain head at the time of the deposit.
     pub telemetry_head: [u8; 32],
     pub kind: RevenueKind,
     /// Actual deposit time, so backfilled periods stay visible.
