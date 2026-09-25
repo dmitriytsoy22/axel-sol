@@ -79,6 +79,7 @@ frontend/src/
   lib/solana/                   axel_v2 client: cluster config, PDAs, readers, math, instruction builders, error messages, vendored IDL (idl-v2/)
   lib/api/                      telemetry and indexer HTTP clients
   lib/demo/, lib/actions/       demo route logic (keys, limits, tokens, transactions) and the Actions handlers
+frontend/e2e/                   Playwright suite on a local stack: validator + demo seed + backend + next dev (e2e/stack/)
 Anchor.toml                     program IDs for localnet and devnet; provider cluster = devnet
 ```
 
@@ -324,7 +325,7 @@ The frontend runs on `axel_v2`. The v1 client and IDL were removed from it; with
 It uses:
 - Next.js 14 App Router, React 18, TypeScript and Tailwind.
 - `next-intl`. Locales are `en` (default, no URL prefix), `ru` and `kk`, so for example `/ru/dashboard`.
-- Wallet Adapter with Phantom and Solflare and `autoConnect`. The cluster, RPC and program ID come from the environment ([api.md](api.md#frontend-environment)).
+- Wallet Adapter with Phantom and Solflare and `autoConnect`. The cluster, RPC and program ID come from the environment ([api.md](api.md#frontend-environment)). A build with `NEXT_PUBLIC_E2E=1` adds "E2E Burner" (`lib/solana/e2eBurnerWallet.ts`), which signs with a key in `localStorage`, for the end-to-end suite only and never on mainnet.
 - The client in `lib/solana/` ([api.md](api.md#typescript-client-frontend-axel_v2)). Amounts are `bigint` base units of the project's payment token and are shown with its symbol and decimals (tKZT, USDC), never in SOL; the SOL balance in the wallet menu is for fees.
 
 | Route | What it does | Chain access |

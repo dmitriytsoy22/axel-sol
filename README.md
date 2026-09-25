@@ -271,6 +271,8 @@ To run the judge demo routes on that seeded chain, set `NEXT_PUBLIC_DEMO_ACCESS=
 
 Checks, as run in CI: `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`.
 
+End-to-end, also in CI: `npm run test:e2e` starts a local validator with `axel_v2`, the demo seed, the backend and `next dev`, then runs the judge path (demo access → buy in a raise → shares → simulated month → claim → verify → solvency) and the KYC refusal in Chromium, with a burner wallet the app offers only in a test build. It needs `anchor build`, the Agave CLI on PATH, `npm ci` in `backend/` and `npx playwright install chromium`; see [CONTRIBUTING.md](CONTRIBUTING.md#end-to-end-tests).
+
 **Backend** (optional: telemetry, KYC and event history)
 
 ```bash
@@ -349,12 +351,13 @@ axel-sol/
 │   ├── src/lib/solana/             # axel_v2 client: config, PDAs, readers, math, instructions, errors, idl-v2/ (vendored)
 │   ├── src/lib/demo/, lib/actions/ # demo keys, limits, tokens and transactions; Solana Actions handlers
 │   ├── scripts/demo-env.mjs        # prints the demo routes' keys for a cluster the seed filled
+│   ├── e2e/                        # Playwright suite; e2e/stack/ starts validator, seed, backend and next dev
 │   ├── src/fonts/, public/images/  # self-hosted fonts; car and city photos with credits
 │   ├── messages/                   # en.json, ru.json, kk.json
 │   └── design.md                   # design direction, tokens and page rules
 ├── docs/                           # product, architecture, api, v2, roadmap; planning/ and ru/ (historical)
 ├── assets/                         # logo, hero, screenshots
-├── .github/workflows/ci.yml        # frontend, backend and programs CI
+├── .github/workflows/ci.yml        # frontend, backend, programs and end-to-end CI
 ├── Anchor.toml · Cargo.toml · rust-toolchain.toml · package.json
 └── LICENSE · CONTRIBUTING.md · SECURITY.md
 ```
@@ -402,6 +405,7 @@ Done so far:
 - Built the judge demo path and Blinks: `/api/demo` routes (signed access with demo KYC, test tenge and SOL; shares from the desk through the transfer hook; simulated months deposited by the operator and attested by the oracle; limits in Upstash Redis; optional Turnstile), a `/demo` page that walks a judge through buy → shares → payout → claim → verify → solvency, and spec-compliant invest and claim Actions with `actions.json`. Checked end to end in a browser against a seeded local chain, with a wallet that really signs.
 - Built the v2 screens: raise progress with a soft-cap marker, live escrow balance and a state timeline; a refund dialog that settles a failed raise first; in-browser verification of each car's telemetry chain, income reports and purchase papers; a live Proof of solvency page; the recovery flows (proposal, the owner's veto, execution); and the console split into platform admin, operator and KYC. Checked in EN / RU / KK at phone and desktop widths against a seeded local chain.
 - Wrote the v2 demo seed ([`scripts/seed-devnet`](scripts/seed-devnet/README.md)). From a seed string it plans a fictional fleet in every project state: backfilled telemetry, attested deposits, claims, transfers, a failed raise with refunds and a share recovery. Every economic figure is labeled as an assumption. The executor is idempotent and resumable, the dry run prices the SOL budget with live rent, and a proof-of-solvency check verifies I1–I5 for every project. It ran end to end on a local validator; devnet is still to come.
+- Added a Playwright end-to-end suite ([CONTRIBUTING.md](CONTRIBUTING.md#end-to-end-tests)) that runs the judge path and a KYC refusal against the real app, backend and `axel_v2` on a local validator seeded with the demo fleet. The claim is checked three ways: the page, the wallet's balance on the validator, and the backend's event index. It runs in CI.
 
 In progress during the hackathon (**planned, not done yet**):
 - [ ] Public frontend deployment on devnet (the judge demo path and Blinks are built and checked on a local chain)
@@ -428,6 +432,7 @@ In progress during the hackathon (**planned, not done yet**):
 - [x] Frontend v2 screens: in-browser verification of telemetry and reports, Proof of solvency, recovery flows, console split by role
 - [x] Judge demo path and Solana Actions (Blinks), checked on a local chain
 - [x] v2 demo seed with a proof-of-solvency check, run on a local validator
+- [x] End-to-end tests of the judge path and the KYC refusal: app, backend and program on a seeded local validator, in CI
 - [ ] Public deployment on devnet
 - [ ] End-to-end devnet demo, including a holder-to-holder transfer
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key

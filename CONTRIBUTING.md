@@ -33,7 +33,7 @@ cp .env.local.example .env.local   # devnet RPC and program ID are prefilled
 npm run dev                         # http://localhost:3000
 npm test                            # Vitest
 npm run test:cov                    # Vitest with coverage
-npm run lint                        # next lint
+npm run lint                        # next lint over src/ and e2e/
 npx tsc --noEmit                    # type check
 npm run build                       # production build
 ```
@@ -63,6 +63,46 @@ npm run start:prod    # node dist/main
 Cars come from `FLEET_CONFIG`. A `simulated` car needs no credentials and is published with `data_origin: "simulated"`, while a `yandex_fleet` car needs the `YANDEX_*` credentials. `backend/.env.example` documents every variable the backend reads.
 
 Backend tests boot the real `AppModule` (`src/testing/test-app.ts`) and replace only the outside world: the Solana RPC with `FakeRpc`, which checks signatures and applies `set_investor` with the IDL coder, the program's history and log subscription with `FakeLedger`, whose logs carry events encoded by the IDL coder, the Sumsub API with `FakeSumsub`, which checks request signatures, and the clock. The indexer is off in `createTestApp` unless a test sets `INDEXER_ENABLED=true`. `npm run test:localnet` (`*.localnet.ts`) starts its own `solana-test-validator` on free ports with `target/deploy/axel_v2.so` and sends real transactions; it is not part of `npm test` or CI. The v2 IDL is vendored in `backend/src/solana/idl/`; `npm run export-idl` in the root refreshes it with the frontend copy.
+
+## End-to-end tests
+
+`frontend/e2e` is a Playwright suite that drives the app, the backend and `axel_v2` together, with nothing faked. `npm run test:e2e` in `frontend/` first starts a local stack (`e2e/stack/global-setup.ts`), from scratch on every run:
+
+1. `solana-test-validator` from an empty ledger, with `target/deploy/axel_v2.so` loaded as an upgradeable program.
+2. The demo seed at `--scale tiny` with a random `DEMO_SEED_SECRET`, while `npm run build` compiles the backend. The seed takes about two minutes, most of it waiting for the failed raise's deadline.
+3. The demo routes' keys from `frontend/scripts/demo-env.mjs`, and 5 SOL airdropped to the demo faucet.
+4. A file server for the seed's published files, the backend with the event indexer, and `next dev` with `NEXT_PUBLIC_E2E=1`. The setup waits until the indexer has caught up with the seeded chain and `next dev` has compiled every page the tests open.
+
+| Service | URL |
+| :--- | :--- |
+| Validator RPC (websocket on 18900, faucet on 19900) | `http://127.0.0.1:18899` |
+| Frontend (`next dev`) | `http://127.0.0.1:13190` |
+| Backend | `http://127.0.0.1:13411` |
+| Published car data | `http://127.0.0.1:13101` |
+
+The ports are fixed and chosen away from the tools' defaults, so the suite runs next to a validator on 8899 or a dev server on 3000. If one of them is taken, the setup stops and names it.
+
+```bash
+anchor build -p axel_v2                  # target/deploy/axel_v2.so; Agave CLI must be on PATH
+npm --prefix backend ci
+cd frontend
+npm ci
+npx playwright install chromium
+npm run test:e2e                         # about 3 minutes, most of it the seed
+```
+
+The seed installs its own dependencies (`npm run seed:deps`). The tests:
+
+- `judge-path.spec.ts`, the judge path on `/demo`: connect a wallet, get demo access, buy a share in the open raise, receive the desk's shares of the Demo Fleet car, simulate a month and claim it, verify that car's published data in the browser, and open the proof of solvency. The claim is also checked outside the app: the wallet's tKZT balance on the validator grew by exactly the amount the page showed, and the backend's `GET /positions/:owner/claims` recorded that amount.
+- `kyc-required.spec.ts`: a wallet without a KYC record sees a disabled "Wallet not verified" button and no way to buy, and the invest Blink refuses to build a purchase for it.
+
+**Wallet.** A build with `NEXT_PUBLIC_E2E=1` adds "E2E Burner" to the wallet picker, on any cluster but mainnet (`lib/solana/e2eBurnerWallet.ts`). It signs transactions and messages with the secret key stored in `localStorage` under `axel:e2e-burner-secret-key`, or creates one there, so a reload stays the same wallet. Each test stores a new key before the app loads and picks the burner in the wallet dialog, so every test has a wallet of its own. Never set `NEXT_PUBLIC_E2E` on a deployment.
+
+**Isolation.** Nothing carries over between runs: a new ledger, new keys, a new backend database, and demo limits (3 access grants per IP address per day, one simulated month a minute) that live in the memory of the new dev server. Those limits also make the judge path one scenario per run, so `--repeat-each` does not apply to it. Retries are off; a red test is a bug to find, not to rerun.
+
+**CI.** The `e2e` job in `.github/workflows/ci.yml` runs after the programs job, with the `axel_v2.so` that job built, the Agave CLI and Node 22. When it fails it uploads the Playwright report and the stack's logs as the `e2e-report` artifact.
+
+**When it fails.** Every process logs to `frontend/e2e/.stack/logs/` (`validator`, `seed`, `backend`, `frontend`, …), which stays after the run. The ledger is deleted at the end of the run, or when the next run starts if it was interrupted. Playwright's HTML report is in `frontend/playwright-report/`, with a trace and screenshot of each failed test. Ctrl-C stops the whole stack. `next dev` writes to `frontend/.next`, so run `npm run build` again before `npm start`.
 
 ## Programs
 

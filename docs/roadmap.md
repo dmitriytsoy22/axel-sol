@@ -42,6 +42,7 @@ Done:
 - [x] Moved the frontend to the v2 program: client, hooks, amounts in the payment token, the six project states, KYC records, escrowed buys, refunds, claims, transfers and a role-based console ([architecture.md](architecture.md#frontend))
 - [x] Frontend v2 screens: soft-cap marker, live escrow, state timeline, refund dialog, in-browser verification of telemetry and reports, Proof of solvency, recovery flows (proposal, veto, execution), console split by role, demo data banner
 - [x] Judge demo path (`/demo` and the `/api/demo` routes: signed demo access, shares from the desk, simulated months, limits, optional Turnstile) and Solana Actions for investing and claiming ([api.md](api.md#judge-demo-api))
+- [x] End-to-end tests (Playwright, in CI) of the judge path and a KYC refusal, against the app, the backend and `axel_v2` on a local validator seeded with the demo fleet ([CONTRIBUTING.md](../CONTRIBUTING.md#end-to-end-tests))
 
 Next steps. Each one addresses a limitation listed in [architecture.md](architecture.md#known-limitations):
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key (program upgrade)

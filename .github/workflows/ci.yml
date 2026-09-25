@@ -126,6 +126,14 @@ jobs:
       - name: Build programs
         run: anchor build
 
+      - name: Keep the axel_v2 program for the e2e job
+        uses: actions/upload-artifact@v7
+        with:
+          name: axel-v2-program
+          path: target/deploy/axel_v2.so
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Check formatting of axel-v2
         run: cargo fmt -p axel-v2 --check
 
@@ -176,3 +184,68 @@ jobs:
             echo "- ELF size: ${size} bytes"
             echo "- Deploy rent, upper estimate (size + 128) x 6960 lamports: ${rent} lamports ($(awk "BEGIN { printf \"%.3f\", ${rent} / 1e9 }") SOL)"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  e2e:
+    name: End-to-end (Playwright, app and backend on a seeded local validator)
+    needs: programs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AGAVE_VERSION: 2.3.13
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache Agave CLI
+        id: agave-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/share/solana/install
+          key: agave-${{ runner.os }}-${{ env.AGAVE_VERSION }}
+
+      - name: Install Agave CLI
+        if: steps.agave-cache.outputs.cache-hit != 'true'
+        run: sh -c "$(curl -sSfL "https://release.anza.xyz/v${AGAVE_VERSION}/install")"
+
+      - name: Add the Agave CLI to PATH
+        run: echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Use the axel_v2 program the programs job built
+        uses: actions/download-artifact@v8
+        with:
+          name: axel-v2-program
+          path: target/deploy
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+            scripts/seed-devnet/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm --prefix frontend ci --no-audit --no-fund
+          npm --prefix backend ci --no-audit --no-fund
+          npm --prefix scripts/seed-devnet ci --no-audit --no-fund
+
+      - name: Install Chromium for Playwright
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Upload the Playwright report and the stack's logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            frontend/playwright-report
+            frontend/e2e/.stack/logs
+          include-hidden-files: true
+          retention-days: 7

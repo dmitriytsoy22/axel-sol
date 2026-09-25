@@ -9,6 +9,7 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import type { ConnectionConfig } from '@solana/web3.js';
 import { SOLANA_RPC_URL } from '@/lib/solana/connection';
+import { E2E_BURNER_ENABLED, E2eBurnerWalletAdapter } from '@/lib/solana/e2eBurnerWallet';
 
 import '@/styles/wallet-modal.css';
 
@@ -23,7 +24,14 @@ interface WalletProviderProps {
 }
 
 const WalletProvider = ({ children }: WalletProviderProps): JSX.Element => {
-  const wallets = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], []);
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+      ...(E2E_BURNER_ENABLED ? [new E2eBurnerWalletAdapter()] : []),
+    ],
+    [],
+  );
 
   return (
     <ConnectionProvider endpoint={SOLANA_RPC_URL} config={CONNECTION_CONFIG}>
