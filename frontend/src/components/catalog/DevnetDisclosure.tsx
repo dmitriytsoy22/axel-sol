@@ -3,7 +3,7 @@ import { useTranslations } from 'next-intl';
 import { ArrowUp, ArrowUpRight } from 'lucide-react';
 import { buttonClasses } from '@/components/ui/Button';
 import { DOCS_URL } from '@/components/layout/constants';
-import { ON_TEST_NETWORK } from '@/lib/network';
+import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
 
 const RISKS = ['riskIncome', 'riskReport', 'riskExit', 'riskValue'] as const;
 
@@ -22,10 +22,12 @@ export function DevnetDisclosure(): JSX.Element {
               id="disclosure-title"
               className="mt-3 font-heading text-h3 font-medium text-foreground md:text-h2"
             >
-              {ON_TEST_NETWORK ? t('devnetTitle') : t('risksTitle')}
+              {ON_TEST_NETWORK ? t('devnetTitle', { network: NETWORK_NAME }) : t('risksTitle')}
             </h2>
             {ON_TEST_NETWORK && (
-              <p className="mt-4 max-w-[48ch] text-body text-muted-foreground">{t('devnetBody')}</p>
+              <p className="mt-4 max-w-[48ch] text-body text-muted-foreground">
+                {t('devnetBody', { network: NETWORK_NAME })}
+              </p>
             )}
             <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-4">
               <a href="#vehicles" className={buttonClasses({ size: 'lg' })}>
