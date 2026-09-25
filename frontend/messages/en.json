@@ -267,6 +267,8 @@
   },
   "Admin": {
     "overline": "Operator console",
+    "guardTitle": "Manage a car's project",
+    "guardLead": "For the operator who runs the car: wallet approvals, income deposits and the sale status, each signed on Solana.",
     "connectTitle": "Connect the operator wallet",
     "connectBody": "This console manages a car's project: approving wallets, depositing income and pausing sales. Only the wallet that created the project can sign these.",
     "connectPointsTitle": "With the operator wallet",

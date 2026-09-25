@@ -19,7 +19,10 @@ export function MobileInvestBar({ project, approval, onBuy }: MobileInvestBarPro
   const locale = useLocale();
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-sticky border-t border-border bg-background px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:hidden">
+    <div
+      data-mobile-invest-bar
+      className="fixed inset-x-0 bottom-0 z-sticky border-t border-border bg-background px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:hidden"
+    >
       <div className="flex items-center gap-4">
         {/* Below 360px the button needs the whole row; the price is in the panel above. */}
         <p className="hidden shrink-0 min-[360px]:block">

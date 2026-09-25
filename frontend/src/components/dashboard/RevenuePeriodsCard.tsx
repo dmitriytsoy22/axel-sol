@@ -72,9 +72,10 @@ export function RevenuePeriodsCard({
                   {formatDate(item.period.depositedAt, locale)}
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              {/* Once the row wraps on a phone, amounts keep to the right edge so they line up. */}
+              <div className="flex w-full items-center gap-4 sm:w-auto">
                 <Pill tone={status.tone}>{t(status.key)}</Pill>
-                <span className="min-w-[6rem] text-right font-semibold tabular-nums text-foreground">
+                <span className="ml-auto min-w-[6rem] text-right font-semibold tabular-nums text-foreground sm:ml-0">
                   +{formatSol(item.claimableShare, locale)}
                 </span>
                 {item.status === 'claimable' && <ClaimButton period={item} onSuccess={onClaimed} />}

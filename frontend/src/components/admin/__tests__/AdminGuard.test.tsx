@@ -56,6 +56,9 @@ describe('AdminGuard', () => {
     renderGuard({ isAdmin: false, isLoading: false }, { connected: false });
 
     expect(
+      screen.getByRole('heading', { level: 1, name: "Manage a car's project" }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole('heading', { name: 'Connect the operator wallet' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Connect wallet' })).toBeInTheDocument();
@@ -66,7 +69,10 @@ describe('AdminGuard', () => {
     renderGuard({ isAdmin: false, isLoading: false }, { connected: true });
 
     expect(
-      screen.getByRole('heading', { name: "This wallet isn't the operator" }),
+      screen.getByRole('heading', { level: 1, name: "Manage a car's project" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: "This wallet isn't the operator" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/G67x…kZzm didn't create this car's project/)).toBeInTheDocument();
     expect(screen.queryByText('Admin Content')).not.toBeInTheDocument();

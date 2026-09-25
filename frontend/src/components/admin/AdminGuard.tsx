@@ -6,6 +6,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { buttonClasses } from '@/components/ui/Button';
 import { Link } from '@/i18n/routing';
 import { shortAddress } from '@/lib/format';
@@ -36,10 +37,13 @@ export function AdminGuard({ isAdmin, isLoading, children }: AdminGuardProps) {
     );
   }
 
+  // Same opening as Portfolio and Payouts, so a visitor sees which page this is first.
+  const header = <PageHeader overline={t('overline')} title={t('guardTitle')} lead={t('guardLead')} />;
+
   if (!connected) {
     return (
-      <div className="page-container section-y">
-        <h1 className="sr-only">{t('overline')}</h1>
+      <div className="page-container flex flex-col gap-10 pb-24 pt-10 md:gap-12 md:pt-14">
+        {header}
         <ConnectWalletPanel
           title={t('connectTitle')}
           body={t('connectBody')}
@@ -52,9 +56,10 @@ export function AdminGuard({ isAdmin, isLoading, children }: AdminGuardProps) {
 
   if (!isAdmin) {
     return (
-      <div className="page-container section-y">
+      <div className="page-container flex flex-col gap-10 pb-24 pt-10 md:gap-12 md:pt-14">
+        {header}
         <Notice
-          as="h1"
+          as="h2"
           title={t('accessDenied')}
           body={t('accessDeniedBody', {
             address: publicKey ? shortAddress(publicKey.toBase58()) : '',

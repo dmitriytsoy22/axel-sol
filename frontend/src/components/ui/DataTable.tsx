@@ -98,7 +98,9 @@ export function DataTable<T>({
     <div
       className={`w-full overflow-hidden rounded-card border border-border bg-card shadow-sm ${className}`}
     >
-      <div className="hidden overflow-x-auto sm:block">
+      {/* relative: screen-reader-only text inside cells is absolutely positioned; without a
+          containing block here it escapes the scroller and widens the whole page. */}
+      <div className="relative hidden overflow-x-auto sm:block">
         <table className="w-full whitespace-nowrap text-left text-small">
           <thead className="border-b border-border bg-muted">
             <tr>
@@ -117,16 +119,18 @@ export function DataTable<T>({
                           : 'descending'
                         : undefined
                     }
-                    className={`px-4 py-3 font-medium text-muted-foreground first:pl-6 last:pr-6 ${alignRight ? 'text-right' : ''}`}
+                    // Baseline alignment keeps every header label on one line of text, whether
+                    // its sort icon sits before it (right-aligned numbers) or after it.
+                    className={`px-4 py-3 align-baseline font-medium text-muted-foreground first:pl-6 last:pr-6 ${alignRight ? 'text-right' : ''}`}
                   >
                     {col.sortable ? (
                       <button
                         type="button"
                         onClick={() => handleSort(key)}
-                        className={`inline-flex items-center gap-1.5 rounded-control transition-colors duration-fast ease-move hover:text-foreground ${alignRight ? 'flex-row-reverse' : ''}`}
+                        className={`inline-flex items-baseline gap-1.5 rounded-control transition-colors duration-fast ease-move hover:text-foreground ${alignRight ? 'flex-row-reverse' : ''}`}
                       >
                         {col.header}
-                        <span aria-hidden="true" className="flex flex-col">
+                        <span aria-hidden="true" className="flex flex-col self-center">
                           <ChevronUp
                             className={`-mb-1 h-3 w-3 ${isSorted && sortConfig.direction === 'asc' ? 'text-foreground' : 'text-subtle-foreground/50'}`}
                             strokeWidth={2}

@@ -155,6 +155,20 @@
     background-color: oklch(var(--background));
   }
 
+  /* No one-word last lines: headings balance their lines, running text avoids orphans.
+     Browsers without support keep the normal wrap. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p,
+  li,
+  dd {
+    text-wrap: pretty;
+  }
+
   ::selection {
     background: oklch(var(--cyan-500) / 0.24);
     color: oklch(var(--foreground));
@@ -233,6 +247,15 @@
   @media (min-width: 768px) {
     .section-y {
       padding-block: var(--section-py);
+    }
+  }
+
+  /* Below md the asset page pins its purchase bar to the bottom of the screen. The page
+     ends with room for it (padding, 48px button, border), so the bar never covers the
+     last line of the footer. */
+  @media (max-width: 767px) {
+    body:has([data-mobile-invest-bar]) {
+      padding-bottom: calc(0.75rem + 3rem + 1px + max(0.75rem, env(safe-area-inset-bottom)));
     }
   }
 }

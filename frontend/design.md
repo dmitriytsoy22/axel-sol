@@ -164,8 +164,11 @@ Rules: at most three sizes per screen region; body text never below 16 px, input
 16 px (iOS zoom). Money, percentages, dates and counters use `tabular-nums`. Text columns are
 capped at 65ch.
 
-Numbers are formatted with `Intl.NumberFormat` in the `ru-KZ` / `kk-KZ` / `en` locale with the
-narrow currency symbol, so Russian and Kazakh read "1 250 000 ₸" and English reads "₸1,250,000".
+Numbers are formatted with `Intl.NumberFormat` in the `ru-KZ` locale for Russian and Kazakh
+and `en-US` for English, with the narrow currency symbol, so Russian and Kazakh read
+"1 250 000 ₸" and English reads "₸1,250,000". Kazakh dates are spelled from the CLDR pattern in
+`lib/format.ts` ("2026 ж. 7 сәу."), because desktop Chrome has no Kazakh formatting data
+(decision 19).
 v1 devnet data is in SOL; v2 moves prices to the tenge stablecoin (tKZT on devnet).
 
 ### Spacing, layout, radii, elevation
@@ -204,8 +207,9 @@ buttons carry an `aria-label` and a 44×44 hit area.
 
 - Animate only `transform` and `opacity`. No `transition: all`.
 - Reveal is CSS only: add the `reveal` class to at most 2–4 hero blocks. The keyframes run only
-  while `<html data-reveal>` is set by the inline gate in `app/[locale]/layout.tsx`, which sets
-  it only when `document.visibilityState === 'visible'` and clears it after 1.5 s. Without the
+  while `<html data-reveal>` is set by the inline gate (`lib/revealGate.ts`, inlined by
+  `app/[locale]/layout.tsx`), which sets it only when `document.visibilityState === 'visible'`
+  and clears it after 1.5 s. Without the
   flag, content is plainly visible. This avoids the framer-motion `useInView` bug that leaves
   content at opacity 0 in WKWebView. No scroll-triggered animation, no framer-motion reveals.
 - No count-up tickers on money: financial numbers appear exact and static.
@@ -213,13 +217,17 @@ buttons carry an `aria-label` and a 44×44 hit area.
 
 ### Mobile rules
 
-- Breakpoints: Tailwind defaults (sm 640, md 768, lg 1024, xl 1280), `min-width` only.
+- Breakpoints: Tailwind sm 640, md 768 and lg 1024, `min-width` only. One local exception:
+  the asset page's bottom bar hides its price below 360 px (`min-[360px]`), since at 320 px
+  the 48 px button needs the whole row.
 - Type steps down one level below `md`: hero `text-h2` (40) instead of `text-display`, section
   headings `text-h3` (32) instead of `text-h2`.
 - Sections: 56 px vertical padding, 24 px gutters.
 - Hero: art-directed photo, `hero/almaty-night-traffic-portrait.webp` below `md`.
 - Tables become stacked rows of label and value (the holdings table already does this).
-- The invest action on the asset page becomes a sticky bottom bar with a 48 px button.
+- The invest action on the asset page becomes a sticky bottom bar with a 48 px button. The
+  body reserves the bar's height below `md` (`[data-mobile-invest-bar]` in `globals.css`), so
+  the bar never covers the end of the footer.
 - Tap targets are at least 44×44 with 8 px between them.
 
 ## Structure
@@ -344,8 +352,8 @@ product rule, never a placeholder.
     no longer used for notes; photo notes and badges use `text-small` (14 px). 12 px survives
     only as `text-overline` (uppercase, 600, +0.08em). ← guardrails checklist "Text size:
     minimums".
-13. **Numbers follow the reader's locale.** `src/lib/format.ts` formats with `en-US`, `ru-KZ`
-    and `kk-KZ`: "1,250.5 SOL" in English, "1 250,5 SOL" in Russian and Kazakh.
+13. **Numbers follow the reader's locale.** `src/lib/format.ts` formats with `en-US` and
+    `ru-KZ`: "1,250.5 SOL" in English, "1 250,5 SOL" in Russian and Kazakh (see decision 19).
 
 14. **A calculator, not a projection.** The asset page used to show a "Revenue projection" with
     made-up income ($800 a month) and made-up specs (Comfort+, 2.0L Hybrid, White). Both are
@@ -368,6 +376,27 @@ product rule, never a placeholder.
 18. **Tenge for off-chain money, SOL for on-chain money.** Telemetry income (reported in tenge
     by the backend) is formatted with `formatTenge`; it used to show a dollar sign. Chain
     amounts stay in SOL until v2 moves them to tKZT.
+19. **Kazakh formatting does not depend on the browser.** Desktop Chrome reports `kk-KZ` as
+    supported but ships no Kazakh data, so it printed "0.1 SOL", "1,250.5" and dates like
+    "2026 M04 7" to Kazakh readers; Node and Safari were fine, which is why unit tests missed
+    it. Kazakh now uses the `ru-KZ` number marks (identical to CLDR Kazakh), keeps the Kazakh
+    "13%", and spells dates from the CLDR Kazakh pattern with its month abbreviations. A test
+    simulates a browser without Kazakh data. ← review rubric "stress states: only real
+    content", decision 13.
+20. **The wallet picker is ours too.** The adapter's modal was a navy dialog in DM Sans that
+    loaded the font from `fonts.googleapis.com` on every page. `src/styles/wallet-modal.css`
+    replaces the adapter stylesheet: a paper dialog on the theme tokens, Onest, 44 px close
+    target, a bottom sheet below 640 px. A test fails if any imported stylesheet loads
+    anything remotely. ← checklist "fonts: families and loading", anti-slop "mixed assets",
+    this file's shared states (modal).
+21. **Every working screen opens the same way.** The operator console's disconnected and
+    wrong-wallet states had only a hidden H1; they now open with the same page header as
+    Portfolio and Payouts (overline, serif H1, lead). ← review rubric "consistency" and
+    "hierarchy".
+22. **No one-word last lines.** Headings use `text-wrap: balance` and running text
+    `text-wrap: pretty` (base layer), which removed orphans such as "taxi" at 320 px and
+    "public" and "payout" at 1440 px. Browsers without support keep the normal wrap.
+    ← anti-slop "typographic dirt".
 
 ## Constraints
 
@@ -386,6 +415,11 @@ product rule, never a placeholder.
 - `src/app/opengraph-image.tsx` draws the social card with static TTF instances of the site
   fonts (`src/fonts/og/`), since Satori cannot read WOFF2. `src/middleware.ts` excludes
   `/opengraph-image` so the i18n rewrite does not turn it into a 404.
+- Screen-reader text inside a horizontal scroller needs a positioned scroller: the
+  `sr-only` label of an Explorer link escaped the payouts table's `overflow-x-auto` and
+  widened the page by 20 px at 640–767 px until the scroller became `relative`.
+- The adapter's wallet modal title ("Connect a wallet on Solana to continue") is hard-coded
+  in English by `@solana/wallet-adapter-react-ui`; translating it needs a custom modal.
 - Screenshots: `Google Chrome --headless=new` clamps the window to at least 500 px on macOS, so
   a 390 px capture is really a crop of a 500 px layout. Use Playwright's
   `chrome-headless-shell` for mobile widths.
@@ -403,3 +437,9 @@ product rule, never a placeholder.
   and mobile purchase bar); dashboard, payouts and operator console moved to tokens with
   designed disconnected, loading, empty and error states; modal, toast, table, transaction
   status and error boundary restyled; decisions 14–18 added; last legacy alias removed.
+- 2026-09-25: Stage 4, guardrails. Mechanical checklist at 320/390/768/1024/1440 on every page
+  (disconnected and connected, EN/RU/KK) and three review passes. Fixed: wallet picker restyled
+  and its Google Fonts request removed, console header, table header baseline, page overflow
+  from a table at 640–767 px, bottom bar over the footer, payout amounts aligned on phones,
+  browser-independent Kazakh numbers and dates, balanced headings. Decisions 19–22 added; the
+  reveal gate moved to `lib/revealGate.ts` with tests that keep the WKWebView opacity bug out.

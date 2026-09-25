@@ -11,7 +11,7 @@
 
 ---
 
-![AXEL catalog showing two tokenized Toyota Camry projects read live from Solana devnet](assets/hero.png)
+![AXEL home page: an Almaty night street behind the headline, with cars listed, shares sold and payout periods read live from Solana devnet](assets/hero.png)
 
 ---
 
@@ -197,7 +197,7 @@ Both screenshots show live devnet data in the English locale.
 
 | Catalog | Asset page |
 |---------|------------|
-| ![Catalog with both devnet projects, sale progress and price per share](assets/screenshots/01-catalog.png) | ![Asset page for mint Aj9q…37YU with VIN, 13 of 100 shares sold and Explorer links](assets/screenshots/02-asset-detail.png) |
+| ![The fleet: both devnet projects with price per share, payout periods and sale progress](assets/screenshots/01-catalog.png) | ![Asset page for mint Aj9q…37YU with VIN, 13 of 100 shares sold, the purchase panel and Explorer links](assets/screenshots/02-asset-detail.png) |
 
 ---
 
