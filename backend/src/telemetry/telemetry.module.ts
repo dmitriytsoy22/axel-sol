@@ -8,6 +8,5 @@ import { TelemetryController } from './telemetry.controller';
   imports: [ScheduleModule.forRoot(), YandexModule],
   providers: [TelemetryCronService],
   controllers: [TelemetryController],
-  exports: [TelemetryCronService],
 })
 export class TelemetryModule {}

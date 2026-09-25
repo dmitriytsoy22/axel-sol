@@ -12,7 +12,7 @@ Issues and pull requests are welcome. For security problems, follow [SECURITY.md
 | `tests-v2/` | v2 program tests (`node:test`) on LiteSVM, with their own `package.json` |
 | `scripts/` | `init-project.ts` (creates a v1 project on a cluster), `generate-clients.ts` (Codama client of the v2 program into `sdk/axel-v2`) |
 | `sdk/axel-v2/` | Generated TypeScript client of `axel_v2` (`@solana/kit`), with tests against the IDL |
-| `backend/` | NestJS service: Yandex Fleet telemetry oracle and Sumsub KYC webhook |
+| `backend/` | NestJS service: Yandex Fleet telemetry job, wallet sign-in and Sumsub KYC webhook (v2 `set_investor`) |
 | `frontend/` | Next.js 14 app |
 
 ## Prerequisites
@@ -46,15 +46,18 @@ The program IDLs are vendored in `frontend/src/lib/solana/idl/` (v1: `axel.json`
 
 ```bash
 cd backend
-npm install
+npm ci
 cp .env.example .env
 npm run start:dev     # watch mode; GET http://localhost:3001/health
+npm run lint          # ESLint with type-aware typescript-eslint rules
+npm test              # Jest: unit specs and HTTP specs of the whole app
 npm run build         # compile to dist/
 npm run start:prod    # node dist/main
-npx tsc --noEmit      # type check
 ```
 
 Without Yandex Fleet credentials the telemetry job uses simulated data. `backend/.env.example` documents every variable the backend reads.
+
+Backend tests boot the real `AppModule` (`src/testing/test-app.ts`) and replace only the outside world: the Solana RPC with `FakeRpc`, which checks signatures and applies `set_investor` with the IDL coder, the Sumsub API with `FakeSumsub`, which checks request signatures, and the clock. The v2 IDL is vendored in `backend/src/solana/idl/`; `npm run export-idl` in the root refreshes it with the frontend copy.
 
 ## Programs
 

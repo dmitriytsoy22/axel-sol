@@ -2,16 +2,18 @@
 
 AXEL exposes two interfaces:
 
-1. **A small HTTP backend** with three endpoints, in `backend/`.
+1. **A small HTTP backend** with five endpoints, in `backend/`.
 2. **The `axel` and `transfer_hook` Solana programs.** Clients call them directly.
 
-All business actions (buy, deposit, claim, whitelist, pause and so on) are Solana transactions. The backend is not in that path.
+All business actions (buy, deposit, claim, whitelist, pause and so on) are Solana transactions. The backend is not in that path, with one exception: it signs v2 `set_investor` after a Sumsub review.
 
 ## Backend HTTP Endpoints
 
-- Stack: NestJS 11 (`backend/src`).
+- Stack: NestJS 11 (`backend/src`), SQLite through `better-sqlite3` for KYC state.
 - Default port: `3000` (`PORT`).
-- No authentication, no CORS configuration, no database.
+- CORS: only the origins in `CORS_ORIGINS`, methods `GET` and `POST`.
+- Errors use the NestJS shape: `{ "statusCode": 400, "message": "...", "error": "Bad Request" }`.
+- Run a single instance: the per-wallet ordering of webhook events and the rate limits live in the process.
 
 ### Health Check
 
@@ -19,17 +21,17 @@ All business actions (buy, deposit, claim, whitelist, pause and so on) are Solan
 GET /health
 ```
 
-Checks that the RPC answers (`getSlot`) and reports whether the oracle keypair loaded.
+Checks that the RPC answers (`getSlot`) and whether the KYC flow is configured.
 
 **Response `200`:**
 ```json
-{ "status": "ok", "rpc": "connected", "oracle": "loaded" }
+{ "status": "ok", "rpc": "connected", "kyc": "ready" }
 ```
-`oracle` is `"not_configured"` when `ORACLE_KEYPAIR_PATH` is unset or failed to load.
+`kyc` is `"not_configured"` unless `SUMSUB_WEBHOOK_SECRET`, `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY` and the KYC authority keypair are all set.
 
 **Response `503`** (RPC unreachable):
 ```json
-{ "status": "error", "rpc": "disconnected", "oracle": "not_configured" }
+{ "status": "error", "rpc": "disconnected", "kyc": "ready" }
 ```
 
 ### Latest Telemetry
@@ -49,7 +51,7 @@ interface TelemetryResponse {
   tripsCount: number;               // completed orders matched to the licence plate
   carStatus: string;                // "active" | "inactive" ("maintenance" exists in the type, never produced)
   dataHash: string;                 // hex SHA-256 of the canonical JSON (see below)
-  solanaTxSignature: string | null; // record_telemetry signature, null if not submitted
+  solanaTxSignature: string | null; // always null: the backend writes no telemetry on-chain yet
   stale: boolean;                   // true if `date` is neither today nor yesterday (UTC)
   available: boolean;               // false when nothing is cached for this project
 }
@@ -69,58 +71,129 @@ JSON.stringify({ date, vehicle_id, daily_revenue, mileage_km, trips_count, car_s
 
 Here `vehicle_id` is the configured licence plate, and `daily_revenue` is the same number as `dailyRevenue`. The response does **not** say whether the figures came from Yandex or from the simulated fallback ([architecture.md](architecture.md#oracle--telemetry-flow)).
 
+### KYC Sign-In Nonce
+
+```
+GET /kyc/nonce?wallet=<base58 public key>
+```
+
+Returns a [Sign-In With Solana](https://github.com/phantom/sign-in-with-solana) message for the wallet to sign with `signMessage`. The nonce is single-use and expires after 5 minutes. Limit: 10 requests a minute per client IP.
+
+**Response `200`:**
+```json
+{
+  "wallet": "<base58>",
+  "nonce": "9881299645de7120aa4a2c87a7e0f3e8",
+  "message": "axel.example wants you to sign in with your Solana account:\n<base58>\n\nLink this wallet to your AXEL identity check. Only this wallet will be approved to hold AXEL shares.\n\nURI: https://axel.example\nVersion: 1\nChain ID: devnet\nNonce: 9881…\nIssued At: 2026-09-25T08:49:49.946Z\nExpiration Time: 2026-09-25T08:54:49.946Z",
+  "expiresAt": "2026-09-25T08:54:49.946Z"
+}
+```
+The domain and URI come from `SIWS_URI`, the chain ID from `SOLANA_CLUSTER`.
+
+**Response `400`:** `wallet` is missing or not a canonical base58 public key. **`429`:** rate limit.
+
+### KYC Session
+
+```
+POST /kyc/session
+Content-Type: application/json
+
+{ "wallet": "<base58>", "nonce": "<from /kyc/nonce>", "signature": "<base58 ed25519 signature of message>" }
+```
+
+Checks the signature over the stored message, burns the nonce (also when the check fails), and binds the wallet to a Sumsub applicant. The first session creates a random `externalUserId` (`axel-<uuid>`); later sessions of the same wallet reuse it. Limit: 5 requests a minute per client IP.
+
+**Response `200`:**
+```json
+{
+  "wallet": "<base58>",
+  "externalUserId": "axel-2f0c…",
+  "levelName": "basic-kyc-level",
+  "accessToken": "<Sumsub WebSDK access token>",
+  "accessTokenExpiresAt": "2026-09-25T09:19:49.946Z"
+}
+```
+Pass `accessToken` to the Sumsub WebSDK. It is valid for 30 minutes; a new session gives a new one.
+
+| Status | When |
+|---|---|
+| `400` | body fields missing or malformed |
+| `401` | `Unknown, used or expired nonce` (also a nonce issued for another wallet), or `Signature does not match the wallet` |
+| `502` | the Sumsub API failed; details are only in the server log |
+| `503` | `SUMSUB_APP_TOKEN` or `SUMSUB_SECRET_KEY` is not set |
+
 ### KYC Webhook (Sumsub)
 
 ```
 POST /kyc/webhook
-x-payload-digest: <hex HMAC-SHA256 of the raw request body, key = SUMSUB_WEBHOOK_SECRET>
+X-Payload-Digest: <hex HMAC of the raw request body, key = SUMSUB_WEBHOOK_SECRET>
+X-Payload-Digest-Alg: HMAC_SHA1_HEX | HMAC_SHA256_HEX | HMAC_SHA512_HEX
 ```
 
-**Request body.** The backend reads these fields:
-```ts
-interface SumsubWebhookPayload {
-  type: string;                                   // acted on only when "applicantReviewed"
-  applicantId: string;
-  externalUserId: string;                         // must be the investor's Solana wallet (base58)
-  reviewResult?: { reviewAnswer: 'GREEN' | 'RED' };
-  reviewStatus?: string;
-}
-```
+The HMAC is computed over the exact bytes received and compared with `crypto.timingSafeEqual`. A missing or unknown algorithm fails the check. There is no bypass: without a secret every request gets `503`.
 
 **What happens:**
-1. **Signature check.** The backend verifies the digest. If `SUMSUB_WEBHOOK_SECRET` is empty, it logs a warning and **skips the check**.
-2. **Filter.** Only `applicantReviewed` with `reviewAnswer == "GREEN"` proceeds.
-3. **Whitelist transaction.** `externalUserId` is parsed as a public key. The backend then signs `add_to_whitelist(wallet)` with the keypair at `ADMIN_KEYPAIR_PATH`. It sends and confirms the transaction, retrying once.
+
+| Event | Action |
+|---|---|
+| `applicantReviewed`, `GREEN` | The backend fetches the applicant from the Sumsub API and continues only if it has the same `externalUserId`, `reviewStatus == "completed"`, answer `GREEN` and level `SUMSUB_LEVEL_NAME`. Then `set_investor(Active)`: expiry 12 calendar months from now, jurisdiction = ISO 3166 numeric code of `info.country` (else `fixedInfo.country`, else 0), provider `Sumsub`, DEMO flag cleared. |
+| `applicantReviewed`, `RED` with `reviewRejectType == "FINAL"` | `set_investor(Revoked)` |
+| `applicantReset`, `applicantDeactivated` | `set_investor(Revoked)` |
+| anything else, `RED` with `RETRY` | nothing |
+
+Rules applied before any transaction:
+- The wallet is the one bound to `externalUserId` by `/kyc/session`. Unknown users are ignored.
+- Events for one wallet are handled one at a time. An event whose `createdAtMs` is older than the last one applied for that wallet is ignored.
+- The current `Investor` account is read first. Nothing is sent when the record would not change: an approval of a wallet that is already active through Sumsub with the same jurisdiction and flags, and whose expiry is at most 30 days before the new one; a revocation of a record that is already revoked or does not exist.
+- A `Frozen` record is never changed (`blocked`). Revocations touch only records whose provider is `Sumsub`.
+- The transaction is signed and paid by the KYC authority key (`KYC_AUTHORITY_KEYPAIR_PATH`), which must equal `Config.kyc_authority`.
 
 **Response `200`:**
 ```json
-{ "status": "ok", "solanaTxSignature": "<signature>" }
+{ "outcome": "applied", "reason": "approved", "solanaTxSignature": "<signature>" }
 ```
 
-`solanaTxSignature` is `null` in any of these cases:
-- the event was ignored
-- the answer was not `GREEN`
-- the wallet is invalid
-- the admin keypair is not loaded
-- both transaction attempts failed
+| `outcome` | `reason` values |
+|---|---|
+| `applied` | `approved`, `rejected`, `reset`, `deactivated` |
+| `unchanged` | `already_active`, `already_revoked`, `no_record`, `not_granted_by_sumsub` |
+| `blocked` | `frozen` |
+| `ignored` | `event_type`, `review_not_final`, `missing_applicant`, `unknown_user`, `stale_event`, `not_approved`, `level_mismatch`, `applicant_mismatch` |
 
-**Response `401`:** the signature did not match (NestJS `UnauthorizedException`, message `"Invalid signature"`).
+Every verified event is stored in the `kyc_events` table with its outcome and transaction signature.
+
+**Errors.** Sumsub retries any answer other than 2xx, and retries are safe:
+- `400`: the signed body is not a JSON object or has no `type`.
+- `401`: `Invalid webhook signature`.
+- `500`: the RPC failed or the transaction failed on-chain.
+- `502`: the Sumsub API failed.
+- `503`: the webhook secret or the KYC authority key is not configured.
 
 ### Backend Configuration
 
+`backend/.env.example` lists every variable. The values are validated at startup; an invalid value stops the process. With `NODE_ENV=production` the backend refuses to start without `AXEL_PROGRAM_ID`, `CORS_ORIGINS`, `SIWS_URI`, `KYC_AUTHORITY_KEYPAIR_PATH`, `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `SUMSUB_WEBHOOK_SECRET` and `SUMSUB_LEVEL_NAME`, and it requires https origins.
+
 | Variable | Used by | Default / behaviour when unset |
 |---|---|---|
-| `SOLANA_RPC_URL` | `SolanaService` | `http://127.0.0.1:8899` |
 | `PORT` | `main.ts` | `3000` |
+| `CORS_ORIGINS` | CORS | `http://localhost:3000` |
+| `TRUST_PROXY` | client IP for rate limits | `0` |
+| `SOLANA_RPC_URL` | `SolanaService` | `http://127.0.0.1:8899` |
+| `SOLANA_CLUSTER` | sign-in message | `devnet` |
+| `AXEL_PROGRAM_ID` | v2 program client | `address` of `src/solana/idl/axel_v2.json` |
+| `DATABASE_PATH` | SQLite file | `data/axel-backend.sqlite` |
+| `KYC_AUTHORITY_KEYPAIR_PATH` | `set_investor` signer | webhook answers `503`; an unreadable file stops the start |
+| `SIWS_URI` | sign-in message domain and URI | `http://localhost:3000` |
+| `SUMSUB_BASE_URL` | Sumsub API | `https://api.sumsub.com` |
+| `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY` | Sumsub API | `/kyc/session` answers `503` |
+| `SUMSUB_LEVEL_NAME` | WebSDK level, approval check | `basic-kyc-level` |
+| `SUMSUB_WEBHOOK_SECRET` | webhook HMAC | webhook answers `503` |
 | `PROJECT_MINT` | telemetry cron | Cron skips ingestion |
 | `VEHICLE_LICENSE_PLATE` | telemetry cron | Cron skips ingestion |
-| `ORACLE_KEYPAIR_PATH` | telemetry cron | Data is cached but not submitted on-chain |
 | `YANDEX_PARK_ID`, `YANDEX_CLIENT_ID`, `YANDEX_API_KEY` | `YandexFleetService` | Simulated telemetry |
-| `CRON_SCHEDULE` | `@Cron` decorator (read from `process.env` when the module loads) | `0 1 * * *` (daily 01:00) |
-| `SUMSUB_WEBHOOK_SECRET` | `KycService` | Signature verification skipped |
-| `ADMIN_KEYPAIR_PATH` | `KycService` | Webhook cannot whitelist on-chain |
+| `CRON_SCHEDULE` | telemetry job, registered after `.env` is loaded | `0 1 * * *` (daily 01:00, server time) |
 
-The `axel` program ID is hardcoded in `kyc.service.ts` and `telemetry-cron.service.ts`.
+The v2 program ID comes from `AXEL_PROGRAM_ID` or the vendored IDL; instructions are built with `@coral-xyz/anchor` from that IDL. `npm run export-idl` in the repository root refreshes the backend copy together with the frontend one.
 
 ## Frontend Environment
 

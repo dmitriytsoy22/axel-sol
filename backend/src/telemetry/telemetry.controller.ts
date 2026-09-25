@@ -1,5 +1,5 @@
 import { Controller, Get, Param } from '@nestjs/common';
-import { TelemetryCronService, TelemetryRecord } from './telemetry-cron.service';
+import { TelemetryCronService } from './telemetry-cron.service';
 
 interface TelemetryResponse {
   date: string;
@@ -37,11 +37,8 @@ export class TelemetryController {
 
     // Check if the record is from today or yesterday
     const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86_400_000)
-      .toISOString()
-      .slice(0, 10);
-    const isStale =
-      record.telemetry.date !== yesterday && record.telemetry.date !== today;
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const isStale = record.telemetry.date !== yesterday && record.telemetry.date !== today;
 
     return {
       date: record.telemetry.date,

@@ -1,0 +1,6 @@
+dist
+coverage
+data
+node_modules
+src/solana/idl
+package-lock.json

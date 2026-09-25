@@ -1,0 +1,25 @@
+/**
+ * Runs tasks that share a key one after another, and tasks with different keys
+ * concurrently. Used so that two webhooks for the same wallet never read the on-chain
+ * record before the other one's transaction has landed.
+ */
+export class KeyedSerialQueue {
+  private readonly tails = new Map<string, Promise<void>>();
+
+  run<T>(key: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.tails.get(key) ?? Promise.resolve();
+    const result = previous.then(task);
+    // The tail only orders the next task; the caller still receives `result` with its error.
+    const tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.tails.set(key, tail);
+    void tail.then(() => {
+      if (this.tails.get(key) === tail) {
+        this.tails.delete(key);
+      }
+    });
+    return result;
+  }
+}

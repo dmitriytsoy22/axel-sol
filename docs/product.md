@@ -21,7 +21,7 @@ AXEL tokenizes taxi cars on Solana. Each car is a project with its own Token-202
 
 - **Car owner / operator (project admin).** The owner already owns a car and runs it through Yandex Pro. They sell shares in it and then deposit its revenue each period. Per the spec, the admin "already owns the vehicle". AXEL is a direct sale of ownership shares, not a fundraise.
 - **Investors.** Individuals with a Solana wallet (Phantom or Solflare in the UI) who pass KYC. They want small, direct exposure to one real vehicle's income, and payouts they can check on-chain.
-- **Platform operator.** Runs the backend: the oracle keypair that records telemetry, and the KYC webhook that whitelists approved wallets.
+- **Platform operator.** Runs the backend: the daily telemetry job, and the KYC flow whose webhook writes v2 KYC records with a dedicated key.
 
 ## How It Works
 
@@ -29,9 +29,7 @@ AXEL tokenizes taxi cars on Solana. Each car is a project with its own Token-202
    - The owner runs `npm run init-project`, which calls `initialize_project`.
    - This creates a Token-2022 mint with 0 decimals and fixes the maximum share count: `car_cost / price_per_share`.
    - No shares exist yet. There is no UI for this step.
-2. **Get whitelisted.** An investor's wallet gets a `WhitelistEntry` in one of two ways:
-   - The backend's Sumsub webhook, after a `GREEN` review.
-   - The admin panel's whitelist manager.
+2. **Get whitelisted.** On v1 an investor's wallet gets a `WhitelistEntry` from the admin panel's whitelist manager. The backend's Sumsub flow writes v2 KYC records, which v1 does not read.
 3. **Buy shares.**
    - On the asset page, the investor picks a number of shares.
    - `buy_tokens` sends `shares × price` in SOL straight to the owner's wallet, then mints the shares into the investor's token account.
@@ -86,5 +84,5 @@ What the code does **not** contain:
   - Prices and payouts are in SOL; telemetry revenue is in KZT.
   - No fiat on- or off-ramp.
   - Shares are whole units, and the 1% fee rounds up to at least one share per transfer.
-- **KYC loop not wired in the UI.** The backend webhook exists, but the frontend has no KYC flow. The asset page only reads whether the connected wallet is approved and explains why buying is unavailable.
+- **KYC loop not wired in the UI.** The backend's sign-in and Sumsub endpoints exist and write v2 records, but the frontend has no KYC flow and still reads v1. The asset page only reads whether the connected wallet is approved and explains why buying is unavailable.
 - **Single keys.** Admin and oracle are single keys. On devnet they are the same key. No multisig is configured.

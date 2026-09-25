@@ -1,16 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+
+import { AppConfigModule } from './config/app-config.module';
+import { DatabaseModule } from './database/database.module';
+import { HealthController } from './health/health.controller';
+import { KycModule } from './kyc/kyc.module';
 import { SolanaModule } from './solana/solana.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
-import { KycModule } from './kyc/kyc.module';
-import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-    }),
+    // Loads .env into process.env; AppConfigModule validates it when the app is created.
+    ConfigModule.forRoot({ envFilePath: '.env' }),
+    AppConfigModule,
+    DatabaseModule,
     SolanaModule,
     TelemetryModule,
     KycModule,

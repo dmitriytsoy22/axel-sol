@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+
+import { APP_CONFIG, type AppConfig } from '../config/app-config';
 
 const FLEET_API_BASE = 'https://fleet-api.taxi.yandex.net';
 
@@ -21,8 +22,20 @@ export interface DailyTelemetry {
   carStatus: 'active' | 'maintenance' | 'inactive';
 }
 
+/** The fields of a Fleet API order that the aggregation reads. */
+interface FleetOrder {
+  price?: string;
+  mileage?: string;
+  car?: { license?: { number?: string } };
+}
+
+interface OrdersListResponse {
+  orders?: FleetOrder[];
+  cursor?: string;
+}
+
 interface OrdersCache {
-  data: any[];
+  data: FleetOrder[];
   timestamp: number;
 }
 
@@ -35,10 +48,10 @@ export class YandexFleetService {
   private readonly clientId: string;
   private readonly apiKey: string;
 
-  constructor(private readonly config: ConfigService) {
-    this.parkId = this.config.get<string>('YANDEX_PARK_ID', '');
-    this.clientId = this.config.get<string>('YANDEX_CLIENT_ID', '');
-    this.apiKey = this.config.get<string>('YANDEX_API_KEY', '');
+  constructor(@Inject(APP_CONFIG) config: AppConfig) {
+    this.parkId = config.yandex.parkId;
+    this.clientId = config.yandex.clientId;
+    this.apiKey = config.yandex.apiKey;
   }
 
   isConfigured(): boolean {
@@ -63,14 +76,12 @@ export class YandexFleetService {
       const orders = await this.fetchPreviousDayOrders();
       const targetPlate = this.normalizePlate(licensePlate);
 
-      const carOrders = orders.filter((order: any) => {
+      const carOrders = orders.filter((order) => {
         const orderPlate = this.normalizePlate(order.car?.license?.number);
         return orderPlate === targetPlate;
       });
 
-      this.logger.log(
-        `Found ${carOrders.length} orders for [${licensePlate}] on ${dateStr}`,
-      );
+      this.logger.log(`Found ${carOrders.length} orders for [${licensePlate}] on ${dateStr}`);
 
       let totalRevenueKzt = 0;
       let totalMileageMeters = 0;
@@ -91,13 +102,15 @@ export class YandexFleetService {
         tripsCount: carOrders.length,
         carStatus: carOrders.length > 0 ? 'active' : 'inactive',
       };
-    } catch (err: any) {
-      this.logger.error(`Yandex API failed: ${err.message} — falling back to simulation`);
+    } catch (err) {
+      this.logger.error(
+        `Yandex API failed: ${err instanceof Error ? err.message : String(err)} — falling back to simulation`,
+      );
       return this.simulateTelemetry(dateStr, licensePlate);
     }
   }
 
-  private async fetchPreviousDayOrders(): Promise<any[]> {
+  private async fetchPreviousDayOrders(): Promise<FleetOrder[]> {
     // Return cached if fresh
     if (this.ordersCache && Date.now() - this.ordersCache.timestamp < CACHE_TTL) {
       return this.ordersCache.data;
@@ -110,12 +123,12 @@ export class YandexFleetService {
     const end = new Date(yesterday);
     end.setHours(23, 59, 59, 999);
 
-    const allOrders: any[] = [];
+    const allOrders: FleetOrder[] = [];
     let cursor: string | undefined;
 
     // Paginate through all orders
     do {
-      const body: any = {
+      const body: Record<string, unknown> = {
         query: {
           park: {
             id: this.parkId,
@@ -134,10 +147,7 @@ export class YandexFleetService {
         body.cursor = cursor;
       }
 
-      const response = await this.callYandexApi(
-        '/v1/parks/orders/list',
-        body,
-      );
+      const response = await this.callYandexApi('/v1/parks/orders/list', body);
 
       if (response.orders) {
         allOrders.push(...response.orders);
@@ -153,9 +163,9 @@ export class YandexFleetService {
 
   private async callYandexApi(
     path: string,
-    body: any,
+    body: Record<string, unknown>,
     retries = 1,
-  ): Promise<any> {
+  ): Promise<OrdersListResponse> {
     const url = `${FLEET_API_BASE}${path}`;
 
     const response = await fetch(url, {
@@ -180,7 +190,7 @@ export class YandexFleetService {
       throw new Error(`Yandex API ${response.status}: ${text}`);
     }
 
-    return response.json();
+    return (await response.json()) as OrdersListResponse;
   }
 
   /**
@@ -190,9 +200,18 @@ export class YandexFleetService {
   private normalizePlate(plate: string | undefined): string {
     if (!plate) return '';
     const cyrillic: Record<string, string> = {
-      А: 'A', В: 'B', Е: 'E', К: 'K', М: 'M',
-      Н: 'H', О: 'O', Р: 'P', С: 'C', Т: 'T',
-      У: 'Y', Х: 'X',
+      А: 'A',
+      В: 'B',
+      Е: 'E',
+      К: 'K',
+      М: 'M',
+      Н: 'H',
+      О: 'O',
+      Р: 'P',
+      С: 'C',
+      Т: 'T',
+      У: 'Y',
+      Х: 'X',
     };
     return plate
       .replace(/\s/g, '')
@@ -203,10 +222,7 @@ export class YandexFleetService {
   }
 
   /** Deterministic simulation when Yandex credentials are not available */
-  private simulateTelemetry(
-    date: string,
-    vehicleId: string,
-  ): DailyTelemetry {
+  private simulateTelemetry(date: string, vehicleId: string): DailyTelemetry {
     // Simple hash-based seed for reproducibility
     let hash = 0;
     const seed = `${vehicleId}-${date}`;

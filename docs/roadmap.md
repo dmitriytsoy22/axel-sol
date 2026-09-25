@@ -31,15 +31,16 @@ Done:
 - [x] Vendored the program IDL into `frontend/src/lib/solana/idl/` so a fresh clone builds without `anchor build`, and fixed the local dev CSP
 - [x] English documentation: [product](product.md), [architecture](architecture.md), [API](api.md), this roadmap. The Russian overview moved to [ru/](ru/) and the planning documents to [planning/](planning/).
 - [x] Replaced the stale v1 Codama output with a client generated for the v2 program in `sdk/axel-v2` ([v2.md](v2.md))
+- [x] Backend KYC on v2: wallet sign-in (`GET /kyc/nonce`, `POST /kyc/session`), Sumsub sessions bound to the wallet in SQLite, a webhook with a correct HMAC check that signs idempotent `set_investor` calls with a dedicated key, CORS, rate limits, production startup checks, ESLint and Jest ([api.md](api.md#backend-http-endpoints))
 
 Next steps. Each one addresses a limitation listed in [architecture.md](architecture.md#known-limitations):
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key (program upgrade)
 - [ ] Make revenue claims independent of shares bought or transferred after a deposit (program upgrade)
 - [ ] Thaw token accounts without relying on `buy_tokens` creating the ATA (program upgrade)
 - [ ] Create the hook's `ExtraAccountMetaList` during project setup, and add an end-to-end test of a holder-to-holder transfer on a full six-extension mint
-- [ ] Fix the account list in the backend's `record_telemetry` transaction, and mark simulated telemetry as simulated in the API
-- [ ] Connect the asset page's telemetry widget to the backend: one env variable, CORS enabled
-- [ ] Add a KYC flow to the UI (Sumsub with `externalUserId` = wallet), and fix or remove the unused `useWhitelistStatus`
+- [ ] Send telemetry from the backend as v2 `record_telemetry` batches (the broken v1 transaction is removed), and mark simulated telemetry as simulated in the API
+- [ ] Connect the asset page's telemetry widget to the backend: one env variable (the backend already allows the origins in `CORS_ORIGINS`)
+- [ ] Add the KYC flow to the UI on v2 (sign in with the wallet, then the Sumsub WebSDK with the token from `POST /kyc/session`), and replace the unused `useWhitelistStatus` with a `useInvestor` hook
 - [ ] Public frontend deployment and a documented devnet demo path for judges (a whitelisted test wallet)
 - [ ] Recorded end-to-end devnet run with Explorer links: whitelist → buy → deposit → claim → transfer
 

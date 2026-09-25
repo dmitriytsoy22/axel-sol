@@ -9,7 +9,7 @@ AXEL has four parts:
 - Two Anchor programs on Solana: `axel` and `transfer_hook`.
 - One Token-2022 mint per car.
 - A Next.js frontend that reads chain state directly.
-- A small NestJS backend with no database. It does the two jobs that need secrets: signing oracle telemetry and handling the KYC webhook.
+- A small NestJS backend. It does the jobs that need secrets or a server: binding wallets to Sumsub applicants and writing their v2 KYC records, and the daily telemetry job. It keeps KYC state in one SQLite file.
 
 ```
              Investor / admin browser (Phantom or Solflare, devnet)
@@ -24,17 +24,18 @@ AXEL has four parts:
         ▼                                           ▼
 ┌────────────────────────────────┐   ┌────────────────────────────────────┐
 │ Solana (devnet)                │   │ Backend — NestJS 11 (backend/)     │
-│                                │   │ no database, in-memory cache       │
-│ axel program                   │◄──┤ telemetry cron  (oracle keypair)   │──► Yandex Fleet API
-│   12 instructions, 5 acct types│ tx│ KYC webhook     (admin keypair)    │◄── Sumsub webhook
-│ transfer_hook program          │   └────────────────────────────────────┘
+│                                │   │ SQLite (KYC), in-memory telemetry  │
+│ axel program                   │   │ telemetry cron  (no chain writes)  │──► Yandex Fleet API
+│   12 instructions, 5 acct types│   │ KYC sign-in + Sumsub webhook       │◄── Sumsub webhook
+│ axel_v2 program (not deployed) │◄──┤   set_investor (KYC authority key) │
+│ transfer_hook program          │ tx└────────────────────────────────────┘
 │ Token-2022 mint (one per car)  │
 └────────────────────────────────┘
 ```
 
 **Golden rule (from the spec):**
 - Business state lives in on-chain accounts. The frontend reads it straight from RPC, and no server keeps a copy.
-- The backend keeps only an in-memory telemetry cache, up to 30 days per project, which is lost on restart.
+- The backend keeps an in-memory telemetry cache, up to 30 days per project, which is lost on restart. Its SQLite file holds only sign-in nonces, which wallet belongs to which Sumsub applicant, and a log of webhook events; KYC status itself lives in the v2 `Investor` accounts.
 
 ## Repository Layout
 
@@ -214,50 +215,50 @@ Yandex Fleet API              Backend (TelemetryCronService)                  So
       │ ────────────────────────────► │  filter by licence plate                 │
       │                               │  aggregate: revenue × 0.76, km, trips    │
       │                               │  SHA-256 of canonical JSON               │
-      │                               │  record_telemetry(YYYYMMDD, hash) ──────►│ TelemetryRecord PDA
       │                               │  in-memory cache (30 entries/project)    │
       │                  Frontend ───►│  GET /telemetry/latest/:mint             │
 ```
 
-1. The cron needs two settings: `PROJECT_MINT` and `VEHICLE_LICENSE_PLATE`. It fetches the previous day's completed orders for the park (paginated, 500 per page). It keeps orders whose plate matches after normalization: spaces removed, upper-cased, and Cyrillic look-alike letters mapped to Latin.
+1. The job runs on `CRON_SCHEDULE` (read after `.env` is loaded) and needs two settings: `PROJECT_MINT` and `VEHICLE_LICENSE_PLATE`. It fetches the previous day's completed orders for the park (paginated, 500 per page). It keeps orders whose plate matches after normalization: spaces removed, upper-cased, and Cyrillic look-alike letters mapped to Latin.
 2. It aggregates the matching orders into daily figures:
    - Revenue in KZT: the sum of `price`, multiplied by `NET_INCOME_FACTOR = 0.76`. This factor is a hardcoded estimate of "22% Yandex commission + 2% transaction costs".
    - Mileage in km.
    - Trip count.
    - Status: `active` if there were trips, otherwise `inactive`.
 3. It hashes `JSON.stringify({date, vehicle_id, daily_revenue, mileage_km, trips_count, car_status})` with SHA-256.
-4. If `ORACLE_KEYPAIR_PATH` loaded, it signs and sends `record_telemetry`. The hash on chain is a proof of existence: anyone holding the same JSON can recompute it and compare. The raw figures stay off-chain.
+4. It sends nothing on-chain. The v1 `record_telemetry` transaction never worked (limitation 5), and v2's batched `record_telemetry` needs the rent-based daily report that the telemetry rework adds.
 5. It caches the result in memory and serves it at `GET /telemetry/latest/:projectId` (see [api.md](api.md)).
 
-**Simulated fallback.** If the Yandex credentials are missing, or the Yandex call fails, `YandexFleetService` returns **deterministic simulated data** seeded from plate and date. That data is hashed and submitted exactly like real data, and the HTTP response does not mark it as simulated. The repository contains no evidence that a live vehicle or Yandex Fleet park has been connected.
+**Simulated fallback.** If the Yandex credentials are missing, or the Yandex call fails, `YandexFleetService` returns **deterministic simulated data** seeded from plate and date. That data is hashed and served exactly like real data, and the HTTP response does not mark it as simulated. The repository contains no evidence that a live vehicle or Yandex Fleet park has been connected.
 
 **Revenue is not linked to telemetry.** The amount passed to `deposit_revenue` is chosen by the admin. The admin panel computes it as gross revenue − expenses − maintenance reserve, entered in SOL. The program does not check that amount against the telemetry records.
 
-## KYC Webhook Flow
+## KYC Flow (v2)
+
+The backend writes v2 `Investor` records with its own key, `Config.kyc_authority`. That key signs nothing else, and the admin key is not on the server.
 
 ```
-Investor ──► Sumsub (identity check; externalUserId must be the wallet address)
-                 │  POST /kyc/webhook   header x-payload-digest = HMAC-SHA256(raw body)
-                 ▼
-            Backend KycService
-              verify signature (skipped if SUMSUB_WEBHOOK_SECRET is unset)
-              act only on type == "applicantReviewed" and reviewAnswer == "GREEN"
-              parse externalUserId as a Solana public key
-              sign add_to_whitelist(wallet) with ADMIN_KEYPAIR_PATH (one retry)
-                 │
-                 ▼
-            WhitelistEntry{approved: true} ──► investor can call buy_tokens
+Wallet ──► GET  /kyc/nonce?wallet=…     Sign-In With Solana message with a single-use nonce (5 min)
+       ──► POST /kyc/session            wallet, nonce, signature
+             backend: ed25519 check, nonce burned, wallet bound to a random externalUserId (SQLite)
+       ◄── Sumsub WebSDK token for that externalUserId
+Wallet ──► Sumsub WebSDK (documents, liveness)
+Sumsub ──► POST /kyc/webhook            X-Payload-Digest + X-Payload-Digest-Alg
+             backend: HMAC over the raw body (timingSafeEqual), refused if no secret is set
+             GREEN  → confirm with the Sumsub API (same externalUserId, completed, GREEN, our level)
+                      → set_investor(Active, expires in 12 months, jurisdiction from the documents, Sumsub)
+             reset, deactivated, RED FINAL → set_investor(Revoked), only for records Sumsub granted
+             nothing is sent if the record would not change; events for one wallet run in order,
+             and an event older than the last applied one is ignored
 ```
 
-What the webhook does **not** do:
-- A `RED` answer causes no on-chain action. The backend never calls `remove_from_whitelist`.
-- It does not thaw token accounts. Thawing happens inside `buy_tokens`.
+Safety rules:
+- **Only a wallet that signed can be approved.** `externalUserId` is a random ID the backend creates after the signature check, so nobody can start a check for a wallet they do not control.
+- **A sanctions freeze is never lifted or overwritten** by a webhook; manual and demo records are never revoked by one.
+- **Retries are safe.** Sumsub retries any non-2xx answer. An RPC outage, a failed transaction or a Sumsub API error returns 5xx, and the retry finds the on-chain record as it really is.
+- **Fail closed.** Without `SUMSUB_WEBHOOK_SECRET` or the KYC key the webhook answers 503; in production the backend does not start without them ([api.md](api.md#backend-configuration)).
 
-Nothing in the repository creates a Sumsub applicant. There is also no Sumsub link in the UI:
-- The `KycPrompt` component links to `https://kyc.blockpass.org/`.
-- `KycPrompt` is rendered only by `WhitelistGate`, and no page mounts `WhitelistGate`.
-
-In practice, wallets are whitelisted from the admin panel (`WhitelistManager`) or by calling the instruction directly.
+v2 is not deployed yet, so these records exist only on a local validator or LiteSVM. v1 wallets are still approved from the admin panel (`WhitelistManager`) or by calling `add_to_whitelist` directly; the backend no longer calls v1.
 
 ## Frontend
 
@@ -309,16 +310,12 @@ These come from reading the code on 2026-09-24. None of them is fixed yet.
    - A wallet can receive shares by transfer only if it has already bought through `buy_tokens`.
    - Once every share is sold, no new wallet can get a thawed account.
    - Anyone can create an ATA for any wallet. If a wallet's ATA is created before its first purchase, the ATA stays frozen and that wallet's `buy_tokens` fails when minting.
-5. **The backend's `record_telemetry` transaction fails.**
-   - The hand-built instruction in `telemetry-cron.service.ts` passes five accounts: `oracle, project_state, mint, telemetry_record, system_program`.
-   - The program expects four: `oracle, project_state, telemetry_record, system_program`.
-   - The extra `mint` shifts the order, so the telemetry PDA check fails.
-   - The retry path then caches the data without a transaction signature.
+5. **No telemetry is written on-chain.** The backend's v1 `record_telemetry` transaction passed an extra `mint` account, so the telemetry PDA check always failed. That path is removed; v2's batched `record_telemetry` is not wired up yet.
 6. **Simulated telemetry is not flagged.** See [Oracle / Telemetry Flow](#oracle--telemetry-flow).
 7. **The telemetry widget does not reach the backend.**
    - `useTelemetry` fetches `${NEXT_PUBLIC_API_URL}/telemetry/latest/:mint`. That variable is not in `.env.local.example`, and when it is empty the request goes to the Next.js origin, which has no such route.
    - The separate client `lib/api/telemetry.ts` uses `NEXT_PUBLIC_TELEMETRY_API_URL`, but no component calls it.
-   - The backend does not enable CORS.
+   - The backend allows only the origins in `CORS_ORIGINS` (default `http://localhost:3000`).
 8. **The whitelist status hook always returns false.** `useWhitelistStatus` derives the whitelist PDA and then passes it to `fetchWhitelistEntry`, which derives a PDA again from that address. Nothing calls it any more: the asset page uses its own correct reader, `components/asset/useWalletApproval.ts`.
 9. **The revenue vault is subject to rent rules.** The vault is a 0-byte system account, so Solana's rent-state rules apply. A deposit that would leave an empty vault below the rent-exempt minimum (890,880 lamports) is rejected. So is a claim that would leave a non-zero balance below that minimum. Rounding dust can therefore block the last claim of a period, unless the vault holds extra SOL.
 10. **Transfer-fee rounding.** Token-2022 rounds the fee up, and shares have 0 decimals, so every transfer pays at least one whole share. A 1-share transfer delivers nothing to the recipient.

@@ -11,7 +11,7 @@
 | :--- | :--- |
 | `axel` program | devnet `DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M`, source in `programs/axel` |
 | `transfer_hook` program | devnet `5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ`, source in `programs/transfer-hook` |
-| Backend (telemetry oracle, KYC webhook) | `backend/` |
+| Backend (telemetry job, KYC sign-in and webhook) | `backend/` |
 | Frontend | `frontend/` |
 
 Out of scope: third-party services (Solana RPC providers, Yandex Fleet, Sumsub, wallet extensions), the devnet cluster itself, and the known limitations listed below.
@@ -32,5 +32,5 @@ Test against a local validator or accounts you control. AXEL is maintained by on
 
 - **Unaudited programs.** See Status above.
 - **Admin is the permanent delegate.** `initialize_project` sets the project admin as the Token-2022 `PermanentDelegate` of the project mint, so the admin can transfer or burn tokens from any holder. This is intentional.
-- **KYC webhook without a secret.** If `SUMSUB_WEBHOOK_SECRET` is empty, `POST /kyc/webhook` skips signature verification. With `ADMIN_KEYPAIR_PATH` set, anyone who can reach the backend can then trigger `add_to_whitelist`. Always set both variables together.
-- **Keypairs on disk.** The backend loads the oracle and admin keypairs from plain JSON files (`ORACLE_KEYPAIR_PATH`, `ADMIN_KEYPAIR_PATH`). Never commit these files.
+- **KYC key on the server.** The backend signs v2 `set_investor` with the key at `KYC_AUTHORITY_KEYPAIR_PATH`, a plain JSON file. Whoever holds it can approve or revoke any wallet (but cannot move funds or shares). Keep it separate from the admin key, never commit it, and rotate it with `update_config` if it leaks. Without `SUMSUB_WEBHOOK_SECRET` the webhook refuses every request, and in production the backend does not start.
+- **Rate limits need the client IP.** Behind a reverse proxy, set `TRUST_PROXY`, or all clients share one limit on `/kyc/nonce` and `/kyc/session`.
