@@ -161,10 +161,10 @@ Open issues are listed under [Security](#security) and in [docs/architecture.md]
 | `axel_v2` on LiteSVM | 530 |
 | `axel_v2` Rust unit and property tests | 35 |
 | Generated SDK against the IDL | 73 |
-| Frontend unit tests (Vitest) | 582 |
+| Frontend unit tests (Vitest) | 588 |
 | Backend (Jest) | 397, plus the indexer and the operator's deposit flow against a real `solana-test-validator` |
 | Demo seed | 90 |
-| Playwright end to end | the judge path (with the payout history and trip data it leaves), the KYC refusal and the identity page, run against the real app, backend and program on a freshly seeded local validator |
+| Playwright end to end | the judge path (with the payout history and trip data it leaves), the KYC refusal, the identity page and the locale routing, run against the real app, backend and program on a freshly seeded local validator |
 
 **v1 (legacy).** The original `axel` and `transfer_hook` programs, deployed on devnet before the hackathon. The app no longer uses them ([Deployment Status](#deployment-status)).
 
@@ -183,7 +183,7 @@ Open issues are listed under [Security](#security) and in [docs/architecture.md]
 | Backend | NestJS 11 · `@nestjs/schedule` 5 · `@nestjs/throttler` 6 · `better-sqlite3` 12 · `@solana/web3.js` 1.98 · `@coral-xyz/anchor` 0.32.1 · `ws` 8 · Jest 29 + Supertest · ESLint 10 + typescript-eslint |
 | Demo seed | TypeScript · `@coral-xyz/anchor` · HKDF key derivation · RFC 8785 canonical JSON |
 | External services | Yandex Fleet API (telemetry) · Sumsub (KYC) · Upstash Redis and Cloudflare Turnstile (judge demo, optional) · dial.to (Blinks) |
-| CI | GitHub Actions: frontend; backend; demo seed; programs (build, fmt, clippy, Rust and LiteSVM tests, IDL and SDK freshness, v1 typecheck); the backend's event indexer on a local validator; end-to-end |
+| CI | GitHub Actions: frontend; backend; demo seed; programs (build, fmt, clippy, Rust and LiteSVM tests, IDL and SDK freshness, v1 typecheck); the backend's event indexer and operator deposits on a local validator; end-to-end |
 | AI tools | Claude Code (coding assistant) · Google Stitch (UI drafts) |
 
 ---
@@ -540,7 +540,7 @@ Done:
 - **Integration:** merged the three workstreams and fixed what only showed up together:
   - the seed and the backend wrote different telemetry status codes on-chain; they now share one set;
   - the seed's, the demo routes' and the demo script's keys are pinned by a contract test on both sides.
-- **End-to-end tests** (Playwright, in CI): the judge path, the KYC refusal and the identity page against the real app, backend and program on a freshly seeded local validator.
+- **End-to-end tests** (Playwright, in CI): the judge path, the KYC refusal, the identity page and the locale routing against the real app, backend and program on a freshly seeded local validator.
 - **Docs for v2:** this README, [architecture](docs/architecture.md), [API](docs/api.md), [product](docs/product.md) and [roadmap](docs/roadmap.md).
 
 Still to do before the deadline (**planned, not done yet**):

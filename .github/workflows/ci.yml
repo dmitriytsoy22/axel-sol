@@ -300,7 +300,7 @@ jobs:
           retention-days: 7
 
   backend-localnet:
-    name: Backend event indexer on a local validator
+    name: Backend on a local validator (event indexer, operator deposits)
     needs: programs
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -339,6 +339,6 @@ jobs:
         working-directory: backend
         run: npm ci --no-audit --no-fund
 
-      - name: Event indexer against solana-test-validator
+      - name: Event indexer and operator deposits against solana-test-validator
         working-directory: backend
         run: npm run test:localnet
