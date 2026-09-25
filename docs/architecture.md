@@ -9,7 +9,13 @@ AXEL has four parts:
 - Two Anchor programs on Solana: `axel` and `transfer_hook`.
 - One Token-2022 mint per car.
 - A Next.js frontend that reads chain state directly.
-- A small NestJS backend with no database. It does the two jobs that need secrets: signing oracle telemetry and handling the KYC webhook.
+- A small NestJS backend. It does the jobs that need secrets or a server:
+  - binding wallets to Sumsub applicants and writing their v2 KYC records;
+  - the daily telemetry job, which publishes each car's day and appends its hash to the v2 chain as the project's oracle;
+  - co-signing revenue deposits whose report matches the published data;
+  - indexing the history of v2 program events for project timelines and claim histories.
+
+  It keeps KYC state, the published days, the attested reports and the indexed events in one SQLite file.
 
 ```
              Investor / admin browser (Phantom or Solflare, devnet)
@@ -20,21 +26,31 @@ AXEL has four parts:
 │ catalog · asset page · dashboard · payouts · admin panel         │
 │ reads accounts over JSON-RPC, builds transactions from the IDL   │
 └───────┬───────────────────────────────────────────┬──────────────┘
-        │ RPC reads + wallet-signed transactions    │ HTTP GET /telemetry/latest/:mint
+        │ RPC reads + wallet-signed transactions    │ HTTP /telemetry/*, /reports/*, /events
         ▼                                           ▼
 ┌────────────────────────────────┐   ┌────────────────────────────────────┐
 │ Solana (devnet)                │   │ Backend — NestJS 11 (backend/)     │
-│                                │   │ no database, in-memory cache       │
-│ axel program                   │◄──┤ telemetry cron  (oracle keypair)   │──► Yandex Fleet API
-│   12 instructions, 5 acct types│ tx│ KYC webhook     (admin keypair)    │◄── Sumsub webhook
-│ transfer_hook program          │   └────────────────────────────────────┘
-│ Token-2022 mint (one per car)  │
-└────────────────────────────────┘
+│                                │   │ SQLite: KYC, published days,       │
+│ axel program                   │   │   attested reports, event index    │
+│   12 instructions, 5 acct types│   │ telemetry job                      │──► Yandex Fleet API
+│ axel_v2 program (not deployed) │◄──┤   record_telemetry (oracle key)    │
+│ transfer_hook program          │ tx│ reports: co-sign deposit_revenue   │
+│ Token-2022 mint (one per car)  │   │ KYC sign-in + Sumsub webhook       │◄── Sumsub webhook
+│                                │   │   set_investor (KYC authority key) │
+│                                ├──►│ event indexer                      │
+└────────────────────────────────┘ ws│   logsSubscribe + history (RPC)    │
+                                     └────────────────────────────────────┘
 ```
 
 **Golden rule (from the spec):**
 - Business state lives in on-chain accounts. The frontend reads it straight from RPC, and no server keeps a copy.
-- The backend keeps only an in-memory telemetry cache, up to 30 days per project, which is lost on restart.
+- The backend's SQLite file holds:
+  - sign-in nonces, which wallet belongs to which Sumsub applicant, and a log of webhook events;
+  - the published text of every telemetry day, with its place in the chain;
+  - the revenue reports the oracle attested;
+  - an index of the v2 program's events. It is a copy of chain history for timelines, not state: balances and project states are still read from the accounts, and the index can be rebuilt from the chain.
+
+  KYC status itself lives in the v2 `Investor` accounts. The telemetry chain head and each deposit's report hash live in `Project` and `RevenuePeriod`, so the stored texts can always be checked against the chain.
 
 ## Repository Layout
 
@@ -52,7 +68,7 @@ programs/
 tests/                          12 integration test files (node:test, local validator at 127.0.0.1:8899)
 scripts/                        init-project.ts (seed a project), generate-clients.ts (Codama)
 sdk/axel-v2/                    Codama TypeScript client of the v2 program (see v2.md)
-backend/src/                    health, kyc, telemetry, yandex, solana modules
+backend/src/                    health, kyc, fleet (Yandex Fleet client, simulator), telemetry, reports, indexer, solana modules
 frontend/src/
   app/[locale]/                 routes (en default, ru, kk)
   hooks/                        chain reads and transaction hooks
@@ -206,58 +222,95 @@ Seed 6 uses the account at index 3. For a permanent-delegate transfer that accou
 
 ## Oracle / Telemetry Flow
 
-```
-Yandex Fleet API              Backend (TelemetryCronService)                  Solana
-      │   POST /v1/parks/orders/list  │                                          │
-      │ ◄──────────────────────────── │  cron, default 01:00 daily               │
-      │   completed orders, prev day  │                                          │
-      │ ────────────────────────────► │  filter by licence plate                 │
-      │                               │  aggregate: revenue × 0.76, km, trips    │
-      │                               │  SHA-256 of canonical JSON               │
-      │                               │  record_telemetry(YYYYMMDD, hash) ──────►│ TelemetryRecord PDA
-      │                               │  in-memory cache (30 entries/project)    │
-      │                  Frontend ───►│  GET /telemetry/latest/:mint             │
-```
-
-1. The cron needs two settings: `PROJECT_MINT` and `VEHICLE_LICENSE_PLATE`. It fetches the previous day's completed orders for the park (paginated, 500 per page). It keeps orders whose plate matches after normalization: spaces removed, upper-cased, and Cyrillic look-alike letters mapped to Latin.
-2. It aggregates the matching orders into daily figures:
-   - Revenue in KZT: the sum of `price`, multiplied by `NET_INCOME_FACTOR = 0.76`. This factor is a hardcoded estimate of "22% Yandex commission + 2% transaction costs".
-   - Mileage in km.
-   - Trip count.
-   - Status: `active` if there were trips, otherwise `inactive`.
-3. It hashes `JSON.stringify({date, vehicle_id, daily_revenue, mileage_km, trips_count, car_status})` with SHA-256.
-4. If `ORACLE_KEYPAIR_PATH` loaded, it signs and sends `record_telemetry`. The hash on chain is a proof of existence: anyone holding the same JSON can recompute it and compare. The raw figures stay off-chain.
-5. It caches the result in memory and serves it at `GET /telemetry/latest/:projectId` (see [api.md](api.md)).
-
-**Simulated fallback.** If the Yandex credentials are missing, or the Yandex call fails, `YandexFleetService` returns **deterministic simulated data** seeded from plate and date. That data is hashed and submitted exactly like real data, and the HTTP response does not mark it as simulated. The repository contains no evidence that a live vehicle or Yandex Fleet park has been connected.
-
-**Revenue is not linked to telemetry.** The amount passed to `deposit_revenue` is chosen by the admin. The admin panel computes it as gross revenue − expenses − maintenance reserve, entered in SOL. The program does not check that amount against the telemetry records.
-
-## KYC Webhook Flow
+This is the v2 flow. The backend no longer sends anything to the v1 program.
 
 ```
-Investor ──► Sumsub (identity check; externalUserId must be the wallet address)
-                 │  POST /kyc/webhook   header x-payload-digest = HMAC-SHA256(raw body)
-                 ▼
-            Backend KycService
-              verify signature (skipped if SUMSUB_WEBHOOK_SECRET is unset)
-              act only on type == "applicantReviewed" and reviewAnswer == "GREEN"
-              parse externalUserId as a Solana public key
-              sign add_to_whitelist(wallet) with ADMIN_KEYPAIR_PATH (one retry)
-                 │
-                 ▼
-            WhitelistEntry{approved: true} ──► investor can call buy_tokens
+Yandex Fleet API / simulator      Backend                                          Solana (axel_v2)
+      │ orders, driver profiles,  │ daily job (CRON_SCHEDULE)                        │
+      │ rent transactions         │ 1. collect each car's missing days (≤ 31 back)   │
+      │ ◄──────────────────────── │    → day record, RFC 8785 text, SHA-256          │
+      │                           │    → SQLite, published at /telemetry/...         │
+      │                           │ 2. record_telemetry, ≤ 20 days per tx ─────────► │ Project.telemetry_head
+      │                           │                                                  │
+ operator wallet ── POST /reports/draft ──► report from published days + expenses    │
+ operator wallet ── POST /reports/attest (signed deposit) ──► checks, oracle co-signs│
+ operator wallet ── sends deposit_revenue ─────────────────────────────────────────► │ RevenuePeriod.report_hash
 ```
 
-What the webhook does **not** do:
-- A `RED` answer causes no on-chain action. The backend never calls `remove_from_whitelist`.
-- It does not thaw token accounts. Thawing happens inside `buy_tokens`.
+1. **Cars.** `FLEET_CONFIG` maps each share mint to a plate, a source (`yandex_fleet` or `simulated`) and the park's fee. The day boundaries follow `FLEET_UTC_OFFSET` (Kazakhstan, `+05:00`).
+2. **Collecting.** For every car the job reads each finished day it does not have yet, oldest first.
+   - With Yandex Fleet:
+     - trips and distance come from the park's completed orders, matched by plate (spaces removed, upper-cased, Cyrillic look-alikes mapped to Latin);
+     - the rent comes from the park's rent-charge transactions for the drivers currently assigned to the car.
+   - If a request fails, the car stops at that day and nothing is invented.
+   - Simulated cars use a deterministic generator, and their records say `data_origin: "simulated"`.
+3. **Publishing.** Each day becomes a record whose RFC 8785 text is stored as is, served at `GET /telemetry/:mint/:date.json`, and hashed with SHA-256. The text never changes once collected.
+4. **Recording.** The oracle key appends the days to the project's chain with `record_telemetry`, 20 per transaction. Each signed batch is stored before it is sent, so after a crash the next run can tell whether it landed.
+   - It writes only while the project is Operating or Paused, and only if the project's oracle is its key.
+   - It stops if the chain holds a head it did not write.
+   - `GET /telemetry/:mint/proof?date=` gives a day's text, hash, chain position, heads and transaction.
+5. **Attesting revenue.**
+   - The operator asks for a draft report for a period. The report adds up the rent from the published days, subtracts the park's fee and the operator's maintenance and insurance items (each with an optional document hash), and gives the deposit amount.
+   - The operator's wallet signs `deposit_revenue` with that report's hash and amount.
+   - The backend rebuilds the report and checks the transaction (only that deposit, nothing else for the oracle to sign). It refuses a period that overlaps an earlier deposit, then adds the oracle's signature.
+   - The report is published at `/reports/:mint/:hash.json`, and its hash is in the deposit's `RevenuePeriod`.
 
-Nothing in the repository creates a Sumsub applicant. There is also no Sumsub link in the UI:
-- The `KycPrompt` component links to `https://kyc.blockpass.org/`.
-- `KycPrompt` is rendered only by `WhitelistGate`, and no page mounts `WhitelistGate`.
+[api.md](api.md#telemetry-what-is-published) has the record and report formats, the status codes and every check.
 
-In practice, wallets are whitelisted from the admin panel (`WhitelistManager`) or by calling the instruction directly.
+**What this does and does not prove.**
+- It proves that the deposit pays out exactly the published report. The report's income comes only from days whose hashes are in the chain, and simulated data is marked as such, inside the hashed text.
+- It does not prove that the fleet system reported the truth, or that the operator's expense items are complete. The oracle is one backend key, and the Yandex rent attribution uses the drivers' current car assignment.
+
+## Event Indexer (v2)
+
+The backend indexes the events `axel_v2` emits, so the frontend can show a car's timeline and an investor's payouts without scanning the chain itself. Endpoints: [api.md](api.md#program-events-what-is-indexed).
+
+```
+logsSubscribe (confirmed, mentions axel_v2) ── notification ──┐   logs kept, sync starts now
+resubscribed after a drop ────────────────────────────────────┤
+poll every INDEXER_POLL_INTERVAL_MS ──────────────────────────┤
+                                                              ▼
+getSignaturesForAddress(axel_v2, until = cursor), paged to the cursor, then oldest first:
+   failed transaction   → stored without events
+   notified             → the notification's logs
+   otherwise            → getTransaction(confirmed)
+   logs → invoke stack → axel_v2's `Program data:` records, including those written as the
+          Token-2022 transfer hook → decoded with the vendored IDL (round trip checked)
+   SQLite, one transaction per chain transaction: transaction, events, cursor
+```
+
+- The history is the source of truth and the subscription only makes it fast. Nothing that the subscription alone reports is stored.
+- A failed sync is retried after 1 s, doubling up to 60 s. A notified transaction that the history does not list yet is retried the same way for up to two minutes.
+- The database remembers the genesis hash and program ID it was filled from, and halts on a mismatch.
+- The subscription is a small `ws` client, not web3.js's. web3.js hides its reconnects, so it could not trigger a catch-up, and it keeps a socket reconnecting after shutdown.
+- `npm run test:localnet` runs it against `solana-test-validator` with the built `axel_v2.so`. The test sends real transactions (config, KYC, create, buys, activation, telemetry, a deposit, claims and a hooked transfer), some before the backend starts and some while it runs, then restarts the backend. It checks each event against the chain: the claim against the balance change, and the telemetry head against `Project`.
+
+## KYC Flow (v2)
+
+The backend writes v2 `Investor` records with its own key, `Config.kyc_authority`. That key signs nothing else, and the admin key is not on the server.
+
+```
+Wallet ──► GET  /kyc/nonce?wallet=…     Sign-In With Solana message with a single-use nonce (5 min)
+       ──► POST /kyc/session            wallet, nonce, signature
+             backend: ed25519 check, nonce burned, wallet bound to a random externalUserId (SQLite)
+       ◄── Sumsub WebSDK token for that externalUserId
+Wallet ──► Sumsub WebSDK (documents, liveness)
+Sumsub ──► POST /kyc/webhook            X-Payload-Digest + X-Payload-Digest-Alg
+             backend: HMAC over the raw body (timingSafeEqual), refused if no secret is set
+             GREEN  → confirm with the Sumsub API (same externalUserId, completed, GREEN, our level)
+                      → set_investor(Active, expires in 12 months, jurisdiction from the documents, Sumsub)
+             reset, deactivated, RED FINAL → set_investor(Revoked), only for records Sumsub granted
+             nothing is sent if the record would not change; events for one wallet run in order,
+             and an event older than the last applied one is ignored
+```
+
+Safety rules:
+- **Only a wallet that signed can be approved.** `externalUserId` is a random ID the backend creates after the signature check, so nobody can start a check for a wallet they do not control.
+- **A sanctions freeze is never lifted or overwritten** by a webhook; manual and demo records are never revoked by one.
+- **Retries are safe.** Sumsub retries any non-2xx answer. An RPC outage, a failed transaction or a Sumsub API error returns 5xx, and the retry finds the on-chain record as it really is.
+- **Fail closed.** Without `SUMSUB_WEBHOOK_SECRET` or the KYC key the webhook answers 503; in production the backend does not start without them ([api.md](api.md#backend-configuration)).
+
+v2 is not deployed yet, so these records exist only on a local validator or LiteSVM. v1 wallets are still approved from the admin panel (`WhitelistManager`) or by calling `add_to_whitelist` directly; the backend no longer calls v1.
 
 ## Frontend
 
@@ -292,11 +345,11 @@ Details:
 - **Fixed supply:** `token_supply` caps minting. After `revoke_mint_authority`, the mint authority is gone for good.
 - **No double claim per wallet:** `ClaimRecord` is created with `init`, so a second claim for the same period fails.
 - **Checked arithmetic:** overflow is checked with `checked_*` operations; the payout uses u128.
-- **Oracle-only telemetry:** only the registered oracle key can write telemetry, and only one record per project per day.
+- **Oracle-only telemetry:** only the registered oracle key can write telemetry, and only one record per project per day (v1). In v2 the oracle appends to a hash chain with strictly increasing dates, and co-signs every revenue deposit.
 
 ## Known Limitations
 
-These come from reading the code on 2026-09-24. None of them is fixed yet.
+These come from reading the code on 2026-09-24. None of the program's limitations is fixed in v1. Items 5 and 6 are fixed in the backend, which now serves the v2 program only.
 
 1. **Anyone can whitelist anyone.** `add_to_whitelist` and `remove_from_whitelist` accept any signer. Any wallet can approve itself, which defeats KYC gating for `buy_tokens` and for the hook. It can also revoke other wallets. The integration tests call both instructions with a freshly generated keypair.
 2. **Revenue claims use the current balance.** `claim_revenue` pays `current balance / snapshot × deposit`. Two cases pay out more than intended:
@@ -309,16 +362,12 @@ These come from reading the code on 2026-09-24. None of them is fixed yet.
    - A wallet can receive shares by transfer only if it has already bought through `buy_tokens`.
    - Once every share is sold, no new wallet can get a thawed account.
    - Anyone can create an ATA for any wallet. If a wallet's ATA is created before its first purchase, the ATA stays frozen and that wallet's `buy_tokens` fails when minting.
-5. **The backend's `record_telemetry` transaction fails.**
-   - The hand-built instruction in `telemetry-cron.service.ts` passes five accounts: `oracle, project_state, mint, telemetry_record, system_program`.
-   - The program expects four: `oracle, project_state, telemetry_record, system_program`.
-   - The extra `mint` shifts the order, so the telemetry PDA check fails.
-   - The retry path then caches the data without a transaction signature.
-6. **Simulated telemetry is not flagged.** See [Oracle / Telemetry Flow](#oracle--telemetry-flow).
+5. **No telemetry was written on-chain.** The backend's v1 `record_telemetry` transaction passed an extra `mint` account, so the telemetry PDA check always failed. That path is removed. The backend now writes v2 `record_telemetry` batches built from the IDL ([Oracle / Telemetry Flow](#oracle--telemetry-flow)), so v1 projects get no telemetry.
+6. **Simulated telemetry was not flagged.** It was served like real data, and the backend fell back to it silently when Yandex failed. Now every record carries `data_origin` inside its hashed text, there is no fallback, and simulated cars are refused on mainnet.
 7. **The telemetry widget does not reach the backend.**
    - `useTelemetry` fetches `${NEXT_PUBLIC_API_URL}/telemetry/latest/:mint`. That variable is not in `.env.local.example`, and when it is empty the request goes to the Next.js origin, which has no such route.
    - The separate client `lib/api/telemetry.ts` uses `NEXT_PUBLIC_TELEMETRY_API_URL`, but no component calls it.
-   - The backend does not enable CORS.
+   - The backend allows only the origins in `CORS_ORIGINS` (default `http://localhost:3000`).
 8. **The whitelist status hook always returns false.** `useWhitelistStatus` derives the whitelist PDA and then passes it to `fetchWhitelistEntry`, which derives a PDA again from that address. Nothing calls it any more: the asset page uses its own correct reader, `components/asset/useWalletApproval.ts`.
 9. **The revenue vault is subject to rent rules.** The vault is a 0-byte system account, so Solana's rent-state rules apply. A deposit that would leave an empty vault below the rent-exempt minimum (890,880 lamports) is rejected. So is a claim that would leave a non-zero balance below that minimum. Rounding dust can therefore block the last claim of a period, unless the vault holds extra SOL.
 10. **Transfer-fee rounding.** Token-2022 rounds the fee up, and shares have 0 decimals, so every transfer pays at least one whole share. A 1-share transfer delivers nothing to the recipient.

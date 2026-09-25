@@ -8,7 +8,7 @@
     "pretest:v2": "[ tests-v2/node_modules/.package-lock.json -nt tests-v2/package-lock.json ] || npm --prefix tests-v2 ci --no-audit --no-fund",
     "test:v2": "npm --prefix tests-v2 test",
     "build": "anchor build",
-    "export-idl": "cp target/idl/axel_v2.json frontend/src/lib/solana/idl-v2/axel_v2.json && sed 's|IDL can be found at `target/idl/axel_v2.json`.|IDL can be found at `axel_v2.json` next to this file.|' target/types/axel_v2.ts > frontend/src/lib/solana/idl-v2/axel_v2.ts",
+    "export-idl": "for dir in frontend/src/lib/solana/idl-v2 backend/src/solana/idl; do cp target/idl/axel_v2.json \"$dir/axel_v2.json\" && sed 's|IDL can be found at `target/idl/axel_v2.json`.|IDL can be found at `axel_v2.json` next to this file.|' target/types/axel_v2.ts > \"$dir/axel_v2.ts\" || exit 1; done",
     "generate": "npx tsx scripts/generate-clients.ts",
     "init-project": "npx tsx scripts/init-project.ts",
     "lint": "tsc --noEmit"

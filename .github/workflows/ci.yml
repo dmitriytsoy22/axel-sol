@@ -47,7 +47,7 @@ jobs:
         run: npm run build
 
   backend:
-    name: Backend (build)
+    name: Backend (lint, test, build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -63,6 +63,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit and HTTP tests
+        run: npm test
 
       - name: Build
         run: npm run build
@@ -141,16 +147,16 @@ jobs:
       - name: v2 program tests on LiteSVM
         run: npm run test:v2
 
-      - name: Check the IDL vendored in the frontend and the SDK match the build
+      - name: Check the IDL vendored in the frontend and the backend, and the SDK, match the build
         run: |
           npm ci --no-audit --no-fund
           npm run export-idl
           npm run generate
-          changes="$(git status --porcelain -- frontend/src/lib/solana/idl-v2 sdk/axel-v2)"
+          changes="$(git status --porcelain -- frontend/src/lib/solana/idl-v2 backend/src/solana/idl sdk/axel-v2)"
           if [ -n "$changes" ]; then
             echo "::error::Committed IDL or SDK is stale. Run anchor build, npm run export-idl and npm run generate."
             echo "$changes"
-            git diff --stat -- frontend/src/lib/solana/idl-v2 sdk/axel-v2
+            git diff --stat -- frontend/src/lib/solana/idl-v2 backend/src/solana/idl sdk/axel-v2
             exit 1
           fi
 

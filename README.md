@@ -33,8 +33,15 @@ AXEL existed before the hackathon. See [Prior Work and Hackathon Scope](#prior-w
 
 ### 2. Trust in reported income
 - **Problem:** Co-investors in a car usually see only the income the owner chooses to report.
-- **AXEL:** Every deposit, every claim and the share count behind each payout are public program accounts. A backend oracle aggregates the car's daily Yandex Fleet orders (revenue, mileage, trips), hashes them with SHA-256 and writes the hash on-chain with `record_telemetry`. Only the project's registered oracle key can write it, once per day. Anyone holding the same figures can recompute the hash.
-- **Gaps:** the admin chooses the deposited amount, and the program does not check it against telemetry. The backend's `record_telemetry` transaction currently fails, so no telemetry hash is on devnet yet.
+- **AXEL:** Every deposit, every claim and the share count behind each payout are public program accounts. A backend job aggregates the car's daily Yandex Fleet orders (revenue, mileage, trips) and hashes them with SHA-256. `record_telemetry` lets only the project's registered oracle key write such a hash on-chain, once per day, and anyone holding the same figures can recompute it.
+- **v2 backend:**
+  - The backend publishes each car's daily record (trips, km, the rent the park charged, and whether the data is real or simulated) as RFC 8785 JSON.
+  - As the project's oracle, it appends each record's hash to the v2 program's telemetry chain.
+  - It co-signs a revenue deposit only when the report behind it adds up from those published days, and the report's hash is stored with the deposit.
+- **Gaps:**
+  - On v1 the admin chooses the deposited amount, and nothing checks it.
+  - v2 is not deployed, so no telemetry hash is on devnet yet.
+  - The oracle is one backend key, and the Yandex Fleet requests have not been run against a real park.
 
 ### 3. Compliance and KYC on every transfer
 - **Problem:** A plain SPL token can be sent to anyone. Shares of a real asset need an allow-list of holders, enforced on every transfer and not only at the first sale.
@@ -42,7 +49,7 @@ AXEL existed before the hackathon. See [Prior Work and Hackathon Scope](#prior-w
   - `buy_tokens` requires an approved `WhitelistEntry` PDA for the buyer.
   - The mint uses `DefaultAccountState = Frozen`, so every new token account starts frozen. The program, as freeze authority, thaws the buyer's account inside `buy_tokens`.
   - A separate `transfer_hook` program runs on every `transfer_checked` and rejects the transfer unless the owners of both the source and the destination accounts are whitelisted.
-  - A Sumsub webhook on the backend whitelists a wallet after a `GREEN` KYC review.
+  - On v1, wallets are whitelisted from the admin panel. The backend's KYC flow already targets v2: a wallet signs in, passes Sumsub, and the webhook writes its v2 KYC record with a dedicated key.
 - **Gap:** `add_to_whitelist` does not check who signs yet, so the on-chain gate is only as strong as that fix.
 
 ### 4. Fair payouts
@@ -59,7 +66,7 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 - **Token-2022 extensions natively.** One `initialize_project` instruction configures six mint extensions: TransferHook, DefaultAccountState, PermanentDelegate, TransferFeeConfig (1%), MetadataPointer and TokenMetadata. The compliance rules and the car's VIN, make, model, year and valuation live in the token itself, with no custom token program.
 - **Transfer-hook composability.** Token-2022 invokes the hook on every `transfer_checked`, whichever wallet or program moves the shares. The whitelist check is part of the token, not of the AXEL UI.
 - **Low fees for per-period claims.** Each holder claims each period in a transaction of its own, or several periods at once with "Claim all". A claim costs the 5,000-lamport base fee plus rent for a 10-byte `ClaimRecord`.
-- **Wallet adapter.** Solana Wallet Adapter connects Phantom and Solflare. The frontend reads program accounts directly over RPC with the Anchor IDL, so there is no database.
+- **Wallet adapter.** Solana Wallet Adapter connects Phantom and Solflare. The frontend reads program accounts directly over RPC with the Anchor IDL, so no server keeps a copy of business state.
 
 ---
 
@@ -77,10 +84,25 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 - `npm run init-project` creates a project: a Token-2022 mint with six extensions and metadata, plus its `ProjectState`
 - `update_price` and `revoke_mint_authority` are available on-chain; they have no UI yet
 
-**Oracle and KYC backend (NestJS, no database)**
-- `GET /health`, `GET /telemetry/latest/:projectId`, `POST /kyc/webhook`
-- Daily cron that fetches the previous day's completed Yandex Fleet orders for the car's licence plate, aggregates revenue, mileage and trips, hashes them with SHA-256 and signs `record_telemetry` with the oracle key
-- KYC webhook: verifies the Sumsub HMAC-SHA256 signature (skipped if `SUMSUB_WEBHOOK_SECRET` is unset), and on `applicantReviewed` + `GREEN` signs `add_to_whitelist` for the wallet in `externalUserId`
+**Oracle, telemetry, KYC and event-index backend (NestJS, SQLite)**
+- Endpoints ([docs/api.md](docs/api.md#backend-http-endpoints)):
+  - `GET /health`;
+  - telemetry: `GET /telemetry/latest/:mint`, `/telemetry/:mint/:date.json`, `/telemetry/:mint/proof`, `/telemetry/:mint/chain`;
+  - reports: `POST /reports/draft`, `POST /reports/attest`, `GET /reports/:mint`, `/reports/:mint/:hash.json`;
+  - KYC: `GET /kyc/nonce`, `POST /kyc/session`, `POST /kyc/webhook`;
+  - program events: `GET /events`, `/projects/:mint/history`, `/positions/:owner/claims`.
+- Several cars from `FLEET_CONFIG` (share mint → plate, source, park fee). The daily job fills in every missed day, up to 31 back.
+  - Real cars: trips and km come from Yandex Fleet orders, and the rent from the park's charges to the car's drivers.
+  - Simulated cars: a deterministic generator. Every record says `data_origin: "simulated"`, there is no silent fallback, and mainnet refuses them.
+- Each day is published as RFC 8785 JSON, hashed with SHA-256, stored in SQLite, and appended to the v2 chain with `record_telemetry` (20 days per transaction, oracle key). A crash between sending and confirming is reconciled on the next run.
+- Revenue reports: rent − park fee − maintenance − insurance (plus sale proceeds in a final report), with the telemetry head.
+  - Before adding the oracle's signature, the backend rebuilds the report and checks the operator-signed `deposit_revenue`.
+  - The transaction may hold only that deposit, its arguments must match the report, and no earlier deposit may overlap the period.
+- Wallet binding: the wallet signs a Sign-In With Solana message with a single-use nonce, and only then gets a Sumsub WebSDK token for an applicant bound to it
+- Sumsub webhook: HMAC over the raw body with the algorithm Sumsub names, compared in constant time; approvals confirmed with the Sumsub API; v2 `set_investor` (Active for 12 months, or Revoked) built from the IDL and signed by a dedicated KYC key; nothing sent when the record would not change; a sanctions freeze is never touched
+- Refuses to start in production without the webhook secret, the Sumsub credentials, the KYC key, the program ID and the allowed origins; CORS limited to `CORS_ORIGINS`; rate limits on the sign-in endpoints
+- Event indexer: the v2 program's history (`getSignaturesForAddress`, `getTransaction`) stored in SQLite oldest first with a cursor, a `logsSubscribe` websocket that brings new events in at once, retries with backoff, and events the transfer hook emits inside Token-2022 kept. It halts rather than mix two clusters in one database.
+- Jest tests with the Solana RPC, the Sumsub API and the Yandex Fleet API replaced at their boundaries; the fake RPC applies `set_investor` and `record_telemetry` the way the program does. `npm run test:localnet` runs the indexer against `solana-test-validator` with the built `axel_v2.so`.
 
 **Frontend**
 - Next.js 14 App Router; transactions are built from the vendored IDL (`frontend/src/lib/solana/idl/`)
@@ -101,9 +123,9 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 | Client SDK | Codama (`npm run generate` → `sdk/axel-v2`, the v2 program) |
 | Frontend | Next.js 14.2 · React 18.3 · TypeScript 5 · Tailwind CSS 3.4 · `@coral-xyz/anchor` 0.32.1 · `@solana/web3.js` 1.98 · `@solana/spl-token` 0.4.14 · Solana Wallet Adapter (Phantom, Solflare) · `next-intl` 4.8 · React Hook Form 7 + Zod 3 |
 | Frontend tests | Vitest 3.2 · Testing Library · jsdom |
-| Backend | NestJS 11 · `@nestjs/schedule` 5 · `@nestjs/config` 4 · `@solana/web3.js` 1.98 · `@coral-xyz/anchor` 0.32.1 |
-| External services | Yandex Fleet API (telemetry source) · Sumsub (KYC webhook) |
-| CI | GitHub Actions: frontend lint, typecheck, unit tests and build; backend build; programs build, Rust and LiteSVM tests, IDL and SDK freshness |
+| Backend | NestJS 11 · `@nestjs/schedule` 5 · `@nestjs/config` 4 · `@nestjs/throttler` 6 · `better-sqlite3` 12 · `@solana/web3.js` 1.98 · `@coral-xyz/anchor` 0.32.1 · Jest 29 + Supertest · ESLint 10 + typescript-eslint |
+| External services | Yandex Fleet API (telemetry source) · Sumsub (WebSDK tokens, applicant API, webhook) |
+| CI | GitHub Actions: frontend lint, typecheck, unit tests and build; backend lint, tests and build; programs build, Rust and LiteSVM tests, IDL and SDK freshness |
 | AI tools | Claude Code (coding assistant) · Google Stitch (UI drafts) |
 
 ---
@@ -119,15 +141,15 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 │ catalog · asset page · dashboard · payouts · admin panel            │
 │ reads program accounts over RPC with the vendored Anchor IDL        │
 └───────────┬───────────────────────────────────────┬─────────────────┘
-            │ RPC reads + signed transactions       │ GET /telemetry/latest/:mint
+            │ RPC reads + signed transactions       │ HTTP /telemetry, /reports
             ▼                                       ▼
 ┌─────────────────────────────────┐    ┌─────────────────────────────────┐
 │ Solana devnet                   │    │ Backend · NestJS 11    backend/ │
-│                                 │    │ no database                     │
-│ axel program · 12 instructions  │◄───┤ telemetry cron    (oracle key)  │◄── Yandex Fleet API
-│   ProjectState  RevenuePeriod   │ tx │ KYC webhook       (admin key)   │◄── Sumsub webhook
-│   ClaimRecord   WhitelistEntry  │    └─────────────────────────────────┘
-│   TelemetryRecord · vault PDA   │
+│                                 │    │ SQLite: KYC, days, reports      │
+│ axel program · 12 instructions  │    │ telemetry job → v2 chain        │◄── Yandex Fleet API
+│   ProjectState  RevenuePeriod   │    │ deposit attestation (oracle)    │
+│   ClaimRecord   WhitelistEntry  │    │ KYC sign-in, webhook → v2 only  │◄── Sumsub webhook
+│   TelemetryRecord · vault PDA   │    └─────────────────────────────────┘
 │                                 │
 │ Token-2022 mint (one per car)   │
 │   6 extensions, VIN metadata    │
@@ -141,13 +163,13 @@ All open gaps are listed in [Status and Known Limitations](#status-and-known-lim
 **Flow**
 
 1. **`initialize_project`** (admin, via `npm run init-project`): creates the Token-2022 mint (0 decimals, six extensions, metadata with VIN, make, model, year and valuation) and the `ProjectState` PDA. The mint and freeze authorities are that PDA. No shares exist yet.
-2. **KYC webhook:** Sumsub posts `applicantReviewed` with `GREEN` to `POST /kyc/webhook`. The backend checks the HMAC signature and reads the wallet from `externalUserId`.
-3. **Whitelist:** the backend (or the admin panel) calls `add_to_whitelist(wallet)`, which creates `WhitelistEntry { approved: true }` at `["whitelist", wallet]`.
+2. **KYC:** on v1 the admin approves a wallet by hand. The backend's Sumsub flow writes v2 KYC records instead ([docs/architecture.md](docs/architecture.md#kyc-flow-v2)).
+3. **Whitelist:** the admin panel calls `add_to_whitelist(wallet)`, which creates `WhitelistEntry { approved: true }` at `["whitelist", wallet]`.
 4. **`buy_tokens(n)`:** requires the buyer's approved `WhitelistEntry`. It sends `n × price_per_share` lamports to the admin. On a first purchase it creates the buyer's token account and thaws it (accounts start frozen), then mints `n` shares.
 5. **`deposit_revenue(period, amount)`** (admin): moves `amount` lamports into the revenue vault PDA and creates a `RevenuePeriod` with `token_supply_snapshot` = shares sold at that moment.
 6. **`claim_revenue(period)`** (holder): pays `balance × total_deposited / snapshot` from the vault and creates a `ClaimRecord` that blocks a second claim.
 7. **Holder-to-holder transfers:** Token-2022 calls `transfer_hook` on every `transfer_checked`. The hook requires an approved `WhitelistEntry` for both owners, and Token-2022 withholds a 1% transfer fee, in shares.
-8. **`record_telemetry(date, hash)`** (oracle, daily cron): stores the SHA-256 hash of the day's Yandex Fleet figures in a `TelemetryRecord` PDA, one per project per day.
+8. **`record_telemetry(date, hash)`** (oracle): stores the SHA-256 hash of a day's Yandex Fleet figures in a `TelemetryRecord` PDA, one per project per day. The backend does not write v1 telemetry. It writes to the v2 hash chain instead ([docs/architecture.md](docs/architecture.md#oracle--telemetry-flow)).
 
 Full breakdown with every PDA seed, instruction precondition and account layout: [docs/architecture.md](docs/architecture.md). HTTP endpoints and the instruction reference: [docs/api.md](docs/api.md).
 
@@ -185,8 +207,8 @@ AXEL is an MVP on **devnet only**. The programs are **not audited**, and there i
 - `add_to_whitelist` and `remove_from_whitelist` accept **any signer**, so the KYC gate is not enforced on-chain until they are restricted to an authorized key.
 - `claim_revenue` pays on the **current** balance, so shares bought or transferred after a deposit can claim that period again.
 - Neither devnet mint has the hook's `ExtraAccountMetaList`, so holder-to-holder transfers fail today. Primary sales are mints, not transfers, so they are unaffected.
-- The backend's `record_telemetry` transaction passes one account too many and fails. Without Yandex Fleet credentials the backend serves simulated telemetry, and does not mark it as simulated.
-- The telemetry widget on the asset page is not connected to the backend. The UI has no KYC flow; wallets are approved by the backend's Sumsub webhook or from the admin panel.
+- The backend writes telemetry and co-signs deposits only for v2, which is not deployed. Its Yandex Fleet requests have not been run against a real park; simulated days are marked `data_origin: "simulated"`.
+- The telemetry widget on the asset page is not connected to the backend. The UI has no KYC flow yet; on v1, wallets are approved from the admin panel, and the backend's Sumsub flow writes v2 records.
 - Car photos are stock photos of the model, marked "Illustrative photo" on the page.
 
 Security reports: [SECURITY.md](SECURITY.md).
@@ -230,17 +252,23 @@ Checks, as run in CI: `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm
 
 Buying shares requires a wallet with an approved `WhitelistEntry` on devnet. A public demo path for judges is planned (see below).
 
-**Backend** (optional: telemetry oracle and KYC webhook)
+**Backend** (optional: telemetry, KYC and event history)
 
 ```bash
 cd backend
 cp .env.example .env                # every variable is documented in the file
 npm ci
 npm run start:dev                   # watch mode; or: npm run build && npm run start:prod
-curl http://localhost:3001/health   # {"status":"ok","rpc":"connected","oracle":"not_configured"}
+curl http://localhost:3001/health   # {"status":"ok","rpc":"connected","kyc":"not_configured","oracle":"not_configured","indexer":"live"}
 ```
 
-Without Yandex Fleet credentials the telemetry job uses simulated data. Without `ORACLE_KEYPAIR_PATH` and `ADMIN_KEYPAIR_PATH` it sends no transactions.
+Checks, as run in CI: `npm run lint`, `npm test`, `npm run build`. With the Agave toolchain on PATH and `anchor build` done, `npm run test:localnet` also runs the event indexer against a local validator.
+
+- **Cars** come from `FLEET_CONFIG`. A `simulated` car needs no credentials and is published with `data_origin: "simulated"`. A `yandex_fleet` car needs the `YANDEX_*` credentials.
+- **Oracle key.** Without `ORACLE_KEYPAIR_PATH`, days are still published, but nothing is written on-chain and `/reports/attest` answers 503.
+- **KYC.** Without `KYC_AUTHORITY_KEYPAIR_PATH`, `SUMSUB_WEBHOOK_SECRET` and the Sumsub API credentials, the KYC endpoints answer 503.
+- **Production.** With `NODE_ENV=production` the backend does not start without the KYC settings, or without the oracle key when cars are configured.
+- **Event history.** The indexer reads `SOLANA_RPC_URL` (or `INDEXER_RPC_URL`) and its websocket. The SQLite file belongs to one cluster; after resetting a local validator, use a new `DATABASE_PATH`. `INDEXER_ENABLED=false` turns it off.
 
 **Programs**
 
@@ -279,7 +307,7 @@ axel-sol/
 ├── scripts/                        # init-project.ts, generate-clients.ts, last-project.json
 ├── sdk/axel-v2/                    # Codama TypeScript client of the v2 program (docs/v2.md)
 ├── migrations/deploy.ts            # Anchor scaffold, unused
-├── backend/src/                    # NestJS: health, kyc, telemetry, yandex, solana modules
+├── backend/src/                    # NestJS: health, kyc, fleet, telemetry, reports, indexer, solana modules
 ├── frontend/
 │   ├── src/app/[locale]/           # /, /assets/[id], /dashboard, /payouts, /admin
 │   ├── src/components/             # admin, asset, catalog, dashboard, invest, layout, payouts, shared, ui, wallet
@@ -323,6 +351,15 @@ Done so far:
 - Pinned the SBF platform-tools in `Cargo.toml` so `anchor build` works with the current lockfile, and re-ran the program test suite on a local validator (49 tests pass).
 - Added missing asset-page translations (EN / RU / KK).
 - Rewrote this README to match the code.
+- Moved the backend's KYC to v2: wallet sign-in with a single-use nonce, Sumsub sessions bound to that wallet in SQLite, and a webhook that checks the HMAC properly and signs idempotent `set_investor` calls with a dedicated KYC key. Also CORS, rate limits, startup checks, ESLint and 151 Jest tests. See [docs/api.md](docs/api.md#backend-http-endpoints).
+- Made the backend the v2 oracle:
+  - several cars, with the rent model, and simulated data marked as such;
+  - RFC 8785 daily records published from SQLite, with a proof endpoint;
+  - `record_telemetry` batches that survive a crash between sending and confirming;
+  - revenue reports, and a deposit co-signature given only when the operator's report matches the published days.
+
+  Checked against the real `axel_v2.so` in LiteSVM: the chain head and the deposit's `report_hash` match. See [docs/architecture.md](docs/architecture.md#oracle--telemetry-flow).
+- Added a backend event indexer for v2: program history plus a live log subscription, stored idempotently in SQLite and served as `/events`, a project history by share mint, and an owner's claims with exact totals. It is tested against a real `solana-test-validator` running `axel_v2.so`, including the event the transfer hook emits inside Token-2022. See [docs/architecture.md](docs/architecture.md#event-indexer-v2).
 - Wrote the AXEL v2 program (`programs/axel-v2`, 24 instructions): escrowed fundraising with refunds, a KYC registry with restricted signers, a transfer hook inside the program, attested revenue deposits with claims that are safe against transfers and late buys, a telemetry hash chain and time-locked share recovery. It has 35 Rust tests and 530 LiteSVM tests, a generated client in `sdk/axel-v2`, and CI. Design: [docs/v2.md](docs/v2.md). It is not deployed yet.
 - Redesigned the frontend ([`frontend/design.md`](frontend/design.md)): new landing page, asset, portfolio, payouts and operator pages, self-hosted fonts, licensed photos, and pages checked for layout, contrast and accessibility at five widths in EN / RU / KK. The asset page no longer shows made-up specs or income projections.
 
@@ -330,7 +367,7 @@ In progress during the hackathon (**planned, not done yet**):
 - [ ] Public frontend deployment with a judge demo path (a whitelisted devnet test wallet)
 - [ ] End-to-end devnet demo with Explorer links: whitelist → buy → deposit → claim → transfer
 - [ ] Deploy AXEL v2 under its new program ID (written and tested locally, see above)
-- [ ] Move the frontend and backend to v2: stablecoin prices, the new project states, KYC records and recovery alerts
+- [ ] Move the frontend to v2: stablecoin prices, the new project states, KYC sign-in and records, recovery alerts, telemetry verification and the operator's deposit flow
 
 ---
 
@@ -352,7 +389,8 @@ In progress during the hackathon (**planned, not done yet**):
 - [ ] Restrict `add_to_whitelist` / `remove_from_whitelist` to an authorized key
 - [ ] Revenue claims that ignore shares bought or transferred after a deposit
 - [ ] Create the hook's `ExtraAccountMetaList` during project setup
-- [ ] Fix the backend's `record_telemetry` transaction and flag simulated telemetry
+- [x] Backend as the v2 oracle: telemetry batches, published records, attested revenue reports, simulated data flagged
+- [x] Backend event indexer for v2: project histories and claim histories
 - [ ] Connect KYC and the telemetry widget in the UI
 - [ ] Independent security audit, multisig authorities, mainnet
 

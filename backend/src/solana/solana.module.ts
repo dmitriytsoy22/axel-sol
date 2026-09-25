@@ -1,9 +1,21 @@
-import { Module, Global } from '@nestjs/common';
-import { SolanaService } from './solana.service';
+import { Global, Module } from '@nestjs/common';
+import { Connection } from '@solana/web3.js';
+
+import { APP_CONFIG, type AppConfig } from '../config/app-config';
+import { ProgramAccounts } from './program-accounts';
+import { SOLANA_CONNECTION, SolanaService } from './solana.service';
 
 @Global()
 @Module({
-  providers: [SolanaService],
-  exports: [SolanaService],
+  providers: [
+    {
+      provide: SOLANA_CONNECTION,
+      useFactory: (config: AppConfig) => new Connection(config.solana.rpcUrl, 'confirmed'),
+      inject: [APP_CONFIG],
+    },
+    SolanaService,
+    ProgramAccounts,
+  ],
+  exports: [SolanaService, ProgramAccounts],
 })
 export class SolanaModule {}
