@@ -57,3 +57,4 @@ frontend/test-results/
 scripts/seed-devnet/out/localnet*
 scripts/seed-devnet/out/*.localnet*
 scripts/seed-devnet/out/*.tmp
+tests-v2/junit.xml
