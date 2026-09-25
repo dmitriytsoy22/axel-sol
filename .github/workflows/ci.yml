@@ -80,6 +80,27 @@ jobs:
       - name: Build
         run: npm run build
 
+  seed:
+    name: Demo seed (typecheck, unit tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: scripts/seed-devnet/package-lock.json
+
+      - name: Install dependencies
+        run: npm --prefix scripts/seed-devnet ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm --prefix scripts/seed-devnet run typecheck
+
+      - name: Unit tests
+        run: npm run test:seed
+
   programs:
     name: Programs (build, Rust tests, v2 tests on LiteSVM, IDL and SDK)
     runs-on: ubuntu-latest
@@ -175,6 +196,9 @@ jobs:
             exit 1
           fi
 
+      - name: Typecheck the v1 tests and scripts against the build's types
+        run: npm run lint
+
       - name: SDK typecheck and tests
         working-directory: sdk/axel-v2
         run: |
@@ -256,3 +280,47 @@ jobs:
             frontend/e2e/.stack/logs
           include-hidden-files: true
           retention-days: 7
+
+  backend-localnet:
+    name: Backend event indexer on a local validator
+    needs: programs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AGAVE_VERSION: 2.3.13
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache Agave CLI
+        id: agave-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/share/solana/install
+          key: agave-${{ runner.os }}-${{ env.AGAVE_VERSION }}
+
+      - name: Install Agave CLI
+        if: steps.agave-cache.outputs.cache-hit != 'true'
+        run: sh -c "$(curl -sSfL "https://release.anza.xyz/v${AGAVE_VERSION}/install")"
+
+      - name: Add the Agave CLI to PATH
+        run: echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Use the axel_v2 program the programs job built
+        uses: actions/download-artifact@v8
+        with:
+          name: axel-v2-program
+          path: target/deploy
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --no-audit --no-fund
+
+      - name: Event indexer against solana-test-validator
+        working-directory: backend
+        run: npm run test:localnet

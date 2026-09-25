@@ -63,7 +63,7 @@ npm run start:prod    # node dist/main
 
 Cars come from `FLEET_CONFIG`. A `simulated` car needs no credentials and is published with `data_origin: "simulated"`, while a `yandex_fleet` car needs the `YANDEX_*` credentials. `backend/.env.example` documents every variable the backend reads.
 
-Backend tests boot the real `AppModule` (`src/testing/test-app.ts`) and replace only the outside world: the Solana RPC with `FakeRpc`, which checks signatures and applies `set_investor` with the IDL coder, the program's history and log subscription with `FakeLedger`, whose logs carry events encoded by the IDL coder, the Sumsub API with `FakeSumsub`, which checks request signatures, and the clock. The indexer is off in `createTestApp` unless a test sets `INDEXER_ENABLED=true`. `npm run test:localnet` (`*.localnet.ts`) starts its own `solana-test-validator` on free ports with `target/deploy/axel_v2.so` and sends real transactions; it is not part of `npm test` or CI. The v2 IDL is vendored in `backend/src/solana/idl/`; `npm run export-idl` in the root refreshes it with the frontend copy.
+Backend tests boot the real `AppModule` (`src/testing/test-app.ts`) and replace only the outside world: the Solana RPC with `FakeRpc`, which checks signatures and applies `set_investor` with the IDL coder, the program's history and log subscription with `FakeLedger`, whose logs carry events encoded by the IDL coder, the Sumsub API with `FakeSumsub`, which checks request signatures, and the clock. The indexer is off in `createTestApp` unless a test sets `INDEXER_ENABLED=true`. `npm run test:localnet` (`*.localnet.ts`) starts its own `solana-test-validator` on free ports with `target/deploy/axel_v2.so` and sends real transactions; it is not part of `npm test`, and CI runs it in the `backend-localnet` job with the program the programs job built. The v2 IDL is vendored in `backend/src/solana/idl/`; `npm run export-idl` in the root refreshes it with the frontend copy.
 
 ## End-to-end tests
 
@@ -114,14 +114,14 @@ Run from the repository root:
 npm install                              # test and codegen dependencies
 anchor build                             # target/deploy/*.so, target/idl, target/types
 anchor test --provider.cluster localnet  # local validator + tests/**/*.ts
-npm run lint                             # tsc --noEmit over tests/ and scripts/ (needs anchor build)
+npm run lint                             # tsc --noEmit over tests/ and scripts/ (needs anchor build; CI runs it)
 cargo test -p axel-v2                    # v2 math (unit + proptest), dates, telemetry chain, account layouts
 npm run test:v2                          # v2 program on LiteSVM (needs anchor build; reinstalls tests-v2 deps when its lockfile changes)
 npm run export-idl                       # copy target/idl/axel_v2.json and target/types/axel_v2.ts into frontend/src/lib/solana/idl-v2
 npm run generate                         # regenerate sdk/axel-v2 from target/idl/axel_v2.json
 npm --prefix sdk/axel-v2 ci && npm --prefix sdk/axel-v2 test   # generated client against the IDL
 npx tsx scripts/init-project.ts --cluster devnet   # create a project; admin = ~/.config/solana/id.json
-npm run test:seed                        # v2 demo seed unit tests (no validator)
+npm run test:seed                        # v2 demo seed unit tests (no validator; CI runs them)
 npm run seed:validator                   # local validator with axel_v2 as upgradeable program (needs anchor build)
 npm run seed -- --scale tiny             # seed it; needs DEMO_SEED_SECRET, see scripts/seed-devnet/README.md
 ```

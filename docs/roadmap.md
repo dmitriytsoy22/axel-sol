@@ -76,7 +76,8 @@ These close the open items in [architecture.md](architecture.md#known-limitation
 - [ ] Run the Yandex Fleet requests against a real park's credentials: the orders, driver profiles and transactions formats, and the rent category
 - [ ] Require the `Final` deposit before `close_project`, or make the order explicit in the console
 - [ ] Project creation in the console
-- [ ] `test:seed`, the backend's `test:localnet` and the v1 tests in CI
+- [x] `test:seed` and the backend's `test:localnet` in CI
+- [ ] The v1 tests in CI (CI only typechecks them)
 
 ## Before Mainnet
 
