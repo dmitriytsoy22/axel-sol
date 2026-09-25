@@ -22,23 +22,24 @@ vi.mock('next-intl', () => ({
   },
 }));
 
+// Shaped like usePayoutHistory output: amounts are SOL (converted from lamports on-chain).
 const mockData: PayoutRecord[] = [
   {
     id: 'p1',
-    period: 'Q1 2026',
-    deposited: 10000,
+    period: 'Toyota Camry #0',
+    deposited: 1.5,
     share: 0.1,
-    claimAmount: 500,
+    claimAmount: 0.15,
     status: 'claimed',
     txLink: 'http://test-tx',
     timestamp: 1234567890
   },
   {
     id: 'p2',
-    period: 'Q2 2026',
-    deposited: 10000,
+    period: 'Toyota Camry #1',
+    deposited: 2,
     share: 0.1,
-    claimAmount: 600,
+    claimAmount: 0.2,
     status: 'available',
     txLink: '',
     timestamp: 1234567891
@@ -51,28 +52,27 @@ describe('PayoutHistoryTable', () => {
     expect(screen.getByText('Loading payout history...')).toBeInTheDocument();
   });
 
-  it('renders mock data properly mapped to columns', () => {
+  it('renders SOL-denominated payout records in their columns', () => {
     render(<PayoutHistoryTable data={mockData} isLoading={false} />);
-    
-    // Check for values
-    // Check for values
-    expect(screen.getAllByText('Q1 2026')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Q2 2026')[0]).toBeInTheDocument();
-    
-    // Check formatted number ($10,000)
-    expect(screen.getAllByText('$10,000')[0]).toBeInTheDocument();
-    
-    // Check formatted percent
+
+    expect(screen.getAllByText('Toyota Camry #0')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Toyota Camry #1')[0]).toBeInTheDocument();
+
+    // Deposited amount in SOL with lamport-level precision
+    expect(screen.getAllByText('1.5000 SOL')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('2.0000 SOL')[0]).toBeInTheDocument();
+
+    // Share fraction rendered as percent
     expect(screen.getAllByText('10.00%')[0]).toBeInTheDocument();
-    
-    // Check formatted claim (+$500 and +$600)
-    expect(screen.getAllByText('+$500')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('+$600')[0]).toBeInTheDocument();
-    
+
+    // Claim amount in SOL, prefixed with +
+    expect(screen.getAllByText('+0.1500 SOL')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('+0.2000 SOL')[0]).toBeInTheDocument();
+
     // Status text
     expect(screen.getAllByText('Claimed')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Available')[0]).toBeInTheDocument();
-    
+
     // TX link check
     const txLink = screen.getAllByRole('link');
     expect(txLink.length).toBeGreaterThan(0);

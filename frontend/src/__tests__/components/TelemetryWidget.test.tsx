@@ -94,15 +94,17 @@ describe('TelemetryWidget', () => {
     expect(screen.getByText('Telemetry data is currently unavailable.')).toBeInTheDocument();
   });
 
-  it('renders error state on fetch failure', async () => {
+  it('falls back to the unavailable state instead of the RPC error screen on fetch failure', async () => {
     mockFetch.mockRejectedValue(new Error('Network error'));
 
     renderWidget();
 
     await waitFor(() => {
-      expect(screen.getByText('Connection Error')).toBeInTheDocument();
+      expect(screen.getByTestId('telemetry-empty')).toBeInTheDocument();
     });
-    expect(screen.getByText('Failed to load')).toBeInTheDocument();
+    expect(screen.getByText('Telemetry data is currently unavailable.')).toBeInTheDocument();
+    // Telemetry comes from the backend API, not the Solana RPC, so the RpcErrorBoundary must stay out of it
+    expect(screen.queryByText('Connection Error')).not.toBeInTheDocument();
   });
 
   it('handles stale data correctly', async () => {

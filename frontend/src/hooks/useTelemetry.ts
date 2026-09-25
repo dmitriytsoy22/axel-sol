@@ -30,9 +30,6 @@ export function useTelemetry(projectId: string, staleTimeoutMs = 60 * 60 * 1000)
       setError(null);
 
       try {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-
         const response = await fetch(`${API_BASE_URL}/telemetry/latest/${projectId}`);
         if (!response.ok) {
           throw new Error('Failed to fetch telemetry data');
