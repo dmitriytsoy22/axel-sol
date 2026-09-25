@@ -67,7 +67,10 @@
     "licensePlate": "Мемнөмір",
     "status": "Мәртебесі",
     "backToCatalog": "Каталогқа қайту",
-    "notFound": "Актив табылмады"
+    "notFound": "Актив табылмады",
+    "totalSupply": "Барлық токендер",
+    "tokensSold": "Сатылған токендер",
+    "revenueVault": "Түсім қоймасы"
   },
   "Kyc": {
     "title": "Верификация қажет",

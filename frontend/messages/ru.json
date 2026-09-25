@@ -67,7 +67,10 @@
     "licensePlate": "Госномер",
     "status": "Статус",
     "backToCatalog": "Вернуться в каталог",
-    "notFound": "Актив не найден"
+    "notFound": "Актив не найден",
+    "totalSupply": "Всего токенов",
+    "tokensSold": "Продано токенов",
+    "revenueVault": "Хранилище выручки"
   },
   "Kyc": {
     "title": "Требуется верификация",

@@ -67,7 +67,10 @@
     "licensePlate": "License Plate",
     "status": "Status",
     "backToCatalog": "Back to Catalog",
-    "notFound": "Asset not found"
+    "notFound": "Asset not found",
+    "totalSupply": "Total Supply",
+    "tokensSold": "Tokens Sold",
+    "revenueVault": "Revenue Vault"
   },
   "Kyc": {
     "title": "Verification Required",
