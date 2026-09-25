@@ -1,7 +1,7 @@
 {
   "name": "axel-backend",
   "version": "0.1.0",
-  "description": "AXEL backend: Yandex Fleet telemetry job, wallet sign-in and Sumsub KYC for axel_v2",
+  "description": "AXEL backend: fleet telemetry oracle, revenue report attestation, wallet sign-in and Sumsub KYC for axel_v2",
   "private": true,
   "scripts": {
     "build": "nest build",

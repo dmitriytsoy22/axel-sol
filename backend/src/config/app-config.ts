@@ -1,7 +1,12 @@
 import { PublicKey } from '@solana/web3.js';
 import { CronTime } from 'cron';
 
+import { parseUtcOffset } from '../common/dates';
+import { type FleetCar, parseFleetConfig } from '../fleet/fleet-config';
 import idl from '../solana/idl/axel_v2.json';
+import { ConfigError } from './config-error';
+
+export { ConfigError };
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
 
@@ -33,14 +38,26 @@ export interface AppConfig {
   };
   telemetry: {
     cronSchedule: string;
-    projectMint: PublicKey | null;
-    vehicleLicensePlate: string;
   };
-  yandex: {
-    parkId: string;
-    clientId: string;
-    apiKey: string;
+  fleet: {
+    cars: FleetCar[];
+    /** The fleet's time zone as minutes east of UTC; it decides where a day starts. */
+    utcOffsetMinutes: number;
   };
+  oracle: {
+    /** Keypair of `Project.oracle`: signs telemetry batches and co-signs revenue deposits. */
+    keypairPath: string | null;
+  };
+  /** `null` when no Yandex Fleet credentials are set. */
+  yandex: YandexConfig | null;
+}
+
+export interface YandexConfig {
+  parkId: string;
+  clientId: string;
+  apiKey: string;
+  /** Transaction categories that count as the park's rent charge for a car. */
+  rentCategoryIds: string[];
 }
 
 type Env = Record<string, string | undefined>;
@@ -58,8 +75,6 @@ const REQUIRED_IN_PRODUCTION = [
   'SUMSUB_WEBHOOK_SECRET',
   'SUMSUB_LEVEL_NAME',
 ];
-
-export class ConfigError extends Error {}
 
 function optional(env: Env, key: string): string | null {
   const value = env[key]?.trim();
@@ -106,6 +121,46 @@ function origin(key: string, value: string, requireHttps: boolean): URL {
   return url;
 }
 
+const YANDEX_CREDENTIALS = ['YANDEX_PARK_ID', 'YANDEX_CLIENT_ID', 'YANDEX_API_KEY'];
+const DEFAULT_RENT_CATEGORIES = 'partner_service_recurring_payment';
+
+function yandexConfig(env: Env): YandexConfig | null {
+  const present = YANDEX_CREDENTIALS.filter((key) => optional(env, key) !== null);
+  if (present.length === 0) {
+    return null;
+  }
+  const missing = YANDEX_CREDENTIALS.filter((key) => !present.includes(key));
+  if (missing.length > 0) {
+    throw new ConfigError(`Yandex Fleet credentials are incomplete: set ${missing.join(', ')}`);
+  }
+  const rentCategoryIds = (optional(env, 'YANDEX_RENT_CATEGORY_IDS') ?? DEFAULT_RENT_CATEGORIES)
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  if (rentCategoryIds.length === 0) {
+    throw new ConfigError('YANDEX_RENT_CATEGORY_IDS must list at least one category');
+  }
+  return {
+    parkId: optional(env, 'YANDEX_PARK_ID') as string,
+    clientId: optional(env, 'YANDEX_CLIENT_ID') as string,
+    apiKey: optional(env, 'YANDEX_API_KEY') as string,
+    rentCategoryIds,
+  };
+}
+
+function fleetCars(env: Env, cluster: string, yandex: YandexConfig | null): FleetCar[] {
+  const cars = parseFleetConfig(optional(env, 'FLEET_CONFIG') ?? '{}');
+  if (yandex === null && cars.some((car) => car.source === 'yandex_fleet')) {
+    throw new ConfigError(
+      'FLEET_CONFIG has yandex_fleet cars but YANDEX_PARK_ID, YANDEX_CLIENT_ID and YANDEX_API_KEY are not set',
+    );
+  }
+  if (cluster === 'mainnet' && cars.some((car) => car.source === 'simulated')) {
+    throw new ConfigError('Simulated cars are not allowed on mainnet');
+  }
+  return cars;
+}
+
 /**
  * Reads and validates the environment once at startup. Any error aborts the start, so
  * a production process never runs with a missing webhook secret or KYC key.
@@ -136,6 +191,20 @@ export function loadAppConfig(env: Env): AppConfig {
     optional(env, 'SIWS_URI') ?? 'http://localhost:3000',
     isProduction,
   );
+
+  const utcOffset = optional(env, 'FLEET_UTC_OFFSET') ?? '+05:00';
+  const utcOffsetMinutes = parseUtcOffset(utcOffset);
+  if (utcOffsetMinutes === null) {
+    throw new ConfigError(`FLEET_UTC_OFFSET must look like +05:00: ${utcOffset}`);
+  }
+  const yandex = yandexConfig(env);
+  const cars = fleetCars(env, cluster, yandex);
+  const oracleKeypairPath = optional(env, 'ORACLE_KEYPAIR_PATH');
+  if (isProduction && cars.length > 0 && oracleKeypairPath === null) {
+    throw new ConfigError(
+      'Refusing to start in production with FLEET_CONFIG cars but without ORACLE_KEYPAIR_PATH',
+    );
+  }
 
   const cronSchedule = optional(env, 'CRON_SCHEDULE') ?? '0 1 * * *';
   try {
@@ -169,15 +238,9 @@ export function loadAppConfig(env: Env): AppConfig {
         levelName: optional(env, 'SUMSUB_LEVEL_NAME') ?? 'basic-kyc-level',
       },
     },
-    telemetry: {
-      cronSchedule,
-      projectMint: publicKey(env, 'PROJECT_MINT'),
-      vehicleLicensePlate: optional(env, 'VEHICLE_LICENSE_PLATE') ?? '',
-    },
-    yandex: {
-      parkId: optional(env, 'YANDEX_PARK_ID') ?? '',
-      clientId: optional(env, 'YANDEX_CLIENT_ID') ?? '',
-      apiKey: optional(env, 'YANDEX_API_KEY') ?? '',
-    },
+    telemetry: { cronSchedule },
+    fleet: { cars, utcOffsetMinutes },
+    oracle: { keypairPath: oracleKeypairPath },
+    yandex,
   };
 }

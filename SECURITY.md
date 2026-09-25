@@ -11,7 +11,7 @@
 | :--- | :--- |
 | `axel` program | devnet `DJMyW18aG1g48c534cC2VsaQh15pPan2tMBDkhyhQX1M`, source in `programs/axel` |
 | `transfer_hook` program | devnet `5s4m6MbjqjhEeFVKwKXMDR2cXWT7crz5AbgtZeLwCbdJ`, source in `programs/transfer-hook` |
-| Backend (telemetry job, KYC sign-in and webhook) | `backend/` |
+| Backend (telemetry oracle and deposit attestation, KYC sign-in and webhook) | `backend/` |
 | Frontend | `frontend/` |
 
 Out of scope: third-party services (Solana RPC providers, Yandex Fleet, Sumsub, wallet extensions), the devnet cluster itself, and the known limitations listed below.

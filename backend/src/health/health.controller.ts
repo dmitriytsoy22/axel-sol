@@ -4,12 +4,15 @@ import { APP_CONFIG, type AppConfig } from '../config/app-config';
 import { InvestorRegistry } from '../kyc/investor-registry.service';
 import { SumsubClient } from '../kyc/sumsub.client';
 import { SolanaService } from '../solana/solana.service';
+import { TelemetryChainService } from '../telemetry/telemetry-chain.service';
 
 interface HealthResponse {
   status: 'ok' | 'error';
   rpc: 'connected' | 'disconnected';
   /** `ready` when the webhook secret, the Sumsub API credentials and the KYC key are all set. */
   kyc: 'ready' | 'not_configured';
+  /** `ready` when the oracle key is loaded, so telemetry is written and deposits are co-signed. */
+  oracle: 'ready' | 'not_configured';
 }
 
 @Controller('health')
@@ -19,6 +22,7 @@ export class HealthController {
     private readonly solana: SolanaService,
     private readonly sumsub: SumsubClient,
     private readonly investors: InvestorRegistry,
+    private readonly chain: TelemetryChainService,
   ) {}
 
   @Get()
@@ -28,13 +32,14 @@ export class HealthController {
       this.sumsub.isConfigured() &&
       this.investors.isConfigured();
     const kyc = kycReady ? 'ready' : 'not_configured';
+    const oracle = this.chain.oracleKey() === null ? 'not_configured' : 'ready';
 
     if (!(await this.solana.isRpcConnected())) {
       throw new HttpException(
-        { status: 'error', rpc: 'disconnected', kyc },
+        { status: 'error', rpc: 'disconnected', kyc, oracle },
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
-    return { status: 'ok', rpc: 'connected', kyc };
+    return { status: 'ok', rpc: 'connected', kyc, oracle };
   }
 }

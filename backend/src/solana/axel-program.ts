@@ -9,6 +9,8 @@ export type AxelV2Idl = Omit<AxelV2, 'address'> & { address: string };
 export type AxelProgram = Program<AxelV2Idl>;
 
 const INVESTOR_SEED = Buffer.from('investor');
+const PROJECT_SEED = Buffer.from('project');
+const PERIOD_SEED = Buffer.from('period');
 
 export function createAxelProgram(connection: Connection, programId: PublicKey): AxelProgram {
   const provider: Provider = { connection };
@@ -17,4 +19,14 @@ export function createAxelProgram(connection: Connection, programId: PublicKey):
 
 export function investorAddress(programId: PublicKey, wallet: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync([INVESTOR_SEED, wallet.toBuffer()], programId)[0];
+}
+
+export function projectAddress(programId: PublicKey, shareMint: PublicKey): PublicKey {
+  return PublicKey.findProgramAddressSync([PROJECT_SEED, shareMint.toBuffer()], programId)[0];
+}
+
+export function periodAddress(programId: PublicKey, project: PublicKey, index: number): PublicKey {
+  const indexLe = Buffer.alloc(4);
+  indexLe.writeUInt32LE(index);
+  return PublicKey.findProgramAddressSync([PERIOD_SEED, project.toBuffer(), indexLe], programId)[0];
 }

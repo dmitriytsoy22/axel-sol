@@ -38,6 +38,57 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX kyc_events_external_user_id ON kyc_events (external_user_id);
   `,
+  `
+  CREATE TABLE telemetry_days (
+    mint TEXT NOT NULL,
+    date TEXT NOT NULL,
+    canonical_json TEXT NOT NULL,
+    data_hash TEXT NOT NULL,
+    data_origin TEXT NOT NULL,
+    status TEXT NOT NULL,
+    trips INTEGER NOT NULL,
+    km INTEGER NOT NULL,
+    rent_charged INTEGER NOT NULL,
+    collected_at INTEGER NOT NULL,
+    chain_position INTEGER,
+    head_before TEXT,
+    head_after TEXT,
+    tx_signature TEXT,
+    confirmed_at INTEGER,
+    PRIMARY KEY (mint, date)
+  );
+  CREATE INDEX telemetry_days_tx_signature ON telemetry_days (tx_signature);
+
+  CREATE TABLE telemetry_submissions (
+    signature TEXT PRIMARY KEY,
+    mint TEXT NOT NULL,
+    last_valid_block_height INTEGER NOT NULL,
+    submitted_at INTEGER NOT NULL,
+    outcome TEXT NOT NULL
+  );
+  CREATE INDEX telemetry_submissions_mint_outcome ON telemetry_submissions (mint, outcome);
+
+  CREATE TABLE revenue_reports (
+    report_hash TEXT PRIMARY KEY,
+    mint TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    gross TEXT NOT NULL,
+    data_origin TEXT NOT NULL,
+    canonical_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE report_attestations (
+    deposit_signature TEXT PRIMARY KEY,
+    report_hash TEXT NOT NULL REFERENCES revenue_reports (report_hash),
+    mint TEXT NOT NULL,
+    recent_blockhash TEXT NOT NULL,
+    attested_at INTEGER NOT NULL
+  );
+  CREATE INDEX report_attestations_mint ON report_attestations (mint);
+  `,
 ];
 
 export function openDatabase(path: string): SqliteDatabase {

@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 
-import { CLOCK, systemClock } from '../common/clock';
 import { APP_CONFIG, type AppConfig } from '../config/app-config';
 import { loadKeypair } from '../solana/keypair';
 import { InvestorRegistry, KYC_AUTHORITY } from './investor-registry.service';
@@ -22,7 +21,6 @@ const globalFetch: FetchFn = (input, init) => fetch(input, init);
     InvestorRegistry,
     KycSessionService,
     KycWebhookService,
-    { provide: CLOCK, useValue: systemClock },
     { provide: HTTP_FETCH, useValue: globalFetch },
     {
       provide: KYC_AUTHORITY,

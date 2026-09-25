@@ -31,6 +31,12 @@ Done:
 - [x] Vendored the program IDL into `frontend/src/lib/solana/idl/` so a fresh clone builds without `anchor build`, and fixed the local dev CSP
 - [x] English documentation: [product](product.md), [architecture](architecture.md), [API](api.md), this roadmap. The Russian overview moved to [ru/](ru/) and the planning documents to [planning/](planning/).
 - [x] Replaced the stale v1 Codama output with a client generated for the v2 program in `sdk/axel-v2` ([v2.md](v2.md))
+- [x] Backend as the v2 oracle ([architecture.md](architecture.md#oracle--telemetry-flow)):
+  - several cars, with the rent model;
+  - RFC 8785 daily records published from SQLite, with proofs;
+  - `record_telemetry` batches that are reconciled after a crash;
+  - revenue reports, and deposit co-signatures only for reports that match the published days;
+  - simulated data flagged everywhere and refused on mainnet.
 - [x] Backend KYC on v2: wallet sign-in (`GET /kyc/nonce`, `POST /kyc/session`), Sumsub sessions bound to the wallet in SQLite, a webhook with a correct HMAC check that signs idempotent `set_investor` calls with a dedicated key, CORS, rate limits, production startup checks, ESLint and Jest ([api.md](api.md#backend-http-endpoints))
 
 Next steps. Each one addresses a limitation listed in [architecture.md](architecture.md#known-limitations):
@@ -38,7 +44,7 @@ Next steps. Each one addresses a limitation listed in [architecture.md](architec
 - [ ] Make revenue claims independent of shares bought or transferred after a deposit (program upgrade)
 - [ ] Thaw token accounts without relying on `buy_tokens` creating the ATA (program upgrade)
 - [ ] Create the hook's `ExtraAccountMetaList` during project setup, and add an end-to-end test of a holder-to-holder transfer on a full six-extension mint
-- [ ] Send telemetry from the backend as v2 `record_telemetry` batches (the broken v1 transaction is removed), and mark simulated telemetry as simulated in the API
+- [ ] Run the Yandex Fleet requests once against a real park's credentials: the orders, driver profiles and transactions shapes, and the rent category
 - [ ] Connect the asset page's telemetry widget to the backend: one env variable (the backend already allows the origins in `CORS_ORIGINS`)
 - [ ] Add the KYC flow to the UI on v2 (sign in with the wallet, then the Sumsub WebSDK with the token from `POST /kyc/session`), and replace the unused `useWhitelistStatus` with a `useInvestor` hook
 - [ ] Public frontend deployment and a documented devnet demo path for judges (a whitelisted test wallet)
@@ -61,4 +67,4 @@ These items are not scheduled.
 - [ ] Multi-vehicle operations. The program already supports one project per mint; the admin panel manages only the first project, and projects can only be created from the CLI.
 - [ ] Project creation and price management in the admin UI
 - [ ] More than one telemetry source or oracle. The spec lists the single centralized oracle as an MVP constraint.
-- [ ] Show each period's telemetry hashes next to its revenue deposit, so holders can compare them
+- [ ] Show each deposit's report (days, expenses, telemetry head) next to it in the UI, with a "Verify" button that recomputes the chain; the backend already publishes both

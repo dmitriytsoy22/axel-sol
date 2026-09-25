@@ -9,14 +9,24 @@ import { AppModule } from '../app.module';
 import { configureApp } from '../app.setup';
 import { CLOCK, type Clock } from '../common/clock';
 import { APP_CONFIG, type AppConfig, loadAppConfig } from '../config/app-config';
+import { FLEET_HTTP_FETCH } from '../fleet/yandex-fleet.client';
 import { KYC_AUTHORITY } from '../kyc/investor-registry.service';
 import { HTTP_FETCH } from '../kyc/sumsub.client';
 import { SOLANA_CONNECTION } from '../solana/solana.service';
+import { ORACLE_KEYPAIR } from '../telemetry/telemetry-chain.service';
 import { FakeRpc } from './fake-rpc';
 import { FakeSumsub } from './fake-sumsub';
+import { FakeYandex } from './fake-yandex';
 
 export const TEST_WEBHOOK_SECRET = 'test-webhook-secret';
 export const TEST_LEVEL = 'axel-individual';
+export const TEST_YANDEX = {
+  parkId: 'test-park',
+  clientId: 'taxi/park/test-park',
+  apiKey: 'test-key',
+};
+/** 11:00 on 2026-09-25 in Almaty, so the last finished fleet day is 2026-09-24. */
+export const TEST_NOW = Date.parse('2026-09-25T06:00:00.000Z');
 
 export class TestClock implements Clock {
   constructor(public current: number) {}
@@ -37,7 +47,9 @@ export interface TestApp {
   clock: TestClock;
   rpc: FakeRpc;
   sumsub: FakeSumsub;
+  yandex: FakeYandex;
   kycAuthority: Keypair;
+  oracle: Keypair | null;
 }
 
 export interface TestAppOptions {
@@ -48,11 +60,18 @@ export interface TestAppOptions {
    * KYC_AUTHORITY_KEYPAIR_PATH like production does. Default: a fresh key.
    */
   kycAuthority?: Keypair | null | 'from-config';
+  /**
+   * `null` starts without an oracle key; `'from-config'` loads it from ORACLE_KEYPAIR_PATH
+   * like production does. Default: a fresh key.
+   */
+  oracle?: Keypair | null | 'from-config';
+  /** Reuses a chain, e.g. to restart the backend against the same projects. */
+  rpc?: FakeRpc;
 }
 
 /** Boots the real AppModule with the RPC, the Sumsub API and the clock replaced at their boundaries. */
 export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
-  const programId = Keypair.generate().publicKey;
+  const programId = options.rpc?.programId ?? Keypair.generate().publicKey;
   const config = loadAppConfig({
     DATABASE_PATH: ':memory:',
     AXEL_PROGRAM_ID: programId.toBase58(),
@@ -64,29 +83,38 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     SUMSUB_SECRET_KEY: 'test-secret-key',
     SUMSUB_WEBHOOK_SECRET: TEST_WEBHOOK_SECRET,
     SUMSUB_LEVEL_NAME: TEST_LEVEL,
+    YANDEX_PARK_ID: TEST_YANDEX.parkId,
+    YANDEX_CLIENT_ID: TEST_YANDEX.clientId,
+    YANDEX_API_KEY: TEST_YANDEX.apiKey,
     ...options.env,
   });
   const kycAuthority = Keypair.generate();
-  const clock = new TestClock(Date.parse('2026-09-25T06:00:00.000Z'));
-  const rpc = new FakeRpc(programId, kycAuthority.publicKey);
+  const oracle = options.oracle === undefined ? Keypair.generate() : options.oracle;
+  const clock = new TestClock(TEST_NOW);
+  const rpc = options.rpc ?? new FakeRpc(programId, kycAuthority.publicKey);
   const sumsub = new FakeSumsub(config.kyc.sumsub);
+  const yandex = new FakeYandex(TEST_YANDEX);
 
-  const builder = Test.createTestingModule({ imports: [AppModule] })
+  let builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(APP_CONFIG)
     .useValue(config)
     .overrideProvider(SOLANA_CONNECTION)
     .useValue(rpc)
     .overrideProvider(HTTP_FETCH)
     .useValue(sumsub.fetch)
+    .overrideProvider(FLEET_HTTP_FETCH)
+    .useValue(yandex.fetch)
     .overrideProvider(CLOCK)
     .useValue(clock);
-  const moduleRef = await (
-    options.kycAuthority === 'from-config'
-      ? builder
-      : builder
-          .overrideProvider(KYC_AUTHORITY)
-          .useValue(options.kycAuthority === undefined ? kycAuthority : options.kycAuthority)
-  ).compile();
+  if (options.kycAuthority !== 'from-config') {
+    builder = builder
+      .overrideProvider(KYC_AUTHORITY)
+      .useValue(options.kycAuthority === undefined ? kycAuthority : options.kycAuthority);
+  }
+  if (oracle !== 'from-config') {
+    builder = builder.overrideProvider(ORACLE_KEYPAIR).useValue(oracle);
+  }
+  const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication<NestExpressApplication>({
     rawBody: true,
@@ -95,7 +123,17 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   configureApp(app, config);
   // Listening once keeps every request of a test on one server; app.close() stops it.
   await app.listen(0, '127.0.0.1');
-  return { app, http: request(app.getHttpServer()), config, clock, rpc, sumsub, kycAuthority };
+  return {
+    app,
+    http: request(app.getHttpServer()),
+    config,
+    clock,
+    rpc,
+    sumsub,
+    yandex,
+    kycAuthority,
+    oracle: oracle === 'from-config' ? null : oracle,
+  };
 }
 
 export type DigestAlgorithm = 'HMAC_SHA1_HEX' | 'HMAC_SHA256_HEX' | 'HMAC_SHA512_HEX';

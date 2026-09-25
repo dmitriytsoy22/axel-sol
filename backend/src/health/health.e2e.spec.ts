@@ -17,7 +17,12 @@ describe('GET /health', () => {
 
     const response = await t.http.get('/health').expect(200);
 
-    expect(response.body).toEqual({ status: 'ok', rpc: 'connected', kyc: 'ready' });
+    expect(response.body).toEqual({
+      status: 'ok',
+      rpc: 'connected',
+      kyc: 'ready',
+      oracle: 'ready',
+    });
   });
 
   it('reports KYC as not configured without the KYC key', async () => {
@@ -25,7 +30,20 @@ describe('GET /health', () => {
 
     const response = await t.http.get('/health').expect(200);
 
-    expect(response.body).toEqual({ status: 'ok', rpc: 'connected', kyc: 'not_configured' });
+    expect(response.body).toMatchObject({ status: 'ok', kyc: 'not_configured', oracle: 'ready' });
+  });
+
+  it('reports the oracle as not configured without the oracle key', async () => {
+    t = await createTestApp({ oracle: null });
+
+    const response = await t.http.get('/health').expect(200);
+
+    expect(response.body).toEqual({
+      status: 'ok',
+      rpc: 'connected',
+      kyc: 'ready',
+      oracle: 'not_configured',
+    });
   });
 
   it('answers 503 when the RPC does not respond', async () => {
@@ -34,7 +52,12 @@ describe('GET /health', () => {
 
     const response = await t.http.get('/health').expect(503);
 
-    expect(response.body).toEqual({ status: 'error', rpc: 'disconnected', kyc: 'ready' });
+    expect(response.body).toEqual({
+      status: 'error',
+      rpc: 'disconnected',
+      kyc: 'ready',
+      oracle: 'ready',
+    });
   });
 });
 
@@ -58,6 +81,26 @@ describe('startup', () => {
     await expect(
       createTestApp({ kycAuthority: 'from-config', env: { KYC_AUTHORITY_KEYPAIR_PATH: path } }),
     ).rejects.toThrow(`ENOENT: no such file or directory, open '${path}'`);
+  });
+
+  it('fails when ORACLE_KEYPAIR_PATH points to a file that is not a keypair', async () => {
+    const path = join(dir, 'oracle.json');
+    writeFileSync(path, '{"secretKey":[]}');
+
+    await expect(
+      createTestApp({ oracle: 'from-config', env: { ORACLE_KEYPAIR_PATH: path } }),
+    ).rejects.toThrow(`${path} is not a Solana keypair file (expected a JSON array of 64 bytes)`);
+  });
+
+  it('loads the oracle key from ORACLE_KEYPAIR_PATH', async () => {
+    const keypair = Keypair.generate();
+    const path = join(dir, 'oracle.json');
+    writeFileSync(path, JSON.stringify(Array.from(keypair.secretKey)));
+
+    started = await createTestApp({ oracle: 'from-config', env: { ORACLE_KEYPAIR_PATH: path } });
+    const response = await started.http.get('/health').expect(200);
+
+    expect(response.body).toMatchObject({ oracle: 'ready' });
   });
 
   it('loads the KYC key from KYC_AUTHORITY_KEYPAIR_PATH', async () => {

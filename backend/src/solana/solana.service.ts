@@ -1,3 +1,4 @@
+import { utils } from '@coral-xyz/anchor';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   Connection,
@@ -20,6 +21,14 @@ export class TransactionFailedError extends Error {
   ) {
     super(`Transaction ${signature} failed: ${JSON.stringify(error)}`);
   }
+}
+
+/** A transaction signed by the fee payer, not sent yet. Its signature is known in advance. */
+export interface SignedTransaction {
+  transaction: VersionedTransaction;
+  signature: string;
+  blockhash: string;
+  lastValidBlockHeight: number;
 }
 
 @Injectable()
@@ -48,6 +57,13 @@ export class SolanaService {
 
   /** Signs with `signer` as fee payer, sends, and waits for `confirmed`. Throws if the transaction fails. */
   async sendAndConfirm(instructions: TransactionInstruction[], signer: Keypair): Promise<string> {
+    const signed = await this.sign(instructions, signer);
+    await this.sendAndConfirmSigned(signed);
+    return signed.signature;
+  }
+
+  /** Builds a v0 transaction on a fresh blockhash with `signer` as fee payer and signs it. */
+  async sign(instructions: TransactionInstruction[], signer: Keypair): Promise<SignedTransaction> {
     const { blockhash, lastValidBlockHeight } =
       await this.connection.getLatestBlockhash('confirmed');
     const message = new TransactionMessage({
@@ -57,15 +73,30 @@ export class SolanaService {
     }).compileToV0Message();
     const transaction = new VersionedTransaction(message);
     transaction.sign([signer]);
+    return {
+      transaction,
+      signature: utils.bytes.bs58.encode(transaction.signatures[0]),
+      blockhash,
+      lastValidBlockHeight,
+    };
+  }
 
-    const signature = await this.connection.sendRawTransaction(transaction.serialize());
+  /**
+   * Sends and waits for `confirmed`. Throws `TransactionFailedError` if it landed and failed,
+   * and web3.js's `TransactionExpiredBlockheightExceededError` once it can no longer land.
+   */
+  async sendAndConfirmSigned(signed: SignedTransaction): Promise<void> {
+    const signature = await this.connection.sendRawTransaction(signed.transaction.serialize());
     const { value } = await this.connection.confirmTransaction(
-      { signature, blockhash, lastValidBlockHeight },
+      {
+        signature,
+        blockhash: signed.blockhash,
+        lastValidBlockHeight: signed.lastValidBlockHeight,
+      },
       'confirmed',
     );
     if (value.err !== null) {
       throw new TransactionFailedError(signature, value.err);
     }
-    return signature;
   }
 }

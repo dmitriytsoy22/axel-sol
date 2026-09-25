@@ -2,14 +2,14 @@
 
 AXEL exposes two interfaces:
 
-1. **A small HTTP backend** with five endpoints, in `backend/`.
+1. **A small HTTP backend** in `backend/`: health, published telemetry, revenue reports and deposit attestation, and KYC.
 2. **The `axel` and `transfer_hook` Solana programs.** Clients call them directly.
 
-All business actions (buy, deposit, claim, whitelist, pause and so on) are Solana transactions. The backend is not in that path, with one exception: it signs v2 `set_investor` after a Sumsub review.
+All business actions (buy, deposit, claim, whitelist, pause and so on) are Solana transactions. The backend signs three kinds of v2 transactions: `set_investor` after a Sumsub review (KYC key), `record_telemetry` batches (oracle key), and its co-signature on an operator's `deposit_revenue` (oracle key).
 
 ## Backend HTTP Endpoints
 
-- Stack: NestJS 11 (`backend/src`), SQLite through `better-sqlite3` for KYC state.
+- Stack: NestJS 11 (`backend/src`), SQLite through `better-sqlite3` for KYC state, published telemetry and attested reports.
 - Default port: `3000` (`PORT`).
 - CORS: only the origins in `CORS_ORIGINS`, methods `GET` and `POST`.
 - Errors use the NestJS shape: `{ "statusCode": 400, "message": "...", "error": "Bad Request" }`.
@@ -21,55 +21,244 @@ All business actions (buy, deposit, claim, whitelist, pause and so on) are Solan
 GET /health
 ```
 
-Checks that the RPC answers (`getSlot`) and whether the KYC flow is configured.
+Checks that the RPC answers (`getSlot`) and whether the KYC flow and the oracle are configured.
 
 **Response `200`:**
 ```json
-{ "status": "ok", "rpc": "connected", "kyc": "ready" }
+{ "status": "ok", "rpc": "connected", "kyc": "ready", "oracle": "ready" }
 ```
-`kyc` is `"not_configured"` unless `SUMSUB_WEBHOOK_SECRET`, `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY` and the KYC authority keypair are all set.
+- `kyc` is `"not_configured"` unless `SUMSUB_WEBHOOK_SECRET`, `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY` and the KYC authority keypair are all set.
+- `oracle` is `"not_configured"` without `ORACLE_KEYPAIR_PATH`.
 
 **Response `503`** (RPC unreachable):
 ```json
-{ "status": "error", "rpc": "disconnected", "kyc": "ready" }
+{ "status": "error", "rpc": "disconnected", "kyc": "ready", "oracle": "ready" }
 ```
 
-### Latest Telemetry
+### Telemetry: what is published
+
+Every car in `FLEET_CONFIG` gets one record per calendar day of the fleet's zone (`FLEET_UTC_OFFSET`, default `+05:00`). The daily job (`CRON_SCHEDULE`) collects every finished day a car is missing, up to 31 days back, oldest first. A car's first day is its `startDate`, or yesterday. If a day cannot be read, the car stops at that day and the next run starts there again, so no day is skipped.
+
+**Day record** (`axel.telemetry.day/v1`), shown here as its canonical text:
+
+```json
+{"currency":"KZT","data_origin":"simulated","date":"2026-09-24","km":143,"mint":"<share mint>","rent_charged":12000,"schema":"axel.telemetry.day/v1","status":"active","trips":17,"utc_offset":"+05:00"}
+```
+
+| Field | Meaning |
+|---|---|
+| `date`, `utc_offset` | The calendar day and the zone it is in |
+| `status` | `active`: the car was rented out or drove; `idle`: no rent and no trips; `maintenance`: in repair (only the simulation produces it) |
+| `trips`, `km` | Completed orders booked that day and their total distance (km, rounded down) |
+| `rent_charged` | Whole KZT the park charged for the car that day, net of corrections; this is the owners' gross income |
+| `data_origin` | `yandex_fleet` or `simulated`. It is inside the hashed text, so it is committed on-chain too |
+
+- **Hash.** `data_hash` = SHA-256 of the record's [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) (JCS) canonical form. That text is what `GET /telemetry/:mint/:date.json` serves, byte for byte, and it never changes after it is collected.
+- **On-chain entry.** `record_telemetry` gets `{ date: YYYYMMDD, data_hash, trips, km, rent_paid: rent_charged, status }` with these status codes:
+
+  | Code | Status |
+  |---|---|
+  | 0 | reserved, never written |
+  | 1 | `active` |
+  | 2 | `idle` |
+  | 3 | `maintenance` |
+
+- **Chain.** `head = sha256(head_before ‖ u32 LE(YYYYMMDD) ‖ data_hash)`, starting from 32 zero bytes. The oracle key appends up to 20 days per transaction. The program stores only the head, the count and the last date in `Project`.
+- **Where the figures come from.**
+  - `yandex_fleet`:
+    - trips and distance come from the park's completed orders (`POST /v1/parks/orders/list`), matched to the car by plate;
+    - `rent_charged` is the sum of the transactions in `YANDEX_RENT_CATEGORY_IDS` (`POST /v2/parks/transactions/list`) of the drivers whose current car is this one (`POST /v1/parks/driver-profiles/list`).
+    - There is no fallback: when the API fails, nothing is published for that day.
+  - `simulated`: a deterministic generator seeded by mint and date:
+    - rented out on 85% of days, idle on 10% and in maintenance on 5%;
+    - 12–24 trips of 6–12 km on a rented day;
+    - `simulatedDailyRent` charged on rented days only.
+    - Refused on mainnet.
+
+### Latest Telemetry (asset page widget)
 
 ```
-GET /telemetry/latest/:projectId
+GET /telemetry/latest/:mint
 ```
 
-`projectId` is the project's mint address in base58. It must equal the backend's `PROJECT_MINT`, because the cache is keyed by that value. The endpoint returns the newest cached day for the project. The cache is in memory, holds up to 30 days per project, and is filled only by the cron job, so it is empty after a restart until the next run.
+The newest collected day of a car, in the shape the asset page widget reads.
 
-**Response `200`** (`TelemetryResponse` in `backend/src/telemetry/telemetry.controller.ts`):
+**Response `200`:**
 ```ts
-interface TelemetryResponse {
-  date: string;                     // "YYYY-MM-DD" (UTC), the day the figures cover
-  dailyRevenue: number;             // KZT, sum of order prices × 0.76, rounded
-  mileageKm: number;                // integer km
-  tripsCount: number;               // completed orders matched to the licence plate
-  carStatus: string;                // "active" | "inactive" ("maintenance" exists in the type, never produced)
-  dataHash: string;                 // hex SHA-256 of the canonical JSON (see below)
-  solanaTxSignature: string | null; // always null: the backend writes no telemetry on-chain yet
-  stale: boolean;                   // true if `date` is neither today nor yesterday (UTC)
-  available: boolean;               // false when nothing is cached for this project
+interface LatestTelemetryResponse {
+  date: string;                     // "YYYY-MM-DD" in the fleet's zone
+  dailyRevenue: number;             // rent_charged, KZT
+  mileageKm: number;
+  tripsCount: number;
+  carStatus: 'active' | 'maintenance' | 'inactive' | ''; // "idle" is reported as "inactive"
+  dataHash: string;                 // hex SHA-256 of the published text
+  solanaTxSignature: string | null; // the record_telemetry transaction, once confirmed
+  stale: boolean;                   // true if `date` is neither today nor yesterday in the fleet's zone
+  available: boolean;               // false for a car outside the fleet or with no day yet
+  dataOrigin: 'yandex_fleet' | 'simulated' | null;
 }
 ```
 
-When nothing is cached, the endpoint still returns `200` with this body:
+### Published Day
+
+```
+GET /telemetry/:mint/:date.json        e.g. /telemetry/<mint>/2026-09-24.json
+```
+
+The day's canonical text, exactly as hashed. `Content-Type: application/json; charset=utf-8`, `Cache-Control: public, max-age=31536000, immutable`. `404` if the car is not in the fleet or the day was not collected; `400` if `date` is not a real day.
+
+### Day Proof
+
+```
+GET /telemetry/:mint/proof?date=YYYY-MM-DD
+```
+
+**Response `200`:**
+```json
+{
+  "mint": "<share mint>",
+  "project": "<project PDA>",
+  "date": "2026-09-24",
+  "dataOrigin": "simulated",
+  "raw": "<the canonical text>",
+  "record": { "...": "the same, parsed" },
+  "rawUrl": "/telemetry/<mint>/2026-09-24.json",
+  "dataHash": "<hex>",
+  "chain": {
+    "position": 25,
+    "headBefore": "<hex>",
+    "headAfter": "<hex>",
+    "txSignature": "<record_telemetry signature>",
+    "confirmedAt": "2026-09-25T06:00:03.000Z"
+  },
+  "headFormula": "sha256(headBefore || u32le(YYYYMMDD) || dataHash)"
+}
+```
+- `position` equals `Project.telemetry_count` right after this day was appended.
+- `chain` is `null` until the day's batch is confirmed, and stays `null` for a day the chain can no longer take (see below).
+
+### Chain Entries
+
+```
+GET /telemetry/:mint/chain?from=YYYY-MM-DD&to=YYYY-MM-DD
+```
+
+Confirmed days between `from` and `to` (both optional), in chain order, at most 366. The response has `entries: [{ date, dataHash, dataOrigin, position, headAfter, txSignature }]` and `truncated`. Recomputing the formula over the entries from the first entry's `headBefore` (see its proof) must give the last `headAfter`, and the last entry of the chain must match `Project.telemetry_head`.
+
+**How the backend keeps the chain.**
+- **Before sending.** A signed batch, with the positions and heads it will produce, is stored first. After a crash the next run can tell whether the batch landed:
+  - the head matches → the batch is marked confirmed;
+  - the chain is unchanged and the blockhash expired → the days are sent again;
+  - the chain is unchanged and the blockhash is still valid → it waits.
+- **Another writer.** If the chain holds a head this backend did not write, it stops writing for that car (`diverged`, logged).
+- **A chain started elsewhere.** With nothing confirmed locally, the backend continues from the head the chain has, for example one the seed script wrote. Collected days that are not later than the chain's last date stay published but off-chain.
+- **When it writes.** Only while the project is `Operating` or `Paused` and the project's oracle is this backend's key.
+
+### Revenue Report: Draft
+
+```
+POST /reports/draft
+Content-Type: application/json
+```
+
+Builds the report the oracle would attest, from the operator's stated expenses and the car's published, on-chain telemetry. Nothing is stored. Limit: 10 requests a minute per client IP.
+
+**Request:**
+```json
+{
+  "mint": "<share mint>",
+  "kind": "regular",
+  "period": { "start": "2026-09-01", "end": "2026-09-30" },
+  "expenses": {
+    "maintenance": [{ "description": "Oil and filters", "amount": 18000, "document_sha256": "<hex or null>" }],
+    "insurance": [{ "description": "OGPO and KASKO, September", "amount": 30000 }]
+  },
+  "car_sale": null
+}
+```
+- `kind` is `regular` (rent) or `final` (the car is sold; `car_sale: { proceeds, document_sha256 }` is then required).
+- The period covers 1–31 days, and every day of it must be published and confirmed on-chain.
+- Amounts are whole KZT, from 1 to 10¹². There are at most 50 items per list. `document_sha256` is the hash of the invoice or policy.
+
+**Response `200`:**
+```json
+{
+  "report": { "...": "see below" },
+  "reportHash": "<hex SHA-256 of the report's canonical text>",
+  "dataOrigin": "simulated",
+  "depositParams": { "gross": "260500000000", "periodStart": 20260901, "periodEnd": 20260930, "reportHash": "<hex>", "kind": "regular" }
+}
+```
+`depositParams` are the `deposit_revenue` arguments that commit to this report.
+
+**Report** (`axel.revenue-report/v1`):
+
+| Field | Value |
+|---|---|
+| `mint`, `project`, `kind`, `period` (`start`, `end`, `days`), `currency: "KZT"` | |
+| `data_origin` | `yandex_fleet`, `simulated`, or `mixed` when the period has both |
+| `income` | `rent` (Σ `rent_charged`), `days_active`, `trips`, `km` |
+| `expenses.park_fee` | `{ bps: parkFeeBps, amount: floor(rent × bps / 10 000) }` |
+| `expenses.maintenance`, `expenses.insurance` | the operator's items |
+| `car_sale` | `null`, or the sale in a final report |
+| `totals` | `maintenance`, `insurance`, `distributable = rent − park fee − maintenance − insurance (+ sale proceeds)` |
+| `deposit` | `payment_mint`, its `decimals`, `gross = distributable × 10^decimals` as a decimal string (`"0"` if nothing is left) |
+| `telemetry` | `first_position`, `last_position`, `head_before`, `head_after`, and `days: [{ date, data_hash }]` for every day |
+
+The platform fee (`Project.revenue_fee_bps`) is taken on-chain from `gross`. Report amounts are in KZT, and `gross` assumes the project's payment mint is a KZT stablecoin (tKZT, KZTE).
+
+| Status | When |
+|---|---|
+| `400` | the input is not valid (the message names the field) |
+| `404` | the car is not in `FLEET_CONFIG`, or its project does not exist |
+| `409` | `missingDays`: days of the period not published and confirmed yet; or the car's telemetry chain diverged |
+| `422` | `gross` would not fit a u64 |
+
+### Revenue Report: Attest a Deposit
+
+```
+POST /reports/attest
+Content-Type: application/json
+
+{ "report": <the report from /reports/draft>, "transaction": "<base64 serialized transaction>" }
+```
+
+The operator's wallet builds `deposit_revenue` with `depositParams`, signs it, and sends it here. The backend runs these checks, then adds the oracle's signature. The caller sends the returned transaction.
+
+1. **Transaction.** At most 1,232 bytes and no address lookup tables. Only ComputeBudget instructions and exactly one `deposit_revenue`, whose `oracle` is this backend's key. The oracle is not the fee payer and its account is read-only. Every other required signature, the operator's included, is present and valid.
+2. **Report.** The backend rebuilds it from the stated expenses and the published days. Any difference is refused with the JSON paths that differ.
+3. **Project.** The deposit is for the report's project. The project is `Operating`, its oracle is this backend's key, and the signer in the `operator` slot is `Project.operator`.
+4. **Arguments.** `gross`, `period_start`, `period_end`, `report_hash` and `kind` equal the report's, and the distributable amount is positive.
+5. **Overlaps.** No `RevenuePeriod` on-chain overlaps the period, and no final (car sale) deposit exists. No earlier attested deposit for an overlapping period has landed or can still land (its blockhash is still valid). Attestations for one car run one at a time.
+
+**Response `200`:**
+```json
+{ "reportHash": "<hex>", "dataOrigin": "simulated", "transaction": "<base64, fully signed>", "signature": "<transaction ID>" }
+```
+The report is stored and published at `/reports/:mint/:reportHash.json`. Sending the same transaction again returns the same answer.
+
+| Status | When |
+|---|---|
+| `400` | not `{ report, transaction }`, not a transaction, lookup tables, or invalid report input |
+| `401` | a signature other than the oracle's is missing or invalid |
+| `404` | the car or its project is unknown |
+| `409` | the project is not `Operating`, or its oracle is another key; the period overlaps a deposit; days are missing; the chain diverged |
+| `422` | the report differs from the rebuilt one (`differences`), other instructions, the oracle pays or is writable, another oracle or operator, arguments differ, nothing to distribute |
+| `503` | `ORACLE_KEYPAIR_PATH` is not set |
+
+### Attested Reports
+
+```
+GET /reports/:mint
+GET /reports/:mint/:reportHash.json
+```
+
+The first lists the reports the oracle attested for the car, oldest period first:
 
 ```json
-{ "date": "", "dailyRevenue": 0, "mileageKm": 0, "tripsCount": 0, "carStatus": "", "dataHash": "", "solanaTxSignature": null, "stale": false, "available": false }
+{ "mint": "<share mint>", "reports": [{ "reportHash": "<hex>", "kind": "regular", "periodStart": "2026-09-01", "periodEnd": "2026-09-30", "gross": "260500000000", "dataOrigin": "simulated", "url": "/reports/<mint>/<hash>.json", "attestations": [{ "depositSignature": "<signature>", "attestedAt": "<ISO time>" }] }] }
 ```
-
-The hashed payload is exactly:
-
-```ts
-JSON.stringify({ date, vehicle_id, daily_revenue, mileage_km, trips_count, car_status })
-```
-
-Here `vehicle_id` is the configured licence plate, and `daily_revenue` is the same number as `dailyRevenue`. The response does **not** say whether the figures came from Yandex or from the simulated fallback ([architecture.md](architecture.md#oracle--telemetry-flow)).
+The second serves a report's canonical text byte for byte. Its SHA-256 is the `report_hash` of the deposit's `RevenuePeriod`.
 
 ### KYC Sign-In Nonce
 
@@ -171,7 +360,7 @@ Every verified event is stored in the `kyc_events` table with its outcome and tr
 
 ### Backend Configuration
 
-`backend/.env.example` lists every variable. The values are validated at startup; an invalid value stops the process. With `NODE_ENV=production` the backend refuses to start without `AXEL_PROGRAM_ID`, `CORS_ORIGINS`, `SIWS_URI`, `KYC_AUTHORITY_KEYPAIR_PATH`, `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `SUMSUB_WEBHOOK_SECRET` and `SUMSUB_LEVEL_NAME`, and it requires https origins.
+`backend/.env.example` lists every variable. The values are validated at startup; an invalid value stops the process. With `NODE_ENV=production` the backend refuses to start without `AXEL_PROGRAM_ID`, `CORS_ORIGINS`, `SIWS_URI`, `KYC_AUTHORITY_KEYPAIR_PATH`, `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `SUMSUB_WEBHOOK_SECRET` and `SUMSUB_LEVEL_NAME`, and it requires https origins. It also needs `ORACLE_KEYPAIR_PATH` when `FLEET_CONFIG` lists a car.
 
 | Variable | Used by | Default / behaviour when unset |
 |---|---|---|
@@ -181,16 +370,18 @@ Every verified event is stored in the `kyc_events` table with its outcome and tr
 | `SOLANA_RPC_URL` | `SolanaService` | `http://127.0.0.1:8899` |
 | `SOLANA_CLUSTER` | sign-in message | `devnet` |
 | `AXEL_PROGRAM_ID` | v2 program client | `address` of `src/solana/idl/axel_v2.json` |
-| `DATABASE_PATH` | SQLite file | `data/axel-backend.sqlite` |
+| `DATABASE_PATH` | SQLite file (KYC state, published days, attested reports) | `data/axel-backend.sqlite` |
 | `KYC_AUTHORITY_KEYPAIR_PATH` | `set_investor` signer | webhook answers `503`; an unreadable file stops the start |
 | `SIWS_URI` | sign-in message domain and URI | `http://localhost:3000` |
 | `SUMSUB_BASE_URL` | Sumsub API | `https://api.sumsub.com` |
 | `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY` | Sumsub API | `/kyc/session` answers `503` |
 | `SUMSUB_LEVEL_NAME` | WebSDK level, approval check | `basic-kyc-level` |
 | `SUMSUB_WEBHOOK_SECRET` | webhook HMAC | webhook answers `503` |
-| `PROJECT_MINT` | telemetry cron | Cron skips ingestion |
-| `VEHICLE_LICENSE_PLATE` | telemetry cron | Cron skips ingestion |
-| `YANDEX_PARK_ID`, `YANDEX_CLIENT_ID`, `YANDEX_API_KEY` | `YandexFleetService` | Simulated telemetry |
+| `FLEET_CONFIG` | cars: `{ "<share mint>": { plate, source, parkFeeBps, simulatedDailyRent?, startDate? } }` | `{}`; a `yandex_fleet` car without Yandex credentials, or a simulated car on mainnet, stops the start |
+| `FLEET_UTC_OFFSET` | where a reported day starts | `+05:00` |
+| `ORACLE_KEYPAIR_PATH` | `record_telemetry` signer and fee payer; deposit co-signer | days are published but not written on-chain; `/reports/attest` answers `503`; required in production when there are cars |
+| `YANDEX_PARK_ID`, `YANDEX_CLIENT_ID`, `YANDEX_API_KEY` | `YandexFleetClient` | required for `yandex_fleet` cars; set all three or none |
+| `YANDEX_RENT_CATEGORY_IDS` | which park transactions are rent | `partner_service_recurring_payment` |
 | `CRON_SCHEDULE` | telemetry job, registered after `.env` is loaded | `0 1 * * *` (daily 01:00, server time) |
 
 The v2 program ID comes from `AXEL_PROGRAM_ID` or the vendored IDL; instructions are built with `@coral-xyz/anchor` from that IDL. `npm run export-idl` in the repository root refreshes the backend copy together with the frontend one.

@@ -7,7 +7,7 @@ AXEL tokenizes taxi cars on Solana. Each car is a project with its own Token-202
 - **Buying.** Wallets that passed KYC and are whitelisted buy whole shares for SOL at a fixed price.
 - **Revenue.** The car owner deposits the car's revenue into a program vault once per period. Each holder claims a pro-rata share.
 - **Transfers.** A transfer hook lets shares move only between whitelisted wallets.
-- **Telemetry.** A backend oracle writes a daily SHA-256 hash of the car's Yandex Pro telemetry (trips, mileage, revenue) on-chain.
+- **Telemetry.** A backend oracle publishes each car's daily figures (trips, mileage, the rent the park charged) and appends their SHA-256 to the v2 program's hash chain. The v2 program is not deployed yet, and the backend writes no v1 telemetry.
 
 **Status:** MVP on Solana devnet, not audited. Only devnet SOL is involved. Nothing in the repository shows a live vehicle or Yandex Fleet park connected. [architecture.md](architecture.md#known-limitations) lists the open issues.
 
@@ -21,7 +21,9 @@ AXEL tokenizes taxi cars on Solana. Each car is a project with its own Token-202
 
 - **Car owner / operator (project admin).** The owner already owns a car and runs it through Yandex Pro. They sell shares in it and then deposit its revenue each period. Per the spec, the admin "already owns the vehicle". AXEL is a direct sale of ownership shares, not a fundraise.
 - **Investors.** Individuals with a Solana wallet (Phantom or Solflare in the UI) who pass KYC. They want small, direct exposure to one real vehicle's income, and payouts they can check on-chain.
-- **Platform operator.** Runs the backend: the daily telemetry job, and the KYC flow whose webhook writes v2 KYC records with a dedicated key.
+- **Platform operator.** Runs the backend, with a separate key for each role:
+  - the daily telemetry job and the co-signing of revenue deposits, as the projects' v2 oracle;
+  - the KYC flow, whose webhook writes v2 KYC records.
 
 ## How It Works
 
@@ -43,10 +45,11 @@ AXEL tokenizes taxi cars on Solana. Each car is a project with its own Token-202
    - Holders can send shares to another whitelisted wallet.
    - Token-2022 withholds a 1% fee, in shares, from each transfer.
    - The hook rejects any transfer where either side is not whitelisted.
-7. **Verify activity.**
-   - The backend fetches the previous day's Yandex orders for the car's licence plate and hashes the daily figures.
-   - It records the hash in a `TelemetryRecord` PDA.
-   - Anyone with the same figures can recompute the hash and compare.
+7. **Verify activity (v2).**
+   - The backend reads each day of the car from Yandex Fleet: trips and distance from the orders, and the rent from the park's charges.
+   - It publishes the day as canonical JSON and appends its SHA-256 to the project's on-chain hash chain.
+   - Anyone can fetch the published days, recompute the chain and compare it with the program's head.
+   - The oracle co-signs a revenue deposit only when its report adds up from those days and the operator's stated expenses. The report's hash is stored with the deposit.
 
 ## Business Model (as implemented)
 
@@ -62,7 +65,7 @@ What the code does **not** contain:
 - **No platform fee** or subscription of any kind.
 - **No off-chain pricing.** Prices are set in SOL by the admin (`update_price`, no UI).
 - **No enforced revenue formula.** The spec's formula `Profit = Revenue − Expenses − Reserve` is computed only in the admin form. The program records whatever amount is deposited.
-- **No revenue tie-in to telemetry.** The backend's `0.76` factor turns gross order value into an estimated net revenue for telemetry only. It is not linked to deposits.
+- **No revenue tie-in to telemetry on v1.** The v1 program records whatever amount the admin deposits. On v2 the backend's oracle co-signs a deposit only if it matches a report built from the published days: rent − park fee − maintenance − insurance.
 
 ## What Is Enforced vs What Is Trusted
 
@@ -71,14 +74,14 @@ What the code does **not** contain:
 | Only whitelisted wallets can buy, and both sides of a transfer must be whitelisted | Who gets whitelisted. KYC runs off-chain, and the current program lets any signer edit the whitelist ([known limitation](architecture.md#known-limitations)). |
 | Supply cap; mint authority can be revoked for good once all shares are sold | That the car exists and matches the VIN in metadata |
 | Pro-rata payout math, one claim per wallet per period | That the admin deposits the car's real net revenue |
-| Only the registered oracle can write telemetry, once per day | That the oracle's data really came from Yandex. The backend falls back to simulated data. |
+| Only the registered oracle can write telemetry, once per day (v1); on v2, days only append to a hash chain, and every deposit needs the oracle's co-signature | That the oracle's data really came from Yandex, and that the operator's expense items are complete. Simulated data is marked `data_origin: "simulated"` in every record and is refused on mainnet. |
 | Price, supply, sales, deposits and claims are all public accounts | The admin's use of permanent-delegate, fee and close powers |
 
 ## MVP Limits
 
 - **Devnet only.** Two test projects exist, both created by the seed script with the same test car metadata (Toyota Camry 2023). Nothing is deployed to mainnet, and the programs have not been audited.
 - **One car per project.** The program supports many projects (one per mint), but the admin panel manages only the first project it finds, and projects can only be created from the CLI.
-- **Centralized oracle.** A single backend keypair and a single data source (Yandex Fleet API). Without Yandex credentials, the telemetry is simulated.
+- **Centralized oracle.** A single backend keypair and a single data source (Yandex Fleet API). A car can be configured as simulated, and its records say so.
 - **Global whitelist.** One `WhitelistEntry` per wallet covers every project.
 - **Units.**
   - Prices and payouts are in SOL; telemetry revenue is in KZT.
