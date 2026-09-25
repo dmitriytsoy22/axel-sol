@@ -6,6 +6,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { ArrowRight, RotateCw } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { usePositions, type Holding } from '@/hooks/usePositions';
+import { INDEXER_URL } from '@/lib/api/indexer';
 import { canClaim } from '@/lib/solana/lifecycle';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
@@ -17,6 +18,7 @@ import { shortAddress } from '@/lib/format';
 import { NETWORK_NAME } from '@/lib/network';
 import { PortfolioSummary } from './PortfolioSummary';
 import { HoldingsTable } from './HoldingsTable';
+import { LatestPayouts } from './LatestPayouts';
 import { ClaimAllButton } from './ClaimAllButton';
 import { RecoveryAlerts } from './RecoveryAlerts';
 import { TransferModal } from './TransferModal';
@@ -33,7 +35,12 @@ function DashboardSkeleton({ summaryLabels }: { summaryLabels: string[] }): JSX.
   );
 }
 
-export function DashboardView(): JSX.Element {
+/** `indexerUrl` defaults to NEXT_PUBLIC_INDEXER_URL; with one the portfolio lists the latest payouts. */
+export function DashboardView({
+  indexerUrl = INDEXER_URL,
+}: {
+  indexerUrl?: string | null;
+}): JSX.Element {
   const t = useTranslations('Dashboard');
   const { connected, connecting, publicKey } = useWallet();
   const { holdings, summary, isLoading, error, refetch } = usePositions();
@@ -88,6 +95,7 @@ export function DashboardView(): JSX.Element {
           {claimable.length > 0 && <ClaimAllButton projects={claimable} onClaimed={refetch} />}
         </div>
         <HoldingsTable holdings={holdings} onChanged={refetch} onTransfer={setTransferring} />
+        {indexerUrl && <LatestPayouts indexerUrl={indexerUrl} />}
         <Link
           href="/payouts"
           className="inline-flex min-h-11 items-center gap-1 self-start text-small font-medium text-primary underline-offset-4 hover:underline"

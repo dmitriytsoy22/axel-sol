@@ -15,6 +15,8 @@ export const REPO_ROOT = resolve(FRONTEND_DIR, '..');
 /** Everything a run writes: logs, the seed's outputs, the ledger (deleted afterwards). */
 export const STACK_DIR = join(FRONTEND_DIR, 'e2e', '.stack');
 export const LOG_DIR = join(STACK_DIR, 'logs');
+/** The seed's published files for each car, served at URLS.publishedData. */
+export const PUBLISHED_DIR = join(STACK_DIR, 'published');
 export const STACK_FILE = join(STACK_DIR, 'stack.json');
 
 const HOST = '127.0.0.1';

@@ -10,6 +10,7 @@ import {
   FRONTEND_DIR,
   LOG_DIR,
   PORTS,
+  PUBLISHED_DIR,
   REPO_ROOT,
   STACK_DIR,
   STACK_FILE,
@@ -31,7 +32,6 @@ const BACKEND_DIR = join(REPO_ROOT, 'backend');
 const SEED_DIR = join(REPO_ROOT, 'scripts', 'seed-devnet');
 const PROGRAM_SO = join(REPO_ROOT, 'target', 'deploy', 'axel_v2.so');
 const LEDGER_DIR = join(STACK_DIR, 'ledger');
-const PUBLISHED_DIR = join(STACK_DIR, 'published');
 const SEED_OUT = join(STACK_DIR, 'seed-output.json');
 
 /** A request to `next dev` can take this long while it compiles the route. */
@@ -243,6 +243,7 @@ async function startFrontend(demo: Record<string, string>, info: StackInfo): Pro
         NEXT_PUBLIC_DEMO_ACCESS: '1',
         NEXT_PUBLIC_PUBLISHED_DATA_URL: URLS.publishedData,
         NEXT_PUBLIC_TELEMETRY_API_URL: URLS.backend,
+        NEXT_PUBLIC_INDEXER_URL: URLS.backend,
         NEXT_PUBLIC_PAYMENT_MINT_SYMBOLS: `${info.payment.mint}:${info.payment.symbol}`,
       }),
     },
@@ -265,6 +266,9 @@ async function startFrontend(demo: Record<string, string>, info: StackInfo): Pro
     ['/demo', 200],
     [`/assets/${info.fleet.mint}`, 200],
     ['/solvency', 200],
+    ['/payouts', 200],
+    ['/dashboard', 200],
+    ['/verify', 200],
     ['/api/demo/access', 405],
     ['/api/demo/shares', 405],
     ['/api/demo/simulate-month', 405],

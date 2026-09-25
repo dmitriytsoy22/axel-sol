@@ -6,7 +6,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { ArrowUpRight, RotateCw } from 'lucide-react';
 import { usePayoutHistory } from '@/hooks/usePayoutHistory';
 import { INDEXER_URL } from '@/lib/api/indexer';
-import { usePositions } from '@/hooks/usePositions';
+import { usePositions, type TokenTotal } from '@/hooks/usePositions';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
 import { PayoutHistoryTable } from '@/components/features/payouts/PayoutHistoryTable';
@@ -26,14 +26,15 @@ export function PayoutsView({
   const t = useTranslations('Payouts');
   const locale = useLocale();
   const { connected, connecting } = useWallet();
-  const positions = usePositions();
+  // With an indexer every figure comes from its one snapshot; the chain alone needs the positions.
+  const positions = usePositions({ enabled: indexerUrl === null });
   const payouts = usePayoutHistory(indexerUrl);
 
   const retry = () => {
     positions.refetch();
     payouts.refetch();
   };
-  const totals = (list: typeof positions.summary.claimed) =>
+  const totals = (list: TokenTotal[]) =>
     list.length > 0 ? formatTokenTotals(list, locale) : formatNumber(0, locale);
 
   let body: React.ReactNode;
@@ -51,7 +52,7 @@ export function PayoutsView({
       <Notice
         as="h2"
         title={t('errorTitle')}
-        body={t('errorBody')}
+        body={t(indexerUrl ? 'errorBodyIndexer' : 'errorBody')}
         action={
           <Button variant="secondary" onClick={retry}>
             <RotateCw aria-hidden="true" strokeWidth={1.75} />
@@ -63,19 +64,27 @@ export function PayoutsView({
   } else {
     const loading = positions.isLoading || payouts.isLoading || connecting;
     const history = payouts.history;
+    const summary = history?.totals ?? positions.summary;
     body = (
       <div className="flex flex-col gap-10">
         <SummaryStats
           label={t('summaryLabel')}
           isLoading={loading}
           items={[
-            { label: t('totalClaimed'), value: totals(positions.summary.claimed) },
-            { label: t('unclaimed'), value: totals(positions.summary.pending) },
+            { label: t('totalClaimed'), value: totals(summary.claimed) },
+            { label: t('unclaimed'), value: totals(summary.pending) },
             { label: t('periods'), value: formatNumber(history?.rows.length ?? 0, locale) },
           ]}
         />
         {history?.source === 'chain' && (
           <p className="max-w-[70ch] text-small text-muted-foreground">{t('chainOnlyNote')}</p>
+        )}
+        {history?.totals && (
+          <p className="max-w-[70ch] text-small text-muted-foreground">
+            {history.totals.slot === null
+              ? t('indexerNoteEmpty')
+              : t('indexerNote', { slot: formatNumber(history.totals.slot, locale) })}
+          </p>
         )}
         <PayoutHistoryTable
           rows={history?.rows ?? []}
@@ -98,7 +107,7 @@ export function PayoutsView({
                       {carTitle(claim.project.car)}
                     </span>
                     <span className="block text-small text-muted-foreground">
-                      {formatDate(claim.claimedAt, locale)}
+                      {claim.claimedAt === null ? '—' : formatDate(claim.claimedAt, locale)}
                     </span>
                   </span>
                   <span className="flex items-center gap-4">

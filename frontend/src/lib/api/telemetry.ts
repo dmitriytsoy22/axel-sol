@@ -15,6 +15,7 @@ const TelemetrySchema = z.object({
   solanaTxSignature: z.string().nullable(),
   stale: z.boolean(),
   available: z.boolean(),
+  dataOrigin: z.string().nullable(),
 });
 
 /** The newest day of trip data the backend holds for a project, by its share mint. */

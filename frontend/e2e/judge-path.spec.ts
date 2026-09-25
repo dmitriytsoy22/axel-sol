@@ -1,7 +1,8 @@
 import type { Page } from '@playwright/test';
-import { formatTokenAmount } from '../src/lib/format';
+import { formatDay, formatNumber, formatTenge, formatTokenAmount } from '../src/lib/format';
 import { indexedClaimTotals, indexedPayouts, paymentBalance } from './support/chain';
 import { connectWallet, expect, test } from './support/fixtures';
+import { lastPublishedDay } from './support/published';
 
 /** One step of the /demo walkthrough, found by its title. */
 function demoStep(page: Page, title: string) {
@@ -21,6 +22,7 @@ test('a judge gets demo access, buys into a raise, claims a simulated month, the
   const shares = demoStep(page, 'Receive shares of a car on the road');
   const simulate = demoStep(page, 'Simulate a month of income');
   const claim = demoStep(page, 'Claim your payout');
+  let claimed = '';
 
   await test.step('connect a wallet on the demo page and get demo access', async () => {
     await page.goto('/demo');
@@ -61,6 +63,7 @@ test('a judge gets demo access, buys into a raise, claims a simulated month, the
     const ready = simulate.getByText(/^Ready to claim: \d/);
     await expect(ready).toBeVisible();
     const amount = (await ready.innerText()).replace('Ready to claim: ', '');
+    claimed = amount;
     await expect
       .poll(
         async () =>
@@ -126,6 +129,22 @@ test('a judge gets demo access, buys into a raise, claims a simulated month, the
     );
     await expect(verify.getByText('Simulated demo month', { exact: true })).toHaveCount(1);
     await expect(verify.getByText('Match the hash recorded at release')).toBeVisible();
+
+    // The backend runs no oracle for the seeded cars, so the widget reads the published files
+    // and shows the last day only because they rebuild the head the project account holds.
+    const trips = page.getByRole('region', { name: 'Trip data' });
+    const last = lastPublishedDay(stack.fleet.mint);
+    await expect(trips.getByText(new RegExp(`for ${formatDay(last.date, 'en')}$`))).toBeVisible();
+    await expect(trips.getByText(formatTenge(last.rentKzt, 'en'), { exact: true })).toBeVisible();
+    await expect(
+      trips.getByText(`${formatNumber(last.km, 'en')} km`, { exact: true }),
+    ).toBeVisible();
+    await expect(trips.getByText('Fictional demo data')).toBeVisible();
+    await expect(
+      trips.getByText(`matched in your browser to day ${formatNumber(last.position, 'en')} of`, {
+        exact: false,
+      }),
+    ).toBeVisible();
   });
 
   await test.step('see every car pass the proof of solvency', async () => {
@@ -136,5 +155,26 @@ test('a judge gets demo access, buys into a raise, claims a simulated month, the
     await expect(page).toHaveURL(`/solvency#${stack.fleet.mint}`);
 
     await expect(page.getByText(`All ${stack.cars} cars pass every check`)).toBeVisible();
+  });
+
+  await test.step("see the claimed month in the payout history and the portfolio, from the backend's index", async () => {
+    await page.goto('/payouts');
+
+    // The only deposit this wallet shared is the simulated month, and its part is what it claimed.
+    const table = page.getByRole('table');
+    await expect(table.getByRole('columnheader', { name: /Your part/ })).toBeVisible();
+    await expect(table.getByRole('row').filter({ hasText: `+${claimed}` })).toHaveCount(1);
+    const summary = page.getByLabel('Payout summary');
+    await expect(
+      summary.locator('div').filter({ has: page.getByText('Claimed so far', { exact: true }) }),
+    ).toContainText(claimed);
+    const claims = page.getByRole('region', { name: 'Your claims' });
+    await expect(claims.getByText(`+${claimed}`, { exact: true })).toBeVisible();
+    await expect(page.getByText(/as of Solana slot [\d,]+/)).toBeVisible();
+
+    await page.goto('/dashboard');
+    const latest = page.getByRole('region', { name: 'Latest payouts' });
+    await expect(latest.getByRole('listitem')).toHaveCount(1);
+    await expect(latest.getByRole('listitem')).toContainText(`Your part: +${claimed}`);
   });
 });

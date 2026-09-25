@@ -6,8 +6,10 @@ import { fetchPayoutHistory, INDEXER_URL } from '@/lib/api/indexer';
 import type { RevenueKind } from '@/lib/solana/accounts';
 import { periodAddress } from '@/lib/solana/pda';
 import { fetchPositions, fetchProjects, fetchRevenuePeriods } from '@/lib/solana/readers';
+import { sumByToken } from '@/lib/solana/tokens';
 import type { Project } from '@/types/project';
 import { useChainQuery } from './useChainQuery';
+import type { TokenTotal } from './usePositions';
 
 export interface PayoutRow {
   project: Project;
@@ -16,7 +18,8 @@ export interface PayoutRow {
   periodStart: number;
   periodEnd: number;
   kind: RevenueKind;
-  depositedAt: number;
+  /** Unix seconds; null only for an indexed deposit whose block time the RPC did not report. */
+  depositedAt: number | null;
   /** Paid in for holders, after the platform fee. */
   net: bigint;
   /** Shares the deposit was split across. */
@@ -31,8 +34,18 @@ export interface PayoutRow {
 export interface ClaimRow {
   project: Project;
   amount: bigint;
-  claimedAt: number;
+  claimedAt: number | null;
   signature: string;
+}
+
+/** The wallet's totals across its cars, per payment token, as the indexer replays them. */
+export interface IndexedTotals {
+  /** Everything its claims paid out, including in cars it no longer holds. */
+  claimed: TokenTotal[];
+  /** What a claim pays now in each car, to the base unit. */
+  pending: TokenTotal[];
+  /** Newest slot the index holds: the figures are as of it. */
+  slot: number | null;
 }
 
 export interface PayoutHistory {
@@ -42,12 +55,9 @@ export interface PayoutHistory {
   rows: PayoutRow[];
   /** Newest claim first; the chain alone keeps no claim history. */
   claims: ClaimRow[];
+  /** Only the indexer has them; from the chain alone the positions give the totals. */
+  totals: IndexedTotals | null;
 }
-
-const newestFirst = (
-  a: { depositedAt: number; index: number },
-  b: { depositedAt: number; index: number },
-) => b.depositedAt - a.depositedAt || b.index - a.index;
 
 /** Every deposit of every car the wallet has a position in, straight from the period accounts. */
 async function historyFromChain(connection: Connection, wallet: PublicKey): Promise<PayoutHistory> {
@@ -60,24 +70,31 @@ async function historyFromChain(connection: Connection, wallet: PublicKey): Prom
   );
   const periods = await Promise.all(
     held.map(async (project) =>
-      (await fetchRevenuePeriods(connection, project.address)).map(
-        (period): PayoutRow => ({
-          project,
-          index: period.index,
-          periodStart: period.periodStart,
-          periodEnd: period.periodEnd,
-          kind: period.kind,
-          depositedAt: period.depositedAt,
-          net: period.net,
-          supply: period.supply,
-          period: period.address,
-          earned: null,
-          signature: null,
-        }),
-      ),
+      (await fetchRevenuePeriods(connection, project.address)).map((period) => ({
+        project,
+        period,
+      })),
     ),
   );
-  return { source: 'chain', rows: periods.flat().sort(newestFirst), claims: [] };
+  const rows = periods
+    .flat()
+    .sort((a, b) => b.period.depositedAt - a.period.depositedAt || b.period.index - a.period.index)
+    .map(
+      ({ project, period }): PayoutRow => ({
+        project,
+        index: period.index,
+        periodStart: period.periodStart,
+        periodEnd: period.periodEnd,
+        kind: period.kind,
+        depositedAt: period.depositedAt,
+        net: period.net,
+        supply: period.supply,
+        period: period.address,
+        earned: null,
+        signature: null,
+      }),
+    );
+  return { source: 'chain', rows, claims: [], totals: null };
 }
 
 async function historyFromIndexer(
@@ -100,10 +117,20 @@ async function historyFromIndexer(
     const project = byAddress.get(claim.project);
     return project ? [{ ...claim, project }] : [];
   });
+  const cars = history.projects.flatMap((entry) => {
+    const project = byAddress.get(entry.project);
+    return project ? [{ ...entry, token: project.payment }] : [];
+  });
+  // The indexer lists deposits and claims newest first, in chain order.
   return {
     source: 'indexer',
-    rows: rows.sort(newestFirst),
-    claims: claims.sort((a, b) => b.claimedAt - a.claimedAt),
+    rows,
+    claims,
+    totals: {
+      claimed: sumByToken(cars.map(({ claimed, token }) => ({ amount: claimed, token }))),
+      pending: sumByToken(cars.map(({ pending, token }) => ({ amount: pending, token }))),
+      slot: history.slot,
+    },
   };
 }
 

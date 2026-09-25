@@ -52,8 +52,8 @@ AXEL existed before the hackathon. See [Prior Work and Hackathon Scope](#prior-w
   - **KYC records.** Each wallet has an `Investor` record with status, expiry, jurisdiction and provider. Only the KYC key can write it. A devnet demo key can write DEMO records only, for at most 30 days.
   - **The hook.** The share mint's transfer hook is `axel_v2` itself. Token-2022 calls it on every transfer, and it rejects the transfer unless both owners hold an eligible record and the car is on the road.
   - **Frozen by default.** Share accounts start frozen. The program thaws only an owner's canonical account, and only together with that owner's ledger position.
-  - **Sumsub.** The backend binds a wallet with Sign-In With Solana, sends it through Sumsub, and its webhook writes the record with a dedicated KYC key.
-- **Gap:** the web app has no Sumsub flow yet. Records are written from the console's KYC tab or, for judges, by the demo route.
+  - **Sumsub.** On `/verify` the wallet signs the backend's Sign-In With Solana message, and the page runs the Sumsub WebSDK for the applicant bound to that wallet. Sumsub's webhook to the backend writes the record with a dedicated KYC key.
+- **Gap:** the Sumsub flow has not run against Sumsub's sandbox. Without it, records are written from the console's KYC tab or, for judges, by the demo route.
 
 ### 4. Fair payouts
 - **Problem:** Splitting revenue among many small holders off-chain means trusting whoever does the math and sends the money.
@@ -92,7 +92,8 @@ Open issues are listed under [Security](#security) and in [docs/architecture.md]
   - the escrow balance read live, a timeline of the project's states, fees, holders, and Explorer links for every account;
   - the buy dialog explains the escrow, the refund rule and any power the stablecoin's issuer holds;
   - the buy button reads the wallet's KYC record and says why it is disabled;
-  - anyone can settle a raise whose outcome is certain, and the refund dialog settles a failed raise first when nobody has.
+  - anyone can settle a raise whose outcome is certain, and the refund dialog settles a failed raise first when nobody has;
+  - the car's latest day of trip data, labelled Yandex Fleet, simulated or fictional demo data. It comes from the backend, or from the car's published files, shown only when the browser rebuilds the telemetry head the chain holds.
 - **"Check the car's data yourself."** The browser downloads the car's published telemetry, income reports and purchase papers, hashes them with WebCrypto over RFC 8785 JSON, rebuilds the telemetry hash chain and compares every fingerprint with the chain.
 - **Proof of solvency.** For every car, live: the income vault against deposited − claimed and what holders are owed now, the escrow against sold × price, the share supply against the ledger, and the revenue checkpoints.
 - **Portfolio:**
@@ -100,7 +101,8 @@ Open issues are listed under [Security](#security) and in [docs/architecture.md]
   - value, shares, and exactly what a claim pays now, computed with the program's own math on BigInt;
   - claims per car or "Claim all", and refunds;
   - sending shares to another verified wallet. The recipient's KYC is checked while the address is typed, and a first-time recipient is onboarded in the same transaction.
-- **Payout history.** From the chain, or the wallet's own part of each deposit from an indexer.
+- **Identity check.** `/verify` shows the wallet's KYC record and runs the Sumsub check bound to that wallet; a deployment without it points to demo access.
+- **Payout history.** From the chain, or from the backend's event index: the wallet's own part of each deposit, its claims, and the claimed and claimable totals. The portfolio then lists the newest payouts too.
 - **Feedback and languages.** Every transaction outcome appears in a toast with an Explorer link, and every program error is explained in English, Russian and Kazakh.
 
 **Judge demo** (devnet and localnet deployments only)
@@ -122,7 +124,7 @@ Open issues are listed under [Security](#security) and in [docs/architecture.md]
   - the car's operator and oracle;
   - share recovery: propose, run, withdraw;
   - the config account.
-- **Operator:** its cars' deposits, keys, live income vault and payout history.
+- **Operator:** its cars' deposits, keys, live income vault and payout history, and the monthly deposit. The operator types the month's expenses or loads its report file, and the backend answers the deposit co-signed by the car's oracle. The browser checks the report hash, the transaction and the oracle's signature before the operator's wallet signs and sends it.
 - **KYC key and devnet demo KYC key:** look a wallet's record up, then approve or revoke it.
 
 **Program** (`axel_v2`, 24 instructions, 23 events; [docs/v2.md](docs/v2.md))
@@ -159,10 +161,10 @@ Open issues are listed under [Security](#security) and in [docs/architecture.md]
 | `axel_v2` on LiteSVM | 530 |
 | `axel_v2` Rust unit and property tests | 35 |
 | Generated SDK against the IDL | 73 |
-| Frontend unit tests (Vitest) | 522 |
+| Frontend unit tests (Vitest) | 582 |
 | Backend (Jest) | 397, plus the indexer and the operator's deposit flow against a real `solana-test-validator` |
 | Demo seed | 90 |
-| Playwright end to end | the judge path and the KYC refusal, run against the real app, backend and program on a freshly seeded local validator |
+| Playwright end to end | the judge path (with the payout history and trip data it leaves), the KYC refusal and the identity page, run against the real app, backend and program on a freshly seeded local validator |
 
 **v1 (legacy).** The original `axel` and `transfer_hook` programs, deployed on devnet before the hackathon. The app no longer uses them ([Deployment Status](#deployment-status)).
 
@@ -280,7 +282,7 @@ The judge demo lets anyone run the whole cycle with a wallet and nothing else. E
   - Access: once per wallet, 3 per IP address per day, 80 in total.
   - Simulated months: one a minute across all wallets, and 3 per wallet per day.
 - **What the demo keys can do.** The web server holds five keys, one per demo role: the faucet, the demo KYC key, the desk, and the Demo Fleet car's operator and oracle. The program limits the demo KYC key to DEMO records of at most 30 days. The other four control only test tenge, the desk's demo shares and the Demo Fleet car. The server never holds the admin, KYC authority, treasury or upgrade keys.
-- **In CI.** The same path runs as a test: `npm run test:e2e` in `frontend/` starts a validator with `axel_v2`, seeds the demo fleet, starts the backend and the app, and walks the seven steps in Chromium. It checks the claimed amount against the page, the wallet's balance on the validator and the backend's event index.
+- **In CI.** The same path runs as a test: `npm run test:e2e` in `frontend/` starts a validator with `axel_v2`, seeds the demo fleet, starts the backend and the app, and walks the seven steps in Chromium. It checks the claimed amount against the page, the wallet's balance on the validator and the backend's event index, then finds it in the payout history and the portfolio, which read that index. On the fleet car's page it checks that the trip data widget shows the seed's last published day, matched to the chain's head.
 
 The routes, limits and Blinks are specified in [docs/api.md](docs/api.md#judge-demo-api).
 
@@ -424,7 +426,7 @@ Then run `npm ci && npm run dev` in `frontend/`. Every variable is described in 
 
 **Frontend checks** (as in CI): `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`.
 
-**Backend** (optional for the app: trip data widget, KYC, event history)
+**Backend** (optional for the app: trip data of its fleet's cars, KYC, the operator's deposits, payouts from the event index). Point the app at it with `NEXT_PUBLIC_TELEMETRY_API_URL`, `NEXT_PUBLIC_KYC_API_URL` and `NEXT_PUBLIC_INDEXER_URL`, and add the app's origin to the backend's `CORS_ORIGINS`.
 
 ```bash
 cd backend
@@ -531,13 +533,14 @@ Done:
   - the `axel_v2` client and hooks, with amounts in the payment token;
   - the six project states, escrowed buys, refunds, claims and hooked transfers;
   - in-browser verification of each car's data, a live proof of solvency, and the recovery flows;
-  - a console split by on-chain role.
+  - a console split by on-chain role;
+  - wired to the backend: the Sumsub identity check, the operator's co-signed monthly deposit, payouts from the event index, and trip data with its data origin, falling back to the published files.
 - **Judge demo:** the `/api/demo` routes, the `/demo` walkthrough, and the invest and claim Blinks.
 - **Demo seed** ([`scripts/seed-devnet`](scripts/seed-devnet/README.md)): a fictional fleet in every project state, an idempotent executor, the SOL budget, and proof of solvency (I1–I5).
 - **Integration:** merged the three workstreams and fixed what only showed up together:
   - the seed and the backend wrote different telemetry status codes on-chain; they now share one set;
   - the seed's, the demo routes' and the demo script's keys are pinned by a contract test on both sides.
-- **End-to-end tests** (Playwright, in CI): the judge path and the KYC refusal against the real app, backend and program on a freshly seeded local validator.
+- **End-to-end tests** (Playwright, in CI): the judge path, the KYC refusal and the identity page against the real app, backend and program on a freshly seeded local validator.
 - **Docs for v2:** this README, [architecture](docs/architecture.md), [API](docs/api.md), [product](docs/product.md) and [roadmap](docs/roadmap.md).
 
 Still to do before the deadline (**planned, not done yet**):
@@ -565,8 +568,8 @@ Still to do before the deadline (**planned, not done yet**):
 - [x] End-to-end tests of the judge path in CI
 - [ ] `axel_v2` deployed and seeded on devnet; public web app with the judge demo
 - [ ] Backend hosted; the app's trip data widget and payout history connected to it
-- [ ] KYC through Sumsub in the web app
-- [ ] The operator's attested deposit flow in the console
+- [x] KYC through Sumsub in the web app (not run against Sumsub's sandbox yet)
+- [x] The operator's attested deposit flow in the console
 - [ ] Yandex Fleet and Sumsub requests run against the real services
 - [ ] Independent security audit, Squads multisigs for the admin and the upgrade authority, mainnet
 

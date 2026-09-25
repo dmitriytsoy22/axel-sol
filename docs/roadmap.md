@@ -44,6 +44,7 @@ Frontend:
 - [x] Moved to `axel_v2`: client, hooks, amounts in the payment token, the six project states, KYC records, escrowed buys, refunds, claims, hooked transfers ([architecture.md](architecture.md#frontend))
 - [x] v2 screens: soft-cap marker, live escrow, state timeline, refund dialog, in-browser verification of telemetry, reports and purchase papers, Proof of solvency, recovery flows, console split by role, demo data banner
 - [x] Judge demo path (`/demo` and the `/api/demo` routes) and Solana Actions for investing and claiming ([api.md](api.md#judge-demo-api))
+- [x] Wired to the backend: identity checks on `/verify` (signed nonce, then the Sumsub WebSDK), the operator's monthly deposit in the console (drafted and co-signed by the oracle, checked in the browser, signed by the operator's wallet), payouts and the portfolio from the indexer, and the trip data widget with its data origin, falling back to the published files matched to the chain's head ([api.md](api.md#frontend-environment))
 
 Backend:
 - [x] KYC on v2: wallet sign-in, Sumsub sessions bound to the wallet, a hardened webhook that writes `set_investor` with a dedicated key, CORS, rate limits, startup checks ([api.md](api.md#backend-http-endpoints))
@@ -70,8 +71,7 @@ Demo data and integration:
 
 These close the open items in [architecture.md](architecture.md#known-limitations).
 
-- [ ] KYC in the web app: sign in with the wallet, then the Sumsub WebSDK with the token from `POST /kyc/session`; one sandbox run to confirm the Sumsub request formats
-- [ ] The operator's deposit flow in the console (`POST /v2/deposits/draft` → the operator's wallet signs → send), and the telemetry widget's `dataOrigin` label
+- [ ] One Sumsub sandbox run, through `/verify` and the webhook, to confirm the request formats and the WebSDK's messages
 - [ ] Publish real cars' purchase papers from the backend, and let one deployment verify both the seed's cars and the backend's ([api.md](api.md#published-car-data-read-by-verify))
 - [ ] Run the Yandex Fleet requests against a real park's credentials: the orders, driver profiles and transactions formats, and the rent category
 - [ ] Require the `Final` deposit before `close_project`, or make the order explicit in the console

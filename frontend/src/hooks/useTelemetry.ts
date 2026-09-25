@@ -9,10 +9,14 @@ const POLL_MS = 60_000;
 /** Figures older than this read as stale even when the backend does not say so. */
 const STALE_AFTER_MS = 36 * 60 * 60 * 1000;
 
-export function isStaleTelemetry(data: TelemetryData, now = Date.now()): boolean {
-  if (data.stale) return true;
-  const day = Date.parse(data.date);
+/** Whether figures of a "YYYY-MM-DD" day are too old to read as the car's current state. */
+export function isStaleDay(date: string, now = Date.now()): boolean {
+  const day = Date.parse(date);
   return Number.isFinite(day) && now - day > STALE_AFTER_MS;
+}
+
+export function isStaleTelemetry(data: TelemetryData, now = Date.now()): boolean {
+  return data.stale || isStaleDay(data.date, now);
 }
 
 /**

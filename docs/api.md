@@ -282,6 +282,7 @@ The operator's way to deposit a month's revenue with one wallet signature. The o
 - **It lands only as `periodIndex`**, until `lastValidBlockHeight`. The program creates each period at `Project.period_count`, so once another deposit takes that index the draft can no longer land. Drafting the same period again while an earlier draft can still land is therefore allowed: at most one of them lands.
 - **The report** is stored and published at `/published/:mint/reports/:reportHash.json` right away. The car's published index lists it once its deposit is indexed.
 - **Checks** are those of [`/reports/attest`](#revenue-report-attest-a-deposit) that do not need the operator's transaction: the report is rebuilt from the published days, the project is `Operating` and its oracle is this backend's key, something is left to distribute, no deposit on-chain overlaps the period, and the car's sale has not been paid out. An operator-signed deposit for an overlapping period that has landed or can still land is refused too.
+- **In the console.** The operator's tab of `/admin` calls this endpoint on the backend in `NEXT_PUBLIC_TELEMETRY_API_URL` (`components/admin/DepositDraftPanel.tsx`). The operator types the month's expenses or loads its report as a JSON file; the file's other top-level fields are sent as stated. Before the wallet signs, the browser checks the answer (`lib/operator/depositDraft.ts`): the report hashes (RFC 8785, SHA-256) to `reportHash` and to the deposit's report hash; it is this car's and states the deposit's amount, period and kind; the fee payer is the connected wallet; the transaction holds exactly the `deposit_revenue` the app builds itself from the report, for `periodIndex`, and nothing else; and the car's oracle signed its message. The page shows the report, its hash and the oracle's signature. The wallet signs with `signTransaction` and the app sends the transaction; a wallet that changes the message, for example by adding a priority fee, is refused before anything is sent, since that would void the oracle's signature.
 
 | Status | When |
 |---|---|
@@ -461,6 +462,8 @@ Checks the signature over the stored message, burns the nonce (also when the che
 ```
 Pass `accessToken` to the Sumsub WebSDK. It is valid for 30 minutes; a new session gives a new one.
 
+The app's `/verify` page runs this flow when `NEXT_PUBLIC_KYC_API_URL` is set (`hooks/useKycVerification.ts`, `components/kyc/`): the wallet signs the nonce's message with `signMessage`, the page opens the session and launches the WebSDK from Sumsub's script (`lib/kyc/sumsub.ts`) with the token. When the WebSDK's token expires, the page signs a new nonce for a new one. The approval reaches the chain only through the webhook; the page reads the wallet's `Investor` record every 10 s and shows it verified once `set_investor` lands. Without `NEXT_PUBLIC_KYC_API_URL` the page shows the wallet's record and how to get demo access.
+
 | Status | When |
 |---|---|
 | `400` | body fields missing or malformed |
@@ -557,8 +560,9 @@ The v2 program ID comes from `AXEL_PROGRAM_ID` or the vendored IDL; instructions
 | `NEXT_PUBLIC_SOLANA_RPC_URL` | `lib/solana/connection.ts`, `providers/WalletProvider.tsx`, `next.config.mjs` | The cluster's public RPC (`http://127.0.0.1:8899` for `localnet`). Its origin and websocket are added to the CSP. |
 | `NEXT_PUBLIC_PROGRAM_ID` | `lib/solana/connection.ts` | The `address` in `idl-v2/axel_v2.json` (`AXLcoEH3vJXUSL7nEr1T4d77NarThcbVrnbBzBR8XPZi`). |
 | `NEXT_PUBLIC_PAYMENT_MINT_SYMBOLS` | `lib/solana/tokens.ts` | Unset. `<mint>:<symbol>,<mint>:<symbol>` names payment mints without on-chain metadata. A Token-2022 mint's own metadata symbol wins, Circle's USDC is known by address, anything else shows its short address. |
-| `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts`, `next.config.mjs` | Unset: the car page says trip data is not connected and makes no request. Set: the backend's base URL; the widget asks `/telemetry/latest/<share mint>` every minute. The backend answers only the origins in its `CORS_ORIGINS`, so the frontend's origin must be listed there. |
-| `NEXT_PUBLIC_INDEXER_URL` | `lib/api/indexer.ts`, `next.config.mjs` | Unset: payout history comes from the chain. Set: from the [indexer API](#indexer-api-read-by-the-frontend), which the backend serves; its base URL. |
+| `NEXT_PUBLIC_TELEMETRY_API_URL` | `lib/api/telemetry.ts`, `next.config.mjs` | The backend that runs the cars' oracle; its base URL. Set: the trip data widget asks `/telemetry/latest/<share mint>` every minute, and the operator's console drafts deposits with [`POST /v2/deposits/draft`](#deposit-draft-operator-flow). Unset, or for a car outside the backend's fleet: the widget reads the car's [published files](#published-car-data-read-by-verify) and checks them against the chain; the console says deposits cannot be drafted. The backend answers only the origins in its `CORS_ORIGINS`, so the frontend's origin must be listed there. |
+| `NEXT_PUBLIC_INDEXER_URL` | `lib/api/indexer.ts`, `next.config.mjs` | Unset: payout history comes from the chain. Set: from the [indexer API](#indexer-api-read-by-the-frontend), which the backend serves; its base URL. `/payouts` then shows the wallet's part of each deposit, its claims, and the claimed and claimable totals as of the index's slot, and the portfolio lists the wallet's part of its three newest payouts. |
+| `NEXT_PUBLIC_KYC_API_URL` | `lib/api/kyc.ts`, `next.config.mjs` | Unset: `/verify` shows the wallet's KYC record and how to get demo access. Set: the backend's base URL; `/verify` signs in with [`/kyc/nonce` and `/kyc/session`](#kyc-sign-in-nonce) and runs the Sumsub WebSDK, and a car page offers the check to a wallet without an eligible record. The CSP then allows Sumsub's script (`https://static.sumsub.com`) and its iframe and API (`https://api.sumsub.com`), and the Permissions-Policy lets that iframe use the camera and microphone. |
 | `NEXT_PUBLIC_PUBLISHED_DATA_URL` | `lib/api/published.ts`, `next.config.mjs` | `/demo-data` on test networks (the seed's files in `frontend/public/demo-data`), unset on mainnet. The base of the [published car data](#published-car-data-read-by-verify) the asset page's "Check the car's data yourself" hashes; `<backend>/published` for the backend's cars. An absolute URL's origin is added to the CSP, and that server must allow CORS (the backend answers the origins in its `CORS_ORIGINS`). |
 | `NEXT_PUBLIC_SITE_URL` | `lib/actions/http.ts` | Unset: the [Blinks](#solana-actions-blinks) take their absolute links and icon from the request's host (`X-Forwarded-Host` behind a proxy). |
 | `NEXT_PUBLIC_DEMO_ACCESS` | `lib/demo/config.ts` | Unset. `1` shows the [judge demo](#judge-demo-api) entry points (the demo banner, the mobile menu and the car page) and the `/demo` page, on devnet and localnet only. The routes themselves also need the server variables below. |
@@ -583,7 +587,7 @@ Keys are base58 secret keys or `solana-keygen` JSON arrays. `DEMO_SEED_SECRET=â€
 
 ## Indexer API (read by the frontend)
 
-The chain records every revenue deposit (`RevenuePeriod`) and every position, but not how many shares a wallet held when a deposit arrived, nor its past claims (those are `Claimed` events in transaction logs). A wallet's part of each deposit therefore needs an indexer. The backend serves it from its [event index](#program-events-what-is-indexed). The frontend reads it when `NEXT_PUBLIC_INDEXER_URL` is set and validates the answer with Zod (`lib/api/indexer.ts`); without it, `/payouts` lists each deposit with its amount per share, and the totals come from the positions.
+The chain records every revenue deposit (`RevenuePeriod`) and every position, but not how many shares a wallet held when a deposit arrived, nor its past claims (those are `Claimed` events in transaction logs). A wallet's part of each deposit therefore needs an indexer. The backend serves it from its [event index](#program-events-what-is-indexed). The frontend reads it when `NEXT_PUBLIC_INDEXER_URL` is set and validates the answer with Zod (`lib/api/indexer.ts`): `/payouts` takes every figure from it, including the claimed and claimable totals from `projects`, and the portfolio lists the wallet's part of its newest deposits. Without it, `/payouts` lists each deposit with its amount per share, and the totals come from the positions.
 
 ```
 GET /v2/wallets/:wallet/payouts
@@ -662,6 +666,7 @@ interface CarIndex {
 A month file:
 ```ts
 interface TelemetryMonth {
+  head_before?: string;   // hex chain head before the month's first day; both publishers write it
   days: Array<{
     record: object;       // the raw daily record; it must carry "date": "YYYY-MM-DD"
     data_hash?: string;   // hex SHA-256 of the record's RFC 8785 canonical JSON
@@ -684,6 +689,8 @@ The check, in order:
 6. After activation, the acquisition file is compared with `acquisition_doc_hash`.
 
 File paths in the index must be relative `.json` paths inside the car's folder. A missing index (404) is reported as "nothing published".
+
+**Trip data widget.** The asset page's trip data comes from the backend's `GET /telemetry/latest/:mint` for a car of its fleet. For any other car (`available: false`), or when `NEXT_PUBLIC_TELEMETRY_API_URL` is unset, it reads the car's last recorded day from these files (`lib/verify/latestDay.ts`): the month of `Project.last_telemetry_date`, whose days it hashes and chains from the month's `head_before` (from 32 zero bytes through every earlier month when a month file has none). The day is shown only when the rebuilt head equals `Project.telemetry_head`; otherwise the widget says the published data does not match. Stated hashes and heads are not trusted. The widget labels every day with its `data_origin`: Yandex Fleet, simulated, or fictional demo data.
 
 ## Judge Demo API
 

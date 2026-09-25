@@ -10,6 +10,7 @@ import type { Project } from '@/types/project';
 import { AdminMetrics } from './AdminMetrics';
 import { ConfigCard } from './ConfigCard';
 import { InvestorManager } from './InvestorManager';
+import { DepositDraftPanel } from './DepositDraftPanel';
 import { OperatorPanel } from './OperatorPanel';
 import { ProjectControls } from './ProjectControls';
 import { RecoveryConsole } from './RecoveryConsole';
@@ -68,17 +69,30 @@ export function PlatformConsole({ roles }: { roles: AdminRoles }): JSX.Element {
   );
 }
 
-/** A car's operator: its deposits, keys and payout history; changes come from the admin. */
+/**
+ * A car's operator: its deposits, keys and payout history, and the monthly deposit it makes
+ * with the oracle's co-signature; changes of the car come from the admin.
+ */
 export function OperatorConsole({ roles }: { roles: AdminRoles }): JSX.Element | null {
   const { project, select } = useSelectedCar(roles.operated);
   if (!project) return null;
+  const { config } = roles;
+  const depositsOpen = project.status === 'operating' && config !== null && !config.paused;
 
   return (
     <>
       <AdminMetrics project={project} projects={roles.operated} onSelect={select} />
       <div className="page-container flex flex-col gap-12 pb-24 pt-10 md:pt-12">
-        <div className="lg:max-w-[48rem]">
-          <OperatorPanel project={project} protocolPaused={roles.config?.paused ?? false} />
+        <div className="flex flex-col gap-8 lg:max-w-[48rem]">
+          <OperatorPanel project={project} protocolPaused={config?.paused ?? false} />
+          {depositsOpen && (
+            <DepositDraftPanel
+              key={project.address.toBase58()}
+              project={project}
+              treasury={config.treasury}
+              onDeposited={roles.refetch}
+            />
+          )}
         </div>
         <CarPayouts project={project} />
       </div>

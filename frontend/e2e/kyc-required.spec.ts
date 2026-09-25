@@ -30,3 +30,21 @@ test('the invest Blink refuses to build a purchase for a wallet without KYC', as
     message: `This wallet has no KYC record yet. Get demo access at ${URLS.frontend}/demo, then try again.`,
   });
 });
+
+test('a wallet without KYC sees its missing record and is pointed to demo access where no identity check runs', async ({
+  page,
+  wallet,
+}) => {
+  await page.goto('/verify');
+  await connectWallet(page, wallet);
+  const main = page.getByRole('main');
+
+  await expect(main.getByText('Not verified', { exact: true })).toBeVisible();
+  await expect(
+    main.getByRole('heading', { name: "Identity checks aren't connected here" }),
+  ).toBeVisible();
+  await expect(main.getByRole('button', { name: 'Verify identity' })).toHaveCount(0);
+  await main.getByRole('link', { name: 'Get demo access' }).click();
+
+  await expect(page).toHaveURL('/demo');
+});

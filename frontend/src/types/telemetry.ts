@@ -12,4 +12,6 @@ export interface TelemetryData {
   solanaTxSignature: string | null;
   stale: boolean;
   available: boolean;
+  /** `yandex_fleet` or `simulated`; null when the backend has no day for the car. */
+  dataOrigin: string | null;
 }
