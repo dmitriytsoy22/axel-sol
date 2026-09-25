@@ -46,6 +46,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check the build leaves out the e2e burner wallet
+        run: |
+          if grep -rlF -e 'E2E Burner' -e 'axel:e2e-burner-secret-key' .next/static .next/server; then
+            echo "::error::A build without NEXT_PUBLIC_E2E=1 contains the e2e burner wallet (see providers/WalletProvider.tsx)"
+            exit 1
+          fi
+
   backend:
     name: Backend (lint, test, build)
     runs-on: ubuntu-latest

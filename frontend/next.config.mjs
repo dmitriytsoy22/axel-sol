@@ -65,6 +65,11 @@ const cspHeader = `
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  env: {
+    // Next inlines a NEXT_PUBLIC_ variable only when it is set. Defining this one always lets a
+    // build without it drop the e2e burner wallet's import (providers/WalletProvider.tsx).
+    NEXT_PUBLIC_E2E: process.env.NEXT_PUBLIC_E2E ?? '',
+  },
   images: {
     remotePatterns: [
       {
