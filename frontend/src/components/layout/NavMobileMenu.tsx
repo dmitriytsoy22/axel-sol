@@ -189,21 +189,31 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
                     </span>
                   )}
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                {/* Two buttons share a row only when both labels fit; "Копировать адрес" and
+                    "Мекенжайды көшіру" take a row of their own at 320 to 390 px. */}
+                <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={copy}
-                    className={buttonClasses({ variant: 'secondary' })}
+                    className={buttonClasses({ variant: 'secondary', className: 'flex-auto' })}
                   >
                     <Copy aria-hidden="true" strokeWidth={1.75} />
-                    <span aria-live="polite">
-                      {copied ? tCommon('copied') : tCommon('copyAddress')}
+                    {/* Both labels hold the width, so "Copied" never lets the row reflow
+                        under the reader's finger. */}
+                    <span aria-live="polite" className="grid [&>*]:col-start-1 [&>*]:row-start-1">
+                      <span className={copied ? 'invisible' : undefined}>
+                        {tCommon('copyAddress')}
+                      </span>
+                      <span className={copied ? undefined : 'invisible'}>{tCommon('copied')}</span>
                     </span>
                   </button>
                   <button
                     type="button"
                     onClick={handleDisconnect}
-                    className={buttonClasses({ variant: 'outline', className: 'text-destructive' })}
+                    className={buttonClasses({
+                      variant: 'outline',
+                      className: 'flex-auto text-destructive',
+                    })}
                   >
                     <LogOut aria-hidden="true" strokeWidth={1.75} />
                     {tCommon('disconnect')}
@@ -211,7 +221,7 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
                   <Link
                     href="/verify"
                     onClick={() => setIsOpen(false)}
-                    className={buttonClasses({ variant: 'outline', className: 'col-span-2' })}
+                    className={buttonClasses({ variant: 'outline', className: 'w-full' })}
                   >
                     <ShieldCheck aria-hidden="true" strokeWidth={1.75} />
                     {tNav('verifyIdentity')}

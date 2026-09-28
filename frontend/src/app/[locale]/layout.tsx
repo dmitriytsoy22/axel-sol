@@ -17,7 +17,7 @@ export async function generateMetadata({ params: { locale } }: { params: { local
 
   return {
     title: {
-      template: '%s | AXEL RWA',
+      template: '%s | AXEL',
       default: t('title'),
     },
     description: t('description'),
@@ -26,7 +26,7 @@ export async function generateMetadata({ params: { locale } }: { params: { local
       title: t('ogTitle'),
       description: t('ogDescription'),
       type: 'website',
-      siteName: 'AXEL Platform',
+      siteName: 'AXEL',
     },
     twitter: {
       card: 'summary_large_image',

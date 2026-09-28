@@ -764,7 +764,7 @@
     "fetching": "Downloading month {done} of {total}…",
     "hashing": "Hashing {days} days…",
     "noSource": "This deployment has no published data source, so there is nothing to check against yet.",
-    "notPublished": "Nothing is published for this car at {url}.",
+    "notPublished": "Nothing is published for this car yet, so its fingerprints on Solana can't be checked.",
     "noWebCrypto": "This browser can't compute SHA-256 on this page: WebCrypto needs HTTPS.",
     "failed": "Couldn't download or read the published files. Try again.",
     "matchTitle": "Trip data verified",
@@ -887,6 +887,7 @@
     "incomeTitle": "Income vault",
     "incomeRule": "Vault ≥ deposited − claimed ≥ owed",
     "incomeNote": "Owed to holders now: {owed}. Surplus: {surplus}, rounding dust and direct transfers.",
+    "incomeShortNote": "Owed to holders now: {owed}. Shortfall: {shortfall}, the vault holds less than the income deposited minus the claims paid.",
     "escrowTitle": "Raise escrow",
     "escrowRule": "Escrow ≥ (sold − refunded) × price",
     "escrowClosed": "Closed",
@@ -1041,7 +1042,11 @@
     "failure_unknown": "The identity check couldn't start. Try again.",
     "demoHere": "This deployment runs no identity check. For the demo, sign one message on the demo page: the wallet gets a 29-day demo record, test tenge and a little SOL, and can buy shares of the demo cars.",
     "demoElsewhere": "This deployment runs no identity check and no demo. On an AXEL devnet deployment with the judge demo, its /demo page gives a wallet a 29-day demo record for one signature.",
-    "getDemoAccess": "Get demo access"
+    "getDemoAccess": "Get demo access",
+    "demoAlready": "This wallet already has demo access. Carry on with the walkthrough on the demo page: it picks up where the wallet left off.",
+    "openDemo": "Open the demo",
+    "lockedHere": "The demo changes only its own records, so it can't renew or restore this one. Contact the platform about this wallet, or connect another wallet to try the demo.",
+    "lockedElsewhere": "This deployment runs no identity check, and a demo can't renew or restore this record. Contact the platform about this wallet."
   },
   "Operator": {
     "title": "Deposit a month's income",

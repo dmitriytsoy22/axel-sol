@@ -16,7 +16,7 @@ import { Notice } from '@/components/ui/Notice';
 import { SummaryStats } from '@/components/ui/SummaryStats';
 import { formatDate, formatNumber, formatTokenAmount, formatTokenTotals } from '@/lib/format';
 import { getExplorerUrl } from '@/lib/solana/connection';
-import { carTitle } from '@/lib/solana/tokens';
+import { CarName } from '@/components/catalog/CarName';
 
 /** `indexerUrl` defaults to NEXT_PUBLIC_INDEXER_URL; without one the history comes from the chain. */
 export function PayoutsView({
@@ -106,7 +106,7 @@ export function PayoutsView({
                 >
                   <span>
                     <span className="block font-medium text-foreground">
-                      {carTitle(claim.project.car)}
+                      <CarName car={claim.project.car} />
                     </span>
                     <span className="block text-small text-muted-foreground">
                       {claim.claimedAt === null ? '—' : formatDate(claim.claimedAt, locale)}

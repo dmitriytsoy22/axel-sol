@@ -33,6 +33,11 @@ const defaultApi = demoApi();
 export interface DemoAccess {
   /** Null until the first read; a 503 body when the demo is unavailable. */
   status: DemoStatus | null;
+  /**
+   * When the next simulated month is allowed, in unix seconds: the status's cooldown counted
+   * from when it arrived, so a page can count it down. Null when a month is allowed now.
+   */
+  cooldownEndsAt: number | null;
   statusError: string | null;
   refetchStatus: () => void;
   /** The connected wallet's session, which the shares and simulation routes require. */
@@ -63,6 +68,7 @@ export function useDemoAccess(api: DemoApi = defaultApi): DemoAccess {
   const wallet = publicKey?.toBase58() ?? null;
 
   const [status, setStatus] = useState<DemoStatus | null>(null);
+  const [statusAt, setStatusAt] = useState(0);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [statusAttempt, setStatusAttempt] = useState(0);
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -75,7 +81,9 @@ export function useDemoAccess(api: DemoApi = defaultApi): DemoAccess {
     setStatusError(null);
     api.status(wallet).then(
       (next) => {
-        if (active) setStatus(next);
+        if (!active) return;
+        setStatus(next);
+        setStatusAt(unixNow());
       },
       (error: unknown) => {
         if (active) setStatusError(error instanceof Error ? error.message : String(error));
@@ -93,14 +101,15 @@ export function useDemoAccess(api: DemoApi = defaultApi): DemoAccess {
   }, [wallet]);
 
   const refetchStatus = useCallback(() => setStatusAttempt((value) => value + 1), []);
+  const cooldown = status?.fleet?.cooldownSeconds ?? null;
+  const cooldownEndsAt = cooldown === null ? null : statusAt + cooldown;
 
   // A simulated month is allowed again once the cooldown ends; read the status then.
   useEffect(() => {
-    const cooldown = status?.fleet?.cooldownSeconds ?? null;
     if (cooldown === null) return;
     const timer = setTimeout(refetchStatus, (cooldown + 1) * 1000);
     return () => clearTimeout(timer);
-  }, [status, refetchStatus]);
+  }, [status, cooldown, refetchStatus]);
 
   const describe = useCallback(
     (error: unknown): string => {
@@ -201,6 +210,7 @@ export function useDemoAccess(api: DemoApi = defaultApi): DemoAccess {
   return useMemo(
     () => ({
       status,
+      cooldownEndsAt,
       statusError,
       refetchStatus,
       session,
@@ -213,6 +223,7 @@ export function useDemoAccess(api: DemoApi = defaultApi): DemoAccess {
     }),
     [
       status,
+      cooldownEndsAt,
       statusError,
       refetchStatus,
       session,

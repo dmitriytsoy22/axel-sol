@@ -148,10 +148,37 @@ describe('RefundButton', () => {
 
     expect(await screen.findByText('Refund received')).toBeInTheDocument();
     expect(screen.getByText('50,000 tKZT is back in your wallet.')).toBeInTheDocument();
-    expect(onRefunded).toHaveBeenCalledTimes(1);
     const [refund] = axelInstructions(sent[0]);
     expect(refund.data).toEqual(instructionDiscriminator('refund'));
     expect(refund.keys[0].pubkey.equals(refunder)).toBe(true);
+    // The page re-reads the positions only once the reader has seen the result.
+    expect(onRefunded).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getAllByRole('button', { name: 'Close' }).at(-1)!);
+    expect(onRefunded).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the result on screen although the refund empties the row that opened it', async () => {
+    const project = await fixtureProject('failed');
+    const refunder = key(fixture.projects.failed.holders[0]);
+    // The portfolio drops a position with no shares left, and the refund button with it.
+    function Row() {
+      const [held, setHeld] = React.useState(true);
+      return held ? (
+        <RefundButton project={project} shares={5n} onRefunded={() => setHeld(false)} />
+      ) : (
+        <p>No shares left</p>
+      );
+    }
+    renderWith(new FixtureNode(), refunder, <Row />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Get 50,000 tKZT back' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm refund' }));
+
+    expect(await screen.findByText('50,000 tKZT is back in your wallet.')).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Get your money back' });
+    await userEvent.click(within(dialog).getAllByRole('button', { name: 'Close' }).at(-1)!);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByText('No shares left')).toBeInTheDocument();
   });
 
   it('settles a raise that ran out below its goal in the same transaction as the refund', async () => {

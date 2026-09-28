@@ -256,7 +256,7 @@ export function VerifyData({
   } else if (state.phase === 'failed') {
     body = (
       <p role="alert" className="text-body text-muted-foreground">
-        {t(failureKey(state.error), { url: folder ?? '' })}
+        {t(failureKey(state.error))}
       </p>
     );
   }

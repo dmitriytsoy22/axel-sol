@@ -4,6 +4,7 @@ import React from 'react';
 import { useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
+import { useWalletConnecting } from '@/components/wallet/useWalletConnecting';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -27,13 +28,20 @@ interface AdminGuardProps {
  * page and is told why, so they can switch wallets here instead of being bounced away.
  */
 export function AdminGuard({ allowed, isLoading, error, onRetry, children }: AdminGuardProps) {
-  const { connected, connecting, publicKey } = useWallet();
+  const { connected, publicKey } = useWallet();
+  const connecting = useWalletConnecting();
   const t = useTranslations('Admin');
   const tCommon = useTranslations('Common');
 
+  // A screen tall under the bar, so the footer waits just below the fold for the console:
+  // a platform or operator console is longer than a screen and would push it away.
   if (isLoading || connecting) {
     return (
-      <div aria-busy="true" data-testid="admin-loading" className="page-container section-y">
+      <div
+        aria-busy="true"
+        data-testid="admin-loading"
+        className="page-container section-y min-h-[calc(100svh-4rem)]"
+      >
         <Skeleton className="h-5 w-40" />
         <Skeleton className="mt-4 h-12 w-2/3 max-w-lg" />
         <Skeleton className="mt-10 h-64 w-full rounded-card" />

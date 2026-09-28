@@ -103,7 +103,20 @@ export function InvestModal({
   ];
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('title')} closeLabel={t('close')}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={t('title')}
+      closeLabel={t('close')}
+      // On a phone the terms scroll; the purchase stays in view under them.
+      footer={
+        showStatus ? undefined : (
+          <Button size="lg" onClick={handleBuy} disabled={!canBuy} className="w-full">
+            {t('confirmInvest')}
+          </Button>
+        )
+      }
+    >
       {showStatus ? (
         <div className="flex flex-col items-center">
           <TransactionStatus status={status} />
@@ -223,10 +236,6 @@ export function InvestModal({
               </p>
             )}
           </section>
-
-          <Button size="lg" onClick={handleBuy} disabled={!canBuy} className="w-full">
-            {t('confirmInvest')}
-          </Button>
 
           {ON_TEST_NETWORK && (
             <p className="text-small text-muted-foreground">

@@ -75,6 +75,9 @@ describe('SolvencyView', () => {
     const kiaRio = carCard(/Kia Rio/);
     expect(kiaRio.getByText('Fails')).toBeInTheDocument();
     expect(kiaRio.getByText('Income vault').closest('.grid')).toHaveTextContent('Short');
+    // The missing amount, positive and named as such, never a "surplus" of dust.
+    expect(kiaRio.getByText(/Shortfall: \d[\d,.]* tKZT, the vault holds less/)).toBeInTheDocument();
+    expect(kiaRio.queryByText(/Surplus/)).not.toBeInTheDocument();
     expect(isOpen(/Kia Rio/)).toBe(true);
     expect(isOpen(/Hyundai Accent/)).toBe(false);
   });

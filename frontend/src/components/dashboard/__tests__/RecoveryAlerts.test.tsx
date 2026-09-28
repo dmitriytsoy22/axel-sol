@@ -60,7 +60,7 @@ describe('RecoveryAlerts', () => {
     const sent = await renderAlerts(await nodeWithRecovery(now() + 3_600));
 
     expect(await screen.findByText('A recovery of your shares is pending')).toBeInTheDocument();
-    expect(screen.getByText(/moving 12 shares of Kia Rio from this wallet/)).toBeInTheDocument();
+    expect(screen.getByText(/moving 12 shares of Kia Rio AXKR017 from this wallet/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Veto the recovery' }));
 
     expect(await screen.findByText('Recovery cancelled')).toBeInTheDocument();

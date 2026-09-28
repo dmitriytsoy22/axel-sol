@@ -45,7 +45,8 @@ export interface TokenUnit {
 /**
  * A token amount in the reader's number format with its symbol: "1,250.5 tKZT" in English,
  * "1 250,5 tKZT" in Russian. Digits past `maxFractionDigits` are cut, never rounded up, so a
- * payout is never shown larger than it is.
+ * payout is never shown larger than it is. A negative amount, such as a vault's shortfall,
+ * takes the locale's minus sign; one that the cut leaves at zero reads "0".
  */
 export function formatTokenAmount(
   amount: bigint,
@@ -53,17 +54,22 @@ export function formatTokenAmount(
   locale: string,
   maxFractionDigits = 2,
 ): string {
+  // BigInt division and remainder keep the sign, so the digits are cut from the magnitude.
+  const magnitude = amount < 0n ? -amount : amount;
   const scale = 10n ** BigInt(unit.decimals);
-  const whole = amount / scale;
+  const whole = magnitude / scale;
   const digits = Math.min(maxFractionDigits, unit.decimals);
-  const fraction = (amount % scale)
+  const fraction = (magnitude % scale)
     .toString()
     .padStart(unit.decimals, '0')
     .slice(0, digits)
     .replace(/0+$/, '');
   const format = new Intl.NumberFormat(intlLocale(locale));
-  const decimal = format.formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-  return `${format.format(whole)}${fraction ? `${decimal}${fraction}` : ''} ${unit.symbol}`;
+  const part = (value: number, type: Intl.NumberFormatPartTypes, fallback: string) =>
+    format.formatToParts(value).find((p) => p.type === type)?.value ?? fallback;
+  const sign = amount < 0n && (whole > 0n || fraction) ? part(-1, 'minusSign', '-') : '';
+  const decimals = fraction ? `${part(1.5, 'decimal', '.')}${fraction}` : '';
+  return `${sign}${format.format(whole)}${decimals} ${unit.symbol}`;
 }
 
 /** Amounts in several tokens, one per token: "1,250 tKZT · 10 USDC". */

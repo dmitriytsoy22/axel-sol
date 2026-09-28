@@ -222,6 +222,12 @@ describe('DemoWalkthrough', () => {
       await simulate.findByText('The next month can be simulated in 42 s.'),
     ).toBeInTheDocument();
     expect(simulate.getByRole('button', { name: 'Simulate another month' })).toBeDisabled();
+
+    // The wait counts down from when the status arrived instead of repeating it.
+    vi.setSystemTime((fixture.now + 10) * 1000);
+    expect(
+      await simulate.findByText('The next month can be simulated in 32 s.', {}, { timeout: 2000 }),
+    ).toBeInTheDocument();
   });
 
   it('says why the demo is unavailable instead of offering steps that would fail', async () => {

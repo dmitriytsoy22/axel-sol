@@ -118,10 +118,14 @@ function ProjectLedger({ project, solvency }: Entry): JSX.Element {
             ok={income.ok}
             holds={amount(income.vault)}
             owes={amount(income.liability)}
-            note={t('incomeNote', {
-              owed: amount(income.owed),
-              surplus: amount(income.surplus),
-            })}
+            note={
+              income.surplus !== null && income.surplus < 0n
+                ? t('incomeShortNote', {
+                    owed: amount(income.owed),
+                    shortfall: amount(-income.surplus),
+                  })
+                : t('incomeNote', { owed: amount(income.owed), surplus: amount(income.surplus) })
+            }
             links={link(project.revenueVault)}
           />
           <Check

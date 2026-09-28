@@ -192,10 +192,13 @@ export function DataTable<T>({
         {currentData.length > 0 ? (
           currentData.map((row, rowIndex) => (
             <dl key={rowIndex} className="flex flex-col gap-2 p-4">
+              {/* The label takes what the value leaves: a narrow row wraps the label's words
+                  first and the value (an amount, a date, a car) only when the label is down to
+                  its longest word. */}
               {columns.map((col, colIndex) => (
-                <div key={colIndex} className="flex items-center justify-between gap-4 text-small">
-                  <dt className="text-muted-foreground">{col.header}</dt>
-                  <dd className="break-words text-right tabular-nums text-foreground">
+                <div key={colIndex} className="flex items-baseline gap-4 text-small">
+                  <dt className="flex-1 text-muted-foreground">{col.header}</dt>
+                  <dd className="min-w-0 break-words text-right tabular-nums text-foreground">
                     {renderCell(col, row)}
                   </dd>
                 </div>

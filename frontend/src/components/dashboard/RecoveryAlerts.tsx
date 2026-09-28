@@ -10,7 +10,7 @@ import { useRecoveryActions, useRecoveryRequests } from '@/hooks/useRecoveries';
 import { useUnixNow } from '@/hooks/useUnixNow';
 import { formatCount, formatDate, formatTime, shortAddress } from '@/lib/format';
 import type { RecoveryRequestAccount } from '@/lib/solana/accounts';
-import { carTitle } from '@/lib/solana/tokens';
+import { carLabel } from '@/components/catalog/CarName';
 import type { Project } from '@/types/project';
 
 function RecoveryAlert({
@@ -53,7 +53,7 @@ function RecoveryAlert({
           <p className="mt-1 max-w-[62ch] text-body text-muted-foreground">
             {t('alertBody', {
               shares: formatCount(request.shares, locale),
-              car: project ? carTitle(project.car) : t('unknownCar'),
+              car: project ? carLabel(project.car) : t('unknownCar'),
               to: shortAddress(request.toOwner.toBase58()),
             })}
           </p>

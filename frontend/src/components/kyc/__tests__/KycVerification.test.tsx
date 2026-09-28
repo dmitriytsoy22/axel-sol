@@ -1,8 +1,8 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ed25519 } from '@noble/curves/ed25519';
-import { utils } from '@coral-xyz/anchor';
+import { BN, utils } from '@coral-xyz/anchor';
 import { Keypair, type PublicKey } from '@solana/web3.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { investorAddress } from '@/lib/solana/pda';
@@ -170,6 +170,37 @@ describe('KycVerification', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Verify identity' })).not.toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not send a revoked wallet to a demo that would refuse it', async () => {
+    const accounts = await patchProgramAccount('investor', investorAddress(alice), (record) => ({
+      ...record,
+      status: { revoked: {} },
+    }));
+    renderPage({ owner: alice, apiUrl: null, node: new FixtureNode(accounts) });
+
+    expect(await screen.findByText('Revoked')).toBeInTheDocument();
+    expect(screen.getByText(/a demo can't renew or restore this record/)).toBeInTheDocument();
+    expect(screen.queryByText(/29-day demo record/)).not.toBeInTheDocument();
+  });
+
+  it('tells a lapsed record apart by who wrote it: the demo renews only its own', async () => {
+    const lapsed = (flags: number) =>
+      patchProgramAccount('investor', investorAddress(alice), (record) => ({
+        ...record,
+        flags,
+        expiresAt: new BN(1_700_000_000),
+      }));
+    renderPage({ owner: alice, apiUrl: null, node: new FixtureNode(await lapsed(0)) });
+    expect(await screen.findByText('Expired')).toBeInTheDocument();
+    expect(screen.getByText(/a demo can't renew or restore this record/)).toBeInTheDocument();
+
+    cleanup();
+    renderPage({ owner: alice, apiUrl: null, node: new FixtureNode(await lapsed(1)) });
+    expect(await screen.findByText('Expired')).toBeInTheDocument();
+    expect(
+      screen.getByText(/its \/demo page gives a wallet a 29-day demo record/),
+    ).toBeInTheDocument();
   });
 
   it("signs the backend's nonce with the wallet and opens Sumsub with the token for that wallet", async () => {

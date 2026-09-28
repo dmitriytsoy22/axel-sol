@@ -23,7 +23,7 @@ import {
   type SumsubProgress,
   type SumsubWebSdk,
 } from '@/lib/kyc/sumsub';
-import type { InvestorAccount } from '@/lib/solana/accounts';
+import { INVESTOR_FLAGS, type InvestorAccount } from '@/lib/solana/accounts';
 import { eligibility } from '@/lib/solana/eligibility';
 
 /** How often the page reads the wallet's record while Sumsub reviews it. */
@@ -192,18 +192,44 @@ function FailureNote({ flow }: { flow: Extract<KycFlow, { step: 'failed' }> }): 
   );
 }
 
+/**
+ * Whether the demo is no way out for this record. The demo key writes only a missing record
+ * or renews its own (`demoKycPlan` on the server), so it refuses a revoked record and a
+ * lapsed one that the platform or Sumsub wrote.
+ */
+function demoLocked(investor: InvestorAccount | null, standing: Standing): boolean {
+  if (standing === 'revoked') return true;
+  return (
+    standing === 'expired' && investor !== null && (investor.flags & INVESTOR_FLAGS.demo) === 0
+  );
+}
+
 /** Where a wallet gets DEMO access when this deployment runs no identity check. */
-function DemoAccessGuide(): JSX.Element {
+function DemoAccessGuide({
+  standing,
+  locked,
+}: {
+  standing: Standing;
+  locked: boolean;
+}): JSX.Element {
   const t = useTranslations('Kyc');
+  if (locked) {
+    return (
+      <p className="max-w-[65ch] text-body text-muted-foreground">
+        {t(DEMO_ACCESS_SHOWN ? 'lockedHere' : 'lockedElsewhere')}
+      </p>
+    );
+  }
+  const hasDemo = standing === 'demo';
   return (
     <div className="flex flex-col items-start gap-4">
       <p className="max-w-[65ch] text-body text-muted-foreground">
-        {t(DEMO_ACCESS_SHOWN ? 'demoHere' : 'demoElsewhere')}
+        {t(DEMO_ACCESS_SHOWN ? (hasDemo ? 'demoAlready' : 'demoHere') : 'demoElsewhere')}
       </p>
       {DEMO_ACCESS_SHOWN && (
         <Link href="/demo" className={buttonClasses({ variant: 'outline', size: 'lg' })}>
           <FlaskConical aria-hidden="true" strokeWidth={1.75} />
-          {t('getDemoAccess')}
+          {t(hasDemo ? 'openDemo' : 'getDemoAccess')}
         </Link>
       )}
     </div>
@@ -275,7 +301,9 @@ export function KycVerification({
     } else if (apiUrl) {
       action = <VerifyFlow apiUrl={apiUrl} loadSdk={loadSdk} />;
     } else {
-      action = <DemoAccessGuide />;
+      action = (
+        <DemoAccessGuide standing={standing} locked={demoLocked(record.investor, standing)} />
+      );
     }
 
     body = (

@@ -162,7 +162,8 @@ describe('DashboardView', () => {
         (await screen.findByRole('heading', { name: 'Latest payouts' })).closest('section')!,
       );
       expect((await latest.findAllByRole('listitem')).map((item) => item.textContent)).toEqual([
-        expect.stringMatching(/Payout #3.*Your part: \+4 tKZT$/),
+        // The share symbol tells apart two cars of one model.
+        expect.stringMatching(/^Kia Rio AXKR017Payout #3.*Your part: \+4 tKZT$/),
         expect.stringMatching(/Payout #2.*Your part: \+3 tKZT$/),
         expect.stringMatching(/Payout #1.*Your part: \+2 tKZT$/),
       ]);

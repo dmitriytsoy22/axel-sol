@@ -12,7 +12,7 @@ import { useRecipientCheck } from '@/hooks/useRecipientCheck';
 import { useTransferShares } from '@/hooks/useTransferShares';
 import { formatCount } from '@/lib/format';
 import { isValidSolanaAddress } from '@/lib/security/sanitize';
-import { carTitle } from '@/lib/solana/tokens';
+import { carLabel } from '@/components/catalog/CarName';
 
 interface TransferModalProps {
   /** The car to send shares of; null keeps the dialog closed. */
@@ -94,7 +94,7 @@ export function TransferModal({
       {holding && (
         <div className="flex flex-col gap-5">
           <p className="text-body text-muted-foreground">
-            {t('lead', { car: carTitle(holding.project.car), count: formatCount(held, locale) })}
+            {t('lead', { car: carLabel(holding.project.car), count: formatCount(held, locale) })}
           </p>
 
           <div>

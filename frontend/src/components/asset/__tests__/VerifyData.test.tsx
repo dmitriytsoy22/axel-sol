@@ -159,13 +159,18 @@ describe('VerifyData', () => {
     ).toBeInTheDocument();
   });
 
-  it('says where it looked when nothing is published for the car', async () => {
+  it('says when nothing is published for the car, and links where it looked', async () => {
     await renderVerify(new FixtureConnection(), fetcherOf({}));
 
     await userEvent.click(verifyButton());
 
+    // The address stays out of the sentence: unbroken, it ran past the card on a phone.
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      `Nothing is published for this car at ${BASE}/${MINT}/index.json.`,
+      "Nothing is published for this car yet, so its fingerprints on Solana can't be checked.",
+    );
+    expect(screen.getByRole('link', { name: /Published files/ })).toHaveAttribute(
+      'href',
+      `${BASE}/${MINT}/index.json`,
     );
     expect(screen.getByRole('button', { name: 'Verify again' })).toBeEnabled();
   });

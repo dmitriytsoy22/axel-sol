@@ -36,6 +36,13 @@ describe('formatTokenAmount', () => {
     expect(formatTokenAmount(0n, USDC, 'en')).toBe('0 USDC');
   });
 
+  it('writes a negative amount with one minus sign in front, as a shortfall is', () => {
+    expect(formatTokenAmount(-554_484_920_000n, TKZT, 'en')).toBe('-554,484.92 tKZT');
+    expect(formatTokenAmount(-554_484_800_000n, TKZT, 'ru')).toBe(`-554${NBSP}484,8 tKZT`);
+    expect(formatTokenAmount(-500_000n, TKZT, 'en')).toBe('-0.5 tKZT');
+    expect(formatTokenAmount(-1_000n, TKZT, 'en')).toBe('0 tKZT');
+  });
+
   it('stays exact beyond the precision of a JavaScript number', () => {
     expect(formatTokenAmount(18_446_744_073_709_551_615n, { decimals: 0, symbol: 'X' }, 'en')).toBe(
       '18,446,744,073,709,551,615 X',

@@ -113,6 +113,31 @@ function Spinner({ on }: { on: boolean }): JSX.Element | null {
   return on ? <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} /> : null;
 }
 
+/** One placeholder per step, so the page keeps its length when the steps arrive. */
+function StepsLoading(): JSX.Element {
+  return (
+    <div aria-busy="true" className="flex flex-col gap-4">
+      {Array.from({ length: 7 }, (_, i) => (
+        <Skeleton key={i} className="h-32 w-full rounded-card" />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * "The next month can be simulated in 42 s", counted down to the end the demo route gave.
+ * The status is read again once it ends; until that answer lands, the last second stays.
+ */
+function Cooldown({ endsAt }: { endsAt: number }): JSX.Element {
+  const t = useTranslations('DemoAccess');
+  const now = useUnixNow(1_000);
+  return (
+    <p role="timer" className="text-small tabular-nums text-muted-foreground">
+      {t('cooldown', { seconds: Math.max(1, endsAt - now) })}
+    </p>
+  );
+}
+
 function OpenRaises({ raises }: { raises: Project[] }): JSX.Element {
   const t = useTranslations('DemoAccess');
   const locale = useLocale();
@@ -150,8 +175,8 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
   const locale = useLocale();
   const now = useUnixNow(5_000);
   const kyc = useInvestor();
-  const { projects, refetch: refetchProjects } = useProjects();
-  const { holdings, refetch: refetchPositions } = usePositions();
+  const { projects, isLoading: projectsLoading, refetch: refetchProjects } = useProjects();
+  const { holdings, isLoading: positionsLoading, refetch: refetchPositions } = usePositions();
   const { claim, status: claimStatus } = useClaim();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileRound, setTurnstileRound] = useState(0);
@@ -175,11 +200,14 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
   });
   const needsTurnstile = status.turnstile && !demo.session;
   const sharesPerWallet = status.fleet ? BigInt(status.fleet.sharesPerWallet) : 0n;
-  const cooldown = status.fleet?.cooldownSeconds ?? null;
   const fleetName = fleet ? carTitle(fleet.car) : t('fleetCar');
   const amount = (value: bigint) => (fleet ? formatTokenAmount(value, fleet.payment, locale) : '—');
 
   const [chainVersion, setChainVersion] = useState(0);
+  // Every step's state is read from these; until they first answer, the placeholders hold
+  // the page instead of steps that would flip from "to do" to "done" and grow meanwhile.
+  if (kyc.isLoading || projectsLoading || positionsLoading) return <StepsLoading />;
+
   const refreshChain = () => {
     setChainVersion((version) => version + 1);
     kyc.refetch();
@@ -311,17 +339,16 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
           wrap
           onClick={simulate}
           disabled={
-            demo.busy !== null || progress.shares !== 'done' || !demo.session || cooldown !== null
+            demo.busy !== null ||
+            progress.shares !== 'done' ||
+            !demo.session ||
+            demo.cooldownEndsAt !== null
           }
         >
           <Spinner on={demo.busy === 'simulate'} />
           {progress.simulate === 'done' ? t('simulateAgain') : t('simulateAction')}
         </Button>
-        {cooldown !== null && (
-          <p aria-live="polite" className="text-small text-muted-foreground">
-            {t('cooldown', { seconds: cooldown })}
-          </p>
-        )}
+        {demo.cooldownEndsAt !== null && <Cooldown endsAt={demo.cooldownEndsAt} />}
         <StepError message={demo.errors.simulate} />
         <TxLink signature={demo.signatures.simulate} />
       </Step>
@@ -388,14 +415,16 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
 function Balance({ project, version }: { project: Project; version: number }): JSX.Element | null {
   const t = useTranslations('DemoAccess');
   const locale = useLocale();
-  const { balance, refetch } = usePaymentBalance(project.payment);
+  const { balance, error, refetch } = usePaymentBalance(project.payment);
   const shownVersion = useRef(version);
   useEffect(() => {
     if (shownVersion.current === version) return;
     shownVersion.current = version;
     refetch();
   }, [version, refetch]);
-  if (balance === null) return null;
+  if (error) return null;
+  // Holds the line while it is read, so the steps below don't move when it lands.
+  if (balance === null) return <Skeleton className="h-6 w-48" />;
   return (
     <p className="text-body text-foreground">
       {t('balance', { amount: formatTokenAmount(balance, project.payment, locale) })}
@@ -415,19 +444,10 @@ export function DemoWalkthrough({ api }: { api?: DemoApi }): JSX.Element {
   const connecting = useWalletConnecting();
   const demo = useDemoAccess(api);
 
-  // One placeholder per step, so the page keeps its length when the steps arrive.
-  const loading = (
-    <div aria-busy="true" className="flex flex-col gap-4">
-      {Array.from({ length: 7 }, (_, i) => (
-        <Skeleton key={i} className="h-32 w-full rounded-card" />
-      ))}
-    </div>
-  );
-
   let body: React.ReactNode;
   if (!connected) {
     body = connecting ? (
-      loading
+      <StepsLoading />
     ) : (
       <ConnectWalletPanel
         title={t('connectTitle')}
@@ -451,7 +471,7 @@ export function DemoWalkthrough({ api }: { api?: DemoApi }): JSX.Element {
       />
     );
   } else if (!demo.status) {
-    body = loading;
+    body = <StepsLoading />;
   } else if (!demo.status.available && demo.status.code) {
     body = (
       <Notice

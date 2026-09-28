@@ -74,16 +74,25 @@ export function PayoutHistoryTable({
         header: t('tablePeriod'),
         accessorKey: 'car',
         sortable: true,
+        // Block lines, not a flex column: they follow the cell's alignment, left in the table
+        // and right in a stacked row, and the pill wraps under the number when the row is narrow.
         cell: (item) => (
-          <span className="flex flex-col">
-            <span className="font-medium text-foreground">
+          <>
+            <span className="block font-medium text-foreground">
               {item.car} <span className="font-mono text-muted-foreground">{item.symbol}</span>
             </span>
-            <span className="inline-flex items-center gap-2 text-muted-foreground">
+            <span className="block text-muted-foreground">
               {t('payoutNumber', { index: item.index })}
-              {item.final && <Pill tone="info">{t('finalPayout')}</Pill>}
+              {item.final && (
+                <>
+                  {' '}
+                  <Pill tone="info" className="ml-1 align-middle">
+                    {t('finalPayout')}
+                  </Pill>
+                </>
+              )}
             </span>
-          </span>
+          </>
         ),
       },
       {

@@ -228,7 +228,9 @@ buttons carry an `aria-label` and a 44×44 hit area.
 - Sections: 56 px vertical padding, 24 px gutters.
 - Hero: art-directed photo, `hero/almaty-night-traffic-portrait.webp` below `md`.
 - Tables become stacked rows of label and value: the holdings table below `lg`, the payouts
-  ledger below `xl`, where a table would be cut off at the card's edge.
+  ledger below `xl`, where a table would be cut off at the card's edge. In a stacked row the
+  label takes what the value leaves, so a narrow row wraps the label's words ("Сіздің /
+  бөлігіңіз") before an amount or a date, and a value's lines stay aligned to the right.
 - The invest action on the asset page becomes a sticky bottom bar with a 48 px button. The
   body reserves the bar's height below `md` (`[data-mobile-invest-bar]` in `globals.css`), so
   the bar never covers the end of the footer.
@@ -308,7 +310,9 @@ product rule, never a placeholder.
   summary labels with placeholder values. Error: retry. A pending recovery of the wallet's shares
   is the first block: an amber panel naming the car, the shares and the new wallet, with a red
   outline "Veto the recovery" until the delay ends. A refund opens a dialog (amount, shares
-  burned, destination account) before the wallet is asked. The send dialog checks the
+  burned, destination account) before the wallet is asked, and its result stays on screen
+  until the reader closes it; only then does the page read the positions again, which drops
+  the refunded row. The send dialog checks the
   recipient while the address is typed and says in green or red what the hook will do.
 - **Payouts (built, stage 3):** page header → the same ruled summary (claimed so far, not
   claimed yet, payouts) → a sortable ledger (payout, period on two lines, date, paid in, per
@@ -329,8 +333,9 @@ product rule, never a placeholder.
   numbered rule cards → one card per car, failing cars first and open, passing cars folded
   into a `<details>` whose summary is the car, its state and a "Passes" pill. An open card
   has four rows (income vault, raise escrow, shares, revenue checkpoints), each with the rule
-  in words, "Holds" and "Owes" figures, a pill and the account link. It reads again every
-  30 s while the tab is visible.
+  in words, "Holds" and "Owes" figures, a pill and the account link. An income vault that
+  holds less than it owes names the shortfall as a positive amount instead of a negative
+  "surplus". It reads again every 30 s while the tab is visible.
 - **Console by role (frontend stage 2):** a paper strip under the bar says which wallet is
   signed in and, for a wallet with several keys, switches roles with a segmented control
   (`role="tablist"`). Platform admin: the ink car header, then car status, operator and
@@ -338,7 +343,8 @@ product rule, never a placeholder.
   protocol-config ledger. Operator: the ink header over a deposits card (open or closed pill,
   paid in, claimed, live income vault, both keys) and the car's payout history. KYC: a page
   header over the registry card, which shows the wallet's current record before approve and
-  revoke, and stops the demo key before a record it may not change.
+  revoke, and stops the demo key before a record it may not change. While the roles are read
+  the console's placeholder is a screen tall under the bar, so the footer waits below the fold.
 - **Judge demo (`/demo`, frontend stage 3):** page header (overline "Judge demo · Solana devnet",
   serif H1, lead) → an ordered list of seven step cards (number in a circle, `text-title` heading,
   one explaining paragraph, then the step's action): get demo access, buy in an open raise (the
@@ -346,8 +352,10 @@ product rule, never a placeholder.
   claim, check the car's data, proof of solvency. The next step to do has a primary border and the
   page's one primary button; done steps show a green check and a "Done" pill and keep their
   Explorer link; later steps stay readable with a secondary button, disabled with the reason where
-  it can't work yet (no session, cooldown with its seconds). Disconnected: the shared connect
-  panel with what the demo gives the wallet. Unavailable (faucet empty, keys missing): a notice
+  it can't work yet (no session, a cooldown that counts down its seconds). The steps appear
+  once the wallet's record, the cars and its positions are read; until then seven placeholders
+  hold the page, so no step flips from "to do" to "done" or grows while the reader looks.
+  Disconnected: the shared connect panel with what the demo gives the wallet. Unavailable (faucet empty, keys missing): a notice
   naming why. The Turnstile widget sits above the access button only when the deployment asks for
   it.
 - **Demo banner (frontend stage 2):** on every test network, a cyan accent strip under the bar
@@ -364,7 +372,11 @@ product rule, never a placeholder.
   middleware never sees get an English one (`app/not-found.tsx`). The car page holds at least a
   screen's height until the car is read, so neither the car nor a "not listed" notice moves
   the footer into view. Modal is a paper dialog and a
-  bottom sheet below `sm`; toasts sit top-right above modals; transaction progress reads
+  bottom sheet below `sm`, never taller than the screen. Its optional `footer` holds the
+  dialog's action outside the scrolling content, so the purchase button is in view when the
+  sheet opens on a phone and nothing, keyboard focus included, slides under it. Tab moves only
+  through the dialog's enabled controls, and closing it returns focus to the control that
+  opened it. Toasts sit top-right above modals; transaction progress reads
   "Approve it in your wallet → Sending to Solana → Waiting for confirmation → Confirmed on
   Solana".
 
@@ -506,6 +518,12 @@ product rule, never a placeholder.
 33. **A date never ends a Russian or Kazakh sentence.** "28 сент. 2026 г." and "2026 ж. 28
     қыр." already end in a dot, so a message that put a period after `{date}` printed "г..".
     Such messages are rephrased, and a test rejects `{date}.` or `{due}.` in either language.
+34. **A car named away from its own page carries its share symbol.** The seeded fleet has three
+    Chevrolet Cobalts, and "Chevrolet Cobalt · Payout #6" beside "Chevrolet Cobalt · Payout #7"
+    named two different cars. Lists (latest payouts, claims) show the symbol muted in mono after
+    the model (`catalog/CarName`), sentences in dialogs and alerts say "Chevrolet Cobalt
+    AXCOB002", and a car page's tab title is "Chevrolet Cobalt 2024 · AXCOB001 | AXEL".
+    ← review rubric "consistency", decision 10.
 
 ## Constraints
 
@@ -532,13 +550,18 @@ product rule, never a placeholder.
   offset while the content above arrived. A link to a section of a car page
   (`#verify-data-title`) is scrolled to by the page once the car is read, and held there
   while the sections above fill in, until the reader scrolls.
-- The wallet pages (portfolio, payouts, verification, demo) show their loading state, not
+- The wallet pages (portfolio, payouts, verification, demo, console) show their loading state, not
   "Connect wallet", during hydration and while a wallet remembered from an earlier visit
   reconnects (`wallet/useWalletConnecting`).
 - The fixed 64 px bar is cleared once, by `scroll-padding-top` on `html`; a section heading
   that links point to adds only its breathing room (`scroll-mt-8`, landing at 96 px). Below
   `md` a car page also sets `scroll-padding-bottom` to the purchase bar's height, so keyboard
   focus never lands under the bar.
+- A car page is a client page, so its title comes from `generateMetadata` in
+  `app/[locale]/assets/[id]/page.tsx`, which reads the share mint and the project account in
+  one RPC call on the server (`DEMO_RPC_URL` when set). The read holds back the first byte for
+  at most 1.5 s; after that, or when it fails, the page keeps the site's title. Every other
+  title ends in "| AXEL", the brand's one name.
 - Next 14 renders a page's `notFound()` in the browser from the page's payload: the 404
   answers with status 404 and a localized title, but its HTML shell carries no content or
   `lang` until the script runs.

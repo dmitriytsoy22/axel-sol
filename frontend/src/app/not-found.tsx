@@ -5,7 +5,7 @@ import { Logo } from '@/components/layout/Logo';
 import { Notice } from '@/components/ui/Notice';
 import { fontVariables } from './fonts';
 
-export const metadata = { title: 'Page not found | AXEL RWA' };
+export const metadata = { title: 'Page not found | AXEL' };
 
 /*
  * An address outside every language, such as /robots.txt on a deployment without one. No

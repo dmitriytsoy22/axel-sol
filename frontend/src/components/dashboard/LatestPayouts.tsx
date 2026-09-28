@@ -4,11 +4,11 @@ import React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { RotateCw } from 'lucide-react';
 import { usePayoutHistory } from '@/hooks/usePayoutHistory';
+import { CarName } from '@/components/catalog/CarName';
 import { Button } from '@/components/ui/Button';
 import { Pill } from '@/components/ui/Pill';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatDay, formatTokenAmount } from '@/lib/format';
-import { carTitle } from '@/lib/solana/tokens';
 
 /** Deposits shown on the portfolio; the payouts page has them all. */
 const SHOWN = 3;
@@ -61,7 +61,9 @@ export function LatestPayouts({ indexerUrl }: { indexerUrl: string }): JSX.Eleme
           >
             <span>
               <span className="flex flex-wrap items-center gap-2 font-medium text-foreground">
-                {carTitle(row.project.car)}
+                <span>
+                  <CarName car={row.project.car} />
+                </span>
                 <span className="font-normal text-muted-foreground">
                   {tPayouts('payoutNumber', { index: row.index })}
                 </span>
