@@ -57,7 +57,10 @@ export default async function RootLayout({
           <WalletProvider>
             <ToastProvider>
               <Navbar />
-              <main id="main" className="flex-1">
+              {/* At least a screen under the bar: pages read the chain and the wallet after they
+                  render, and a footer on the first screen jumped each time a placeholder gave
+                  way to longer or shorter content. */}
+              <main id="main" className="min-h-[calc(100svh-4rem)] flex-1">
                 {children}
               </main>
               <Footer />

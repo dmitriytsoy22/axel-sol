@@ -111,7 +111,7 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
   }
 
   return (
-    <section id="vehicles" aria-labelledby="vehicles-title" className="section-y">
+    <section id="vehicles" aria-labelledby="vehicles-title" className="section-y scroll-mt-flush">
       <div className="page-container grid gap-10 lg:grid-cols-12 lg:gap-8">
         <div className="lg:col-span-4">
           <div className="lg:sticky lg:top-28">

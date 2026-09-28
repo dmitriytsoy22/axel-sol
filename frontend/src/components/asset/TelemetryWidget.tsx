@@ -15,6 +15,10 @@ import type { JsonFetcher } from '@/lib/verify/published';
 import type { Digest } from '@/lib/verify/sha256';
 import type { Project } from '@/types/project';
 
+/*
+ * What the car did that day ("Worked"), never worded like the car's status badge ("On the
+ * road"): a paused or sold car shows its last recorded day here.
+ */
 const STATUS: Record<TripDay['status'], { tone: PillTone; key: string }> = {
   active: { tone: 'success', key: 'statusInService' },
   maintenance: { tone: 'warning', key: 'statusMaintenance' },
@@ -50,6 +54,9 @@ function Message({ testId, children }: { testId: string; children: React.ReactNo
   );
 }
 
+const FIGURE_CELL =
+  'flex items-center justify-between gap-4 bg-card px-5 py-3 sm:flex-col sm:items-start sm:justify-start sm:gap-2 sm:p-5';
+
 function DayFigures({
   telemetry,
 }: {
@@ -84,20 +91,24 @@ function DayFigures({
         )}
         {day.dataOrigin && <OriginPill origin={day.dataOrigin} />}
       </div>
-      <dl className="grid grid-cols-2 overflow-hidden rounded-card border border-border bg-card md:grid-cols-4">
-        <div className="flex flex-col gap-2 border-b border-r border-border p-5 md:border-b-0">
+      {/* Label and value rows on phones; from sm a two by two grid, four in a row only where a
+          quarter still fits "На обслуживании" (not in the car page's narrow column at lg). The
+          1 px gaps over the border color draw the rules for every layout. */}
+      <dl className="grid gap-px overflow-hidden rounded-card border border-border bg-border sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+        <div className={FIGURE_CELL}>
           <dt className="text-small text-muted-foreground">{t('status')}</dt>
-          <dd>
-            <Pill tone={status.tone}>{t(status.key)}</Pill>
+          <dd className="shrink-0">
+            <Pill tone={status.tone} wrap>
+              {t(status.key)}
+            </Pill>
           </dd>
         </div>
-        {figures.map(({ label, value }, i) => (
-          <div
-            key={label}
-            className={`flex flex-col gap-2 border-border p-5 ${i === 0 ? 'border-b md:border-b-0 md:border-r' : ''} ${i === 1 ? 'border-r' : ''}`}
-          >
+        {figures.map(({ label, value }) => (
+          <div key={label} className={FIGURE_CELL}>
             <dt className="text-small text-muted-foreground">{label}</dt>
-            <dd className="text-title font-semibold tabular-nums text-foreground">{value}</dd>
+            <dd className="shrink-0 text-title font-semibold tabular-nums text-foreground">
+              {value}
+            </dd>
           </div>
         ))}
       </dl>
@@ -139,7 +150,7 @@ function TelemetryBody({ telemetry }: { telemetry: CarTelemetry }): JSX.Element 
         <div
           aria-busy="true"
           data-testid="telemetry-loading"
-          className="grid grid-cols-2 gap-4 md:grid-cols-4"
+          className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4"
         >
           <span className="sr-only">{t('loading')}</span>
           {[0, 1, 2, 3].map((i) => (
@@ -202,7 +213,7 @@ export function TelemetryWidget({
 
   return (
     <section aria-labelledby="trip-data-title">
-      <h2 id="trip-data-title" className="scroll-mt-8 text-h4 font-semibold text-foreground">
+      <h2 id="trip-data-title" className="scroll-mt-2 text-h4 font-semibold text-foreground">
         {t('title')}
       </h2>
       <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">{t('lead')}</p>

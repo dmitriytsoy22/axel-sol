@@ -94,8 +94,10 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
     };
   }, [isOpen, close, setIsOpen]);
 
+  // The picker hands focus back to whatever had it when it opened; the menu's own button is
+  // about to unmount, so that is the menu toggle, which stays.
   const handleConnect = () => {
-    setIsOpen(false);
+    close();
     setVisible(true);
   };
 

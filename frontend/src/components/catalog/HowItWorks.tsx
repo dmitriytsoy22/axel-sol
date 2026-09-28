@@ -13,7 +13,7 @@ export function HowItWorks(): JSX.Element {
     <section
       id="how-it-works"
       aria-labelledby="how-it-works-title"
-      className="section-y border-y border-border bg-muted"
+      className="section-y scroll-mt-flush border-y border-border bg-muted"
     >
       <div className="page-container grid gap-10 lg:grid-cols-12 lg:gap-x-8 lg:gap-y-12">
         <div className="lg:col-span-5">

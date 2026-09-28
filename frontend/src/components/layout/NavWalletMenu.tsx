@@ -102,11 +102,10 @@ export const NavWalletMenu = (): JSX.Element => {
       >
         <span aria-hidden="true" className="h-2 w-2 rounded-full bg-success" />
         <span className="font-mono">{truncatedAddress}</span>
-        {balance !== null && (
-          <span className="tabular-nums text-muted-foreground">
-            {formatNumber(balance, locale, 2)} SOL
-          </span>
-        )}
+        {/* "—" holds the balance's place while it is read, so the chip doesn't grow after. */}
+        <span className="tabular-nums text-muted-foreground">
+          {balance === null ? '—' : formatNumber(balance, locale, 2)} SOL
+        </span>
       </button>
 
       {open && (

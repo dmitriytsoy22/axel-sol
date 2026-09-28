@@ -7,10 +7,10 @@ import { Loader2, Pause, Play } from 'lucide-react';
 import type { Project } from '@/types/project';
 import { useProjectAdmin, type ProjectAction } from '@/hooks/useAdminActions';
 import { useUnixNow } from '@/hooks/useUnixNow';
+import { carLabel } from '@/components/catalog/CarName';
 import { Button } from '@/components/ui/Button';
 import { formatDate } from '@/lib/format';
 import { canActivate, canFinalize } from '@/lib/solana/lifecycle';
-import { carTitle } from '@/lib/solana/tokens';
 
 interface ProjectControlsProps {
   project: Project;
@@ -71,6 +71,7 @@ export function ProjectControls({ project, treasury, onChanged }: ProjectControl
       <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
     );
   const { status } = project;
+  const docHashInvalid = docHash !== '' && !DOC_HASH.test(docHash);
   const raising = status === 'fundraising' || status === 'funded';
   const running = status === 'operating' || status === 'paused';
 
@@ -142,11 +143,15 @@ export function ProjectControls({ project, treasury, onChanged }: ProjectControl
                 spellCheck={false}
                 value={docHash}
                 onChange={(e) => setDocHash(e.target.value.trim())}
-                aria-invalid={docHash !== '' && !DOC_HASH.test(docHash)}
+                aria-invalid={docHashInvalid}
                 aria-describedby={`${docId}-hint`}
                 className="h-12 w-full rounded-control border border-input bg-card px-4 font-mono text-small text-foreground aria-[invalid=true]:border-destructive"
               />
-              <p id={`${docId}-hint`} className="text-small text-muted-foreground">
+              {/* The hint is the rule the hash breaks, so it turns red with the field. */}
+              <p
+                id={`${docId}-hint`}
+                className={`text-small ${docHashInvalid ? 'text-destructive' : 'text-muted-foreground'}`}
+              >
                 {t('docHashHint')}
               </p>
               <Button
@@ -189,7 +194,7 @@ export function ProjectControls({ project, treasury, onChanged }: ProjectControl
               {confirming === 'cancelRaise' ? (
                 confirmBox(
                   'cancelRaise',
-                  t('cancelRaisePrompt', { car: carTitle(project.car) }),
+                  t('cancelRaisePrompt', { car: carLabel(project.car) }),
                   t('cancelRaiseConfirm'),
                 )
               ) : (
@@ -209,7 +214,7 @@ export function ProjectControls({ project, treasury, onChanged }: ProjectControl
               {confirming === 'closeProject' ? (
                 confirmBox(
                   'closeProject',
-                  t('closeConfirmPrompt', { car: carTitle(project.car) }),
+                  t('closeConfirmPrompt', { car: carLabel(project.car) }),
                   t('closeConfirm'),
                 )
               ) : (

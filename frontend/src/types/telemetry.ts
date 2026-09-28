@@ -1,6 +1,6 @@
 /** GET /telemetry/latest/:projectId of the AXEL backend (docs/api.md). */
 export interface TelemetryData {
-  /** "YYYY-MM-DD" (UTC), the day the figures cover; empty when nothing is cached. */
+  /** "YYYY-MM-DD" in the fleet's zone, the day the figures cover; empty when nothing is cached. */
   date: string;
   /** Tenge. */
   dailyRevenue: number;

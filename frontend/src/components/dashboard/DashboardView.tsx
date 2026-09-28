@@ -24,6 +24,9 @@ import { ClaimAllButton } from './ClaimAllButton';
 import { RecoveryAlerts } from './RecoveryAlerts';
 import { TransferModal } from './TransferModal';
 
+/** A short address's shape, to size the lead's hidden wording while no wallet is connected. */
+const SIZING_ADDRESS = 'AXEL…AXEL';
+
 function DashboardSkeleton({ summaryLabels }: { summaryLabels: string[] }): JSX.Element {
   return (
     <div data-testid="dashboard-loading" className="flex flex-col gap-12">
@@ -48,6 +51,7 @@ export function DashboardView({
   const { holdings, summary, isLoading, error, refetch } = usePositions();
   const [transferring, setTransferring] = useState<Holding | null>(null);
 
+  const address = connected && publicKey ? shortAddress(publicKey.toBase58()) : null;
   const summaryLabels = [t('totalValue'), t('tokensHeld'), t('unclaimedRevenue')];
   const claimable = holdings
     .filter(({ project, pending }) => pending > 0n && canClaim(project.status))
@@ -115,12 +119,19 @@ export function DashboardView({
         overline={t('overline')}
         title={t('title')}
         lead={
-          connected && publicKey
-            ? t('leadConnected', {
-                address: shortAddress(publicKey.toBase58()),
+          // The lead names the wallet once it connects. Both wordings hold one grid cell, so a
+          // wallet reconnecting on load never pushes the page down by a line.
+          <span className="grid [&>*]:col-start-1 [&>*]:row-start-1">
+            <span className={address ? 'invisible' : undefined}>
+              {t('lead', { network: NETWORK_NAME })}
+            </span>
+            <span className={address ? undefined : 'invisible'}>
+              {t('leadConnected', {
+                address: address ?? SIZING_ADDRESS,
                 network: NETWORK_NAME,
-              })
-            : t('lead')
+              })}
+            </span>
+          </span>
         }
       />
       {body}

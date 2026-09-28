@@ -24,14 +24,17 @@ const LABEL: Record<ProjectStatus, string> = {
 /** Where a car's project stands in the program's state machine, in words and a colored dot. */
 export function ProjectStatusBadge({
   status,
+  wrap,
   className,
 }: {
   status: ProjectStatus;
+  /** Lets a long label ("Сбор не состоялся") wrap inside a narrow column; see `Pill`. */
+  wrap?: boolean;
   className?: string;
 }): JSX.Element {
   const t = useTranslations('Catalog');
   return (
-    <Pill tone={TONE[status]} className={className}>
+    <Pill tone={TONE[status]} wrap={wrap} className={className}>
       {t(LABEL[status])}
     </Pill>
   );

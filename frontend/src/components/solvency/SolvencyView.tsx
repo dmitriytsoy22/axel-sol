@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, ChevronDown, CircleCheck, CircleX, Loader2, RotateCw } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { carLabel } from '@/components/catalog/CarName';
 import { ProjectStatusBadge } from '@/components/catalog/ProjectStatusBadge';
 import { Button } from '@/components/ui/Button';
 import { ExplorerLink } from '@/components/ui/ExplorerLink';
@@ -87,11 +88,12 @@ function ProjectLedger({ project, solvency }: Entry): JSX.Element {
   return (
     <li
       id={mint}
-      className="scroll-mt-8 overflow-hidden rounded-card border border-border bg-card shadow-sm"
+      className="scroll-mt-2 overflow-hidden rounded-card border border-border bg-card shadow-sm"
     >
-      {/* A car that fails opens by itself; the ones that pass stay folded to their verdict. */}
+      {/* A car that fails opens by itself; the ones that pass stay folded to their verdict.
+          The card clips its corners, so the row's focus ring is drawn inside it, on its curve. */}
       <details open={!solvency.ok} className="group">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 bg-muted px-5 py-4 group-open:border-b group-open:border-border md:px-6 [&::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 rounded-[calc(var(--radius)-1px)] bg-muted px-5 py-4 focus-visible:outline-offset-[-2px] group-open:rounded-b-none group-open:border-b group-open:border-border md:px-6 [&::-webkit-details-marker]:hidden">
           <div className="min-w-0">
             <h3 className="text-title font-semibold text-foreground">
               {carTitle(project.car)}{' '}
@@ -159,7 +161,7 @@ function ProjectLedger({ project, solvency }: Entry): JSX.Element {
             href={`/assets/${mint}`}
             className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 hover:underline lg:min-h-0"
           >
-            {t('viewCar', { car: carTitle(project.car) })}
+            {t('viewCar', { car: carLabel(project.car) })}
             <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
           </Link>
         </div>

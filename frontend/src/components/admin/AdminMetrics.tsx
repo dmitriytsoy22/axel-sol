@@ -28,7 +28,11 @@ export function AdminMetrics({ project, projects, onSelect }: AdminMetricsProps)
       ? sharesValue(outstandingShares(project), project.pricePerShare)
       : 0n;
   const items = [
-    { label: t('metricStatus'), value: <ProjectStatusBadge status={project.status} /> },
+    {
+      label: t('metricStatus'),
+      // Two columns of 124 px at 320: "Сбор не состоялся" wraps instead of running into the next.
+      value: <ProjectStatusBadge status={project.status} wrap />,
+    },
     {
       label: t('tokensSold'),
       value: t('ofTotal', {
@@ -53,13 +57,18 @@ export function AdminMetrics({ project, projects, onSelect }: AdminMetricsProps)
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-small text-muted-foreground">
           {projects.length > 1 && (
-            <label htmlFor={selectId} className="flex items-center gap-2">
+            // The select is as wide as its longest option, whose symbol tells two Cobalts apart:
+            // when the label and the select don't fit on one line, the select takes its own.
+            <label
+              htmlFor={selectId}
+              className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1"
+            >
               {t('selectCar')}
               <select
                 id={selectId}
                 value={project.address.toBase58()}
                 onChange={(e) => onSelect(e.target.value)}
-                className="h-10 rounded-control border border-border bg-card px-3 text-small text-foreground"
+                className="h-10 min-w-0 max-w-full rounded-control border border-border bg-card px-3 text-small text-foreground"
               >
                 {projects.map((entry) => (
                   <option key={entry.address.toBase58()} value={entry.address.toBase58()}>

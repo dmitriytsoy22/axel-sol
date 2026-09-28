@@ -71,6 +71,15 @@ const BACKEND_TITLE: Record<number, string> = {
   503: 'refused_503',
 };
 
+/** An item's fields share a row from md, the remove button in a column of its own width. */
+const EXPENSE_COLUMNS = 'md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)_3.5rem]';
+
+const EXPENSE_FIELDS = [
+  { field: 'description', label: 'itemDescription', mono: false },
+  { field: 'amount', label: 'itemAmount', mono: false },
+  { field: 'document', label: 'itemDocument', mono: true },
+] as const;
+
 function ExpenseList({
   legend,
   items,
@@ -81,42 +90,48 @@ function ExpenseList({
   onChange: (items: ExpenseDraft[]) => void;
 }): JSX.Element {
   const t = useTranslations('Operator');
+  const listId = useId();
   const update = (index: number, change: Partial<ExpenseDraft>) =>
     onChange(items.map((item, i) => (i === index ? { ...item, ...change } : item)));
 
   return (
     <fieldset className="flex flex-col gap-3">
-      <legend className="text-small font-medium text-foreground">{legend}</legend>
+      <legend className="mb-2 text-small font-medium text-foreground">{legend}</legend>
+      {/* Labels, not placeholders: a placeholder cut to "(мінде…" read as "required". From md
+          they head the columns once; below md, where the fields stack, each field has its own. */}
+      <div
+        aria-hidden="true"
+        className={`hidden items-end gap-2 text-small text-muted-foreground md:-mb-1 md:grid ${EXPENSE_COLUMNS}`}
+      >
+        {EXPENSE_FIELDS.map(({ field, label }) => (
+          <span key={field}>{t(label)}</span>
+        ))}
+      </div>
       {items.map((item, index) => (
         <div
           key={index}
           role="group"
           aria-label={t('itemLabel', { list: legend, number: index + 1 })}
-          className="grid gap-2 md:grid-cols-[2fr_1fr_2fr_auto]"
+          className={`grid gap-3 md:items-center md:gap-2 ${EXPENSE_COLUMNS}`}
         >
-          <input
-            aria-label={t('itemDescription')}
-            placeholder={t('itemDescription')}
-            value={item.description}
-            onChange={(e) => update(index, { description: e.target.value })}
-            className={plainInputClass}
-          />
-          <input
-            aria-label={t('itemAmount')}
-            placeholder={t('itemAmount')}
-            inputMode="numeric"
-            value={item.amount}
-            onChange={(e) => update(index, { amount: e.target.value })}
-            className={plainInputClass}
-          />
-          <input
-            aria-label={t('itemDocument')}
-            placeholder={t('itemDocument')}
-            spellCheck={false}
-            value={item.document}
-            onChange={(e) => update(index, { document: e.target.value })}
-            className={textInputClass}
-          />
+          {EXPENSE_FIELDS.map(({ field, label, mono }) => (
+            <div key={field} className="flex flex-col gap-1.5">
+              <label
+                htmlFor={`${listId}-${index}-${field}`}
+                className="text-small text-muted-foreground md:sr-only"
+              >
+                {t(label)}
+              </label>
+              <input
+                id={`${listId}-${index}-${field}`}
+                inputMode={field === 'amount' ? 'numeric' : undefined}
+                spellCheck={field === 'document' ? false : undefined}
+                value={item[field]}
+                onChange={(e) => update(index, { [field]: e.target.value })}
+                className={mono ? textInputClass : plainInputClass}
+              />
+            </div>
+          ))}
           <Button
             variant="ghost"
             aria-label={t('removeItem')}

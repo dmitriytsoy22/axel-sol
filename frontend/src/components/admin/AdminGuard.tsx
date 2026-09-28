@@ -33,15 +33,9 @@ export function AdminGuard({ allowed, isLoading, error, onRetry, children }: Adm
   const t = useTranslations('Admin');
   const tCommon = useTranslations('Common');
 
-  // A screen tall under the bar, so the footer waits just below the fold for the console:
-  // a platform or operator console is longer than a screen and would push it away.
   if (isLoading || connecting) {
     return (
-      <div
-        aria-busy="true"
-        data-testid="admin-loading"
-        className="page-container section-y min-h-[calc(100svh-4rem)]"
-      >
+      <div aria-busy="true" data-testid="admin-loading" className="page-container section-y">
         <Skeleton className="h-5 w-40" />
         <Skeleton className="mt-4 h-12 w-2/3 max-w-lg" />
         <Skeleton className="mt-10 h-64 w-full rounded-card" />

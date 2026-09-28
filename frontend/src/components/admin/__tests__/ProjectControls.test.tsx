@@ -49,12 +49,13 @@ const sentInstruction = (sent: Transaction[]) => {
 const buttons = () => screen.queryAllByRole('button').map((button) => button.textContent);
 
 describe('ProjectControls', () => {
-  it('asks before closing a car, and sends close_project only once confirmed', async () => {
-    const { sent, onChanged } = renderControls(makeProject({ status: 'operating' }));
+  it('asks before closing a car, naming it by its share symbol too, and sends close_project only once confirmed', async () => {
+    const project = makeProject({ status: 'operating' });
+    const { sent, onChanged } = renderControls(project);
 
     await userEvent.click(screen.getByRole('button', { name: 'Close project…' }));
     expect(screen.getByRole('alertdialog')).toHaveTextContent(
-      "Close Toyota Camry for good? This can't be undone.",
+      `Close Toyota Camry ${project.car.symbol} for good? This can't be undone.`,
     );
     expect(sent).toHaveLength(0);
 

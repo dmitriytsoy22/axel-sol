@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { expect, describe, it, vi, beforeEach } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import { expect, describe, it, vi, beforeEach, afterEach } from 'vitest';
 import { ConnectionStatus } from './ConnectionStatus';
 import { NextIntlClientProvider } from 'next-intl';
 import * as walletAdapter from '@solana/wallet-adapter-react';
@@ -28,6 +28,25 @@ const renderWithIntl = (ui: React.ReactElement) => {
 describe('ConnectionStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('spells out a slow first check only after a moment, so a quick answer never widens the pill', () => {
+    vi.useFakeTimers();
+    vi.mocked(walletAdapter.useConnection).mockReturnValue({
+      connection: { getVersion: vi.fn(() => new Promise(() => {})) },
+    } as any);
+
+    renderWithIntl(<ConnectionStatus />);
+    expect(screen.getByText('Connecting...')).toHaveClass('sr-only');
+
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+    expect(screen.getByText('Connecting...')).not.toHaveClass('sr-only');
   });
 
   it('renders disconnected state when no connection is provided', async () => {

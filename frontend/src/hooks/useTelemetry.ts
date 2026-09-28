@@ -6,13 +6,20 @@ import type { TelemetryData } from '@/types/telemetry';
 
 const POLL_MS = 60_000;
 
-/** Figures older than this read as stale even when the backend does not say so. */
-const STALE_AFTER_MS = 36 * 60 * 60 * 1000;
+/** Days are calendar days of the fleet's zone, the backend's `FLEET_UTC_OFFSET`. */
+const FLEET_UTC_OFFSET = '+05:00';
+const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * A day is collected in the night after it ends (01:00 in the fleet's zone), so it stays the
+ * newest there is until the next day is collected, 25 hours after it ended; a late run gets
+ * five hours more. Older figures read as stale even when the backend does not say so.
+ */
+const STALE_AFTER_END_MS = 30 * 60 * 60 * 1000;
 
 /** Whether figures of a "YYYY-MM-DD" day are too old to read as the car's current state. */
 export function isStaleDay(date: string, now = Date.now()): boolean {
-  const day = Date.parse(date);
-  return Number.isFinite(day) && now - day > STALE_AFTER_MS;
+  const end = Date.parse(`${date}T00:00:00${FLEET_UTC_OFFSET}`) + DAY_MS;
+  return Number.isFinite(end) && now - end > STALE_AFTER_END_MS;
 }
 
 export function isStaleTelemetry(data: TelemetryData, now = Date.now()): boolean {

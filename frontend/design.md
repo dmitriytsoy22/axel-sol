@@ -138,12 +138,14 @@ Contrast, checked with the WCAG formula on the real pairs:
 | ------------------------ | -------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------- |
 | Heading (`font-heading`) | Axel Serif (Source Serif 4, optical size 40) | `src/fonts/AxelSerif-Variable.woff2`, 72 KB                    | `display`, `h1`, `h2`, `h3` only, weight 500 |
 | Body (`font-sans`)       | Onest                                        | `src/fonts/Onest-Variable.woff2`, 39 KB                        | All UI, text, `h4` and below, numbers        |
-| Code (`font-mono`)       | JetBrains Mono                               | `src/fonts/JetBrainsMono-Variable.woff2`, 28 KB, not preloaded | Addresses, hashes, mints. Latin only         |
+| Code (`font-mono`)       | JetBrains Mono                               | `src/fonts/JetBrainsMono-Variable.woff2`, 28 KB, preloaded     | Addresses, hashes, mints. Latin only         |
 
 All three are self-hosted with `next/font/local`, so the build never calls Google Fonts. Both
 text faces cover the nine Kazakh-specific letters (U+04D8, U+0492, U+049A, U+04A2, U+04E8, U+04B0,
 U+04AE, U+04BA, U+0406) and ₸. Manrope and JetBrains Mono were checked and
-lack Kazakh glyphs, so Manrope is out and mono never carries prose.
+lack Kazakh glyphs, so Manrope is out and mono never carries prose. Mono is preloaded like
+the other two: the bar's wallet chip and a car's share symbol set it on the first screen, and
+its late swap narrowed them and moved their neighbours.
 
 Scale: 16 px base, ratio 1.25 (`--type-ratio`), rounded to the 4 px grid.
 
@@ -228,7 +230,8 @@ buttons carry an `aria-label` and a 44×44 hit area.
 - Sections: 56 px vertical padding, 24 px gutters.
 - Hero: art-directed photo, `hero/almaty-night-traffic-portrait.webp` below `md`.
 - Tables become stacked rows of label and value: the holdings table below `lg`, the payouts
-  ledger below `xl`, where a table would be cut off at the card's edge. In a stacked row the
+  ledger below `xl`, the trip data figures below `sm`, where a table would be cut off at the
+  card's edge. In a stacked row the
   label takes what the value leaves, so a narrow row wraps the label's words ("Сіздің /
   бөлігіңіз") before an amount or a date, and a value's lines stay aligned to the right.
 - The invest action on the asset page becomes a sticky bottom bar with a 48 px button. The
@@ -248,7 +251,9 @@ product rule, never a placeholder.
   the ink theme and turns into a solid paper bar after 16 px of scroll; every other page gets the
   paper bar from the start. Left: logo, then Cars · Portfolio · Payouts · Solvency with a brand-cyan
   underline on the current page (`aria-current`). Right: network pill ("Solana Devnet", its dot
-  shows the RPC state and any state but "connected" is spelled out), language menu (click, not
+  shows the RPC state and any state but "connected" is spelled out, except a first check that
+  answers within 1.5 s, whose "Connecting…" would widen the pill for a moment on every load),
+  language menu (click, not
   hover; Escape and outside click close it), "Connect wallet" as an outline button, since the
   page's primary action lives in the content. Below `md` the right side is a 44 px menu button;
   the menu is a full-height panel under the bar with focus trap, Escape, scroll lock, large nav
@@ -281,7 +286,9 @@ product rule, never a placeholder.
   paid in, shares counted, per share, record link; empty, loading, partial and error states) →
   payout calculator (the reader's shares and their own monthly assumption; results stay "—"
   until they type) → trip data (the telemetry widget, whose honest empty state says the tracker
-  is not connected yet). Below `md` the purchase button moves to a fixed bottom bar with the
+  is not connected yet; its figures are a day's, so the day's status reads "That day: Worked",
+  never like the car's badge, and a day turns stale 30 h after it ends in the fleet's zone,
+  once the next one should have been collected). Below `md` the purchase button moves to a fixed bottom bar with the
   price and a 48 px button; DOM order is the mobile order (photo, panel, details). The page
   keeps showing the car while it re-reads after a purchase.
   **v2 screens (frontend stage 2):** the panel's bar is `asset/RaiseProgress`, a track with a
@@ -299,7 +306,8 @@ product rule, never a placeholder.
   "Verify in this browser" button, then a verdict line with a check, amber triangle or red
   cross, the rebuilt and on-chain heads in mono, and one pill row per deposit.
 - **Dashboard (built, stage 3):** page header (overline, serif H1, a lead that names the
-  connected wallet) → a ruled summary card with three equal figures (value at current price,
+  connected wallet; its wording before and after the wallet connects shares one grid cell, so a
+  reconnecting wallet moves nothing) → a ruled summary card with three equal figures (value at current price,
   shares held "in N cars", not claimed yet) → holdings table (car with thumbnail and its status
   under the name, shares and "x% of the car", value, to claim, actions; stacked rows below
   `lg`) → payouts list, newest first, each
@@ -343,8 +351,13 @@ product rule, never a placeholder.
   protocol-config ledger. Operator: the ink header over a deposits card (open or closed pill,
   paid in, claimed, live income vault, both keys) and the car's payout history. KYC: a page
   header over the registry card, which shows the wallet's current record before approve and
-  revoke, and stops the demo key before a record it may not change. While the roles are read
-  the console's placeholder is a screen tall under the bar, so the footer waits below the fold.
+  revoke, and stops the demo key before a record it may not change. In the car header the car
+  picker drops under its label when both don't fit (320 px in Russian) and the status pill wraps
+  inside its column. Irreversible confirmations and the recovery list name the car with its
+  share symbol (decision 34). Each recovery field says under itself what is wrong with it
+  (`aria-invalid`, `aria-describedby`), and the release step's hash rule turns red with an
+  invalid hash. The operator's expense rows have labels, not placeholders: column heads from
+  `md`, a label over each field below it.
 - **Judge demo (`/demo`, frontend stage 3):** page header (overline "Judge demo · Solana devnet",
   serif H1, lead) → an ordered list of seven step cards (number in a circle, `text-title` heading,
   one explaining paragraph, then the step's action): get demo access, buy in an open raise (the
@@ -369,9 +382,7 @@ product rule, never a placeholder.
   balanced lines with the dot on the first), `layout/PageHeader`. An address no page answers
   gets a localized "Page not found" notice inside the header and footer
   (`app/[locale]/not-found.tsx`, reached through `app/[locale]/[...rest]`); addresses the i18n
-  middleware never sees get an English one (`app/not-found.tsx`). The car page holds at least a
-  screen's height until the car is read, so neither the car nor a "not listed" notice moves
-  the footer into view. Modal is a paper dialog and a
+  middleware never sees get an English one (`app/not-found.tsx`). Modal is a paper dialog and a
   bottom sheet below `sm`, never taller than the screen. Its optional `footer` holds the
   dialog's action outside the scrolling content, so the purchase button is in view when the
   sheet opens on a phone and nothing, keyboard focus included, slides under it. Tab moves only
@@ -522,8 +533,18 @@ product rule, never a placeholder.
     Chevrolet Cobalts, and "Chevrolet Cobalt · Payout #6" beside "Chevrolet Cobalt · Payout #7"
     named two different cars. Lists (latest payouts, claims) show the symbol muted in mono after
     the model (`catalog/CarName`), sentences in dialogs and alerts say "Chevrolet Cobalt
-    AXCOB002", and a car page's tab title is "Chevrolet Cobalt 2024 · AXCOB001 | AXEL".
-    ← review rubric "consistency", decision 10.
+    AXCOB002", and a car page's tab title is "Chevrolet Cobalt 2024 · AXCOB001 | AXEL". The
+    console's "Close Kia Rio AXRIO003 for good?", its recovery list and a solvency card's "Open
+    the … page" link follow the same rule. ← review rubric "consistency", decision 10.
+35. **The footer never shows on the first screen.** Pages render placeholders and read the
+    chain and the wallet after; a footer in view jumped each time a placeholder gave way to
+    longer or shorter content (0.06–0.10 of layout shift on the portfolio, payouts and demo
+    pages, for first visits and returning wallets alike). `main` is at least a screen tall under
+    the bar, so a short page ends in paper and the footer is one scroll away. ← review rubric
+    "stress states: nothing moves while it loads".
+36. **A day is not a status.** Trip data shows the car's last recorded day, which for a paused or
+    sold car is weeks old, so its status reads as that day ("That day: Worked", "Didn't work",
+    "In maintenance") and never repeats the project badge ("On the road"). ← decision 10.
 
 ## Constraints
 
@@ -552,9 +573,18 @@ product rule, never a placeholder.
   while the sections above fill in, until the reader scrolls.
 - The wallet pages (portfolio, payouts, verification, demo, console) show their loading state, not
   "Connect wallet", during hydration and while a wallet remembered from an earlier visit
-  reconnects (`wallet/useWalletConnecting`).
-- The fixed 64 px bar is cleared once, by `scroll-padding-top` on `html`; a section heading
-  that links point to adds only its breathing room (`scroll-mt-8`, landing at 96 px). Below
+  reconnects (`wallet/useWalletConnecting`). The wallet picker gives focus back to what opened
+  it; from the mobile menu, whose button unmounts, that is the menu toggle.
+- Every page's `main` is at least a screen tall under the bar (decision 35), so the footer is
+  never on the first screen, and the car page and console no longer hold a screen themselves.
+- The fixed bar (64 px and a 1 px border) is cleared once, by `scroll-padding-top` on `html`:
+  the bar plus 24 px of focus room (`--focus-room`), so the 4 px focus ring shows below it, and
+  WebKit, which brings a focused text field's line of text rather than its box to that edge,
+  keeps the field's top in view. A section heading that links point to adds only its breathing
+  room (`scroll-mt-2`, landing at 96 px); a full-bleed section (`#vehicles`, `#how-it-works`,
+  `#verify`) takes the focus room back (`scroll-mt-flush`) and sits flush under the bar. A row
+  that fills a card with clipped corners (solvency cars, the home ledger) draws its focus ring
+  inside itself, on the card's curve. Below
   `md` a car page also sets `scroll-padding-bottom` to the purchase bar's height, so keyboard
   focus never lands under the bar.
 - A car page is a client page, so its title comes from `generateMetadata` in

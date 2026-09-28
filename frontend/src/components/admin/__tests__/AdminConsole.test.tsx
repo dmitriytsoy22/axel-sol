@@ -190,6 +190,25 @@ describe('Admin console', () => {
     expect(form.getByRole('button', { name: 'Update roles' })).toBeDisabled();
   });
 
+  it('says under each recovery field what is wrong with it', async () => {
+    renderConsole(key(fixture.admin));
+    const form = within(
+      (await screen.findByRole('heading', { name: 'Share recovery' })).closest('section')!,
+    );
+    const lost = form.getByLabelText('Lost wallet');
+    const shares = form.getByLabelText('Shares to move');
+
+    await userEvent.type(lost, 'not an address');
+    await userEvent.type(shares, '12.5');
+
+    expect(lost).toBeInvalid();
+    expect(lost).toHaveAccessibleDescription("That isn't a valid Solana address.");
+    expect(shares).toBeInvalid();
+    expect(shares).toHaveAccessibleDescription('Enter a whole number of shares.');
+    expect(form.getByLabelText('New wallet')).toBeValid();
+    expect(form.getByRole('button', { name: 'Propose the recovery' })).toBeDisabled();
+  });
+
   it('proposes a share recovery with the case file hash for the selected car', async () => {
     const sent = renderConsole(key(fixture.admin));
     const form = within(

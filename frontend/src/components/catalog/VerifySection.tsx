@@ -58,9 +58,11 @@ export function VerifySection({ projects, isLoading, error }: CatalogFeed): JSX.
     cars = (
       <ul>
         {projects.map((project, index) => (
-          <li key={project.address.toBase58()} className="border-t border-border">
+          <li key={project.address.toBase58()} className="group/car border-t border-border">
             <details open={index < OPEN_CARS} className="group">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 px-5 py-3 md:px-6 [&::-webkit-details-marker]:hidden">
+              {/* The panel clips its corners, so a row's focus ring is drawn inside the row, and
+                  on the panel's curve for a folded last row. */}
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 px-5 py-3 focus-visible:outline-offset-[-2px] group-last/car:rounded-b-[calc(var(--radius)+3px)] group-open:rounded-b-none md:px-6 [&::-webkit-details-marker]:hidden">
                 <span className="text-body font-semibold text-foreground">
                   {carTitle(project.car)}{' '}
                   <span className="font-normal text-muted-foreground">{project.car.year}</span>
@@ -96,7 +98,11 @@ export function VerifySection({ projects, isLoading, error }: CatalogFeed): JSX.
   }
 
   return (
-    <section id="verify" aria-labelledby="verify-title" className="theme-ink section-y">
+    <section
+      id="verify"
+      aria-labelledby="verify-title"
+      className="theme-ink section-y scroll-mt-flush"
+    >
       <div className="page-container grid gap-12 lg:grid-cols-12 lg:gap-8">
         <div className="lg:col-span-5">
           <p className="text-overline uppercase text-muted-foreground">{t('overline')}</p>

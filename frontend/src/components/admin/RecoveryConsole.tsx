@@ -3,6 +3,7 @@
 import React, { useId, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Loader2 } from 'lucide-react';
+import { CarName, carLabel } from '@/components/catalog/CarName';
 import { Button } from '@/components/ui/Button';
 import { ExplorerLink } from '@/components/ui/ExplorerLink';
 import { Pill } from '@/components/ui/Pill';
@@ -10,7 +11,6 @@ import { useRecoveryActions, useRecoveryRequests } from '@/hooks/useRecoveries';
 import { useUnixNow } from '@/hooks/useUnixNow';
 import { durationParts, formatCount, formatDate, formatTime } from '@/lib/format';
 import type { RecoveryRequestAccount } from '@/lib/solana/accounts';
-import { carTitle } from '@/lib/solana/tokens';
 import type { Project } from '@/types/project';
 import { HASH_HEX, parseWallet, textInputClass } from './inputs';
 
@@ -45,7 +45,7 @@ function PendingRequest({
     <li className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-body font-medium text-foreground">
-          {project ? carTitle(project.car) : t('unknownCar')} ·{' '}
+          {project ? <CarName car={project.car} /> : t('unknownCar')} ·{' '}
           <span className="tabular-nums">
             {t('sharesCount', { count: formatCount(request.shares, locale) })}
           </span>
@@ -88,6 +88,8 @@ function PendingRequest({
   );
 }
 
+type Field = 'from' | 'to' | 'shares' | 'hash';
+
 /**
  * A new proposal for one car. It holds what the admin typed about one holder of that car, so
  * the console renders it keyed by the car: a switch to another car starts it empty.
@@ -105,12 +107,24 @@ function ProposalForm({ project, onProposed }: { project: Project; onProposed: (
   const fromKey = parseWallet(from);
   const toKey = parseWallet(to);
   const count = /^\d+$/.test(shares.trim()) ? BigInt(shares.trim()) : null;
-  let problem: string | null = null;
-  if ((from.trim() && !fromKey) || (to.trim() && !toKey)) problem = t('invalidAddress');
-  else if (fromKey && toKey && fromKey.equals(toKey)) problem = t('sameWallet');
-  else if (shares.trim() && (count === null || count === 0n)) problem = t('wholeShares');
-  else if (hash.trim() && !HASH_HEX.test(hash.trim())) problem = t('badHash');
-  const ready = Boolean(fromKey && toKey && count && HASH_HEX.test(hash.trim()) && !problem);
+  const problems: Record<Field, string | null> = {
+    from: from.trim() && !fromKey ? t('invalidAddress') : null,
+    to:
+      to.trim() && !toKey
+        ? t('invalidAddress')
+        : fromKey && toKey && fromKey.equals(toKey)
+          ? t('sameWallet')
+          : null,
+    shares: shares.trim() && (count === null || count === 0n) ? t('wholeShares') : null,
+    hash: hash.trim() && !HASH_HEX.test(hash.trim()) ? t('badHash') : null,
+  };
+  const ready = Boolean(
+    fromKey &&
+    toKey &&
+    count &&
+    HASH_HEX.test(hash.trim()) &&
+    Object.values(problems).every((problem) => problem === null),
+  );
 
   const submit = async () => {
     if (!fromKey || !toKey || !count) return;
@@ -133,28 +147,39 @@ function ProposalForm({ project, onProposed }: { project: Project; onProposed: (
   };
 
   const field = (
-    id: string,
+    id: Field,
     label: string,
     value: string,
     set: (v: string) => void,
     mono = true,
-  ) => (
-    <div>
-      <label htmlFor={`${formId}-${id}`} className="text-small font-medium text-foreground">
-        {label}
-      </label>
-      <input
-        id={`${formId}-${id}`}
-        type="text"
-        inputMode={mono ? undefined : 'numeric'}
-        autoComplete="off"
-        spellCheck={false}
-        value={value}
-        onChange={(e) => set(e.target.value)}
-        className={`${textInputClass} mt-2 ${mono ? '' : 'font-sans tabular-nums'}`}
-      />
-    </div>
-  );
+  ) => {
+    const problem = problems[id];
+    const errorId = `${formId}-${id}-error`;
+    return (
+      <div>
+        <label htmlFor={`${formId}-${id}`} className="text-small font-medium text-foreground">
+          {label}
+        </label>
+        <input
+          id={`${formId}-${id}`}
+          type="text"
+          inputMode={mono ? undefined : 'numeric'}
+          autoComplete="off"
+          spellCheck={false}
+          value={value}
+          onChange={(e) => set(e.target.value)}
+          aria-invalid={problem !== null}
+          aria-describedby={problem ? errorId : undefined}
+          className={`${textInputClass} mt-2 ${mono ? '' : 'font-sans tabular-nums'}`}
+        />
+        {problem && (
+          <p id={errorId} role="alert" className="mt-2 text-small text-destructive">
+            {problem}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="mt-6 grid gap-5 md:grid-cols-2">
@@ -163,11 +188,6 @@ function ProposalForm({ project, onProposed }: { project: Project; onProposed: (
       {field('shares', t('sharesLabel'), shares, setShares, false)}
       {field('hash', t('hashLabel'), hash, setHash)}
       <div className="flex flex-col gap-2 md:col-span-2">
-        {problem && (
-          <p role="alert" className="text-small text-destructive">
-            {problem}
-          </p>
-        )}
         <Button variant="outline" onClick={submit} disabled={!ready || busy} className="self-start">
           {busy && <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />}
           {t('propose')}
@@ -209,7 +229,7 @@ export function RecoveryConsole({
       </h2>
       <p className="mt-2 max-w-[62ch] text-body text-muted-foreground">
         {t('consoleLead', {
-          car: carTitle(project.car),
+          car: carLabel(project.car),
           delay: tCommon(`duration_${delay.unit}`, { count: delay.count }),
         })}
       </p>

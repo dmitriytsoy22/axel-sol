@@ -196,7 +196,7 @@ describe('TelemetryWidget', () => {
       renderWidget();
 
       expect(await screen.findByText('₸153.25')).toBeInTheDocument();
-      expect(screen.getByText('On the road')).toBeInTheDocument();
+      expect(figure('That day')).toHaveTextContent('Worked');
       expect(figure('Distance')).toHaveTextContent('45,120 km');
       expect(screen.getByText('Yandex Fleet')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /Recorded on Solana/ })).toHaveAttribute(
@@ -278,7 +278,7 @@ describe('TelemetryWidget', () => {
       renderWidget(chain, { apiUrl: null, publishedUrl: DATA, fetcher: fetcherOf(files) });
 
       expect(await screen.findByText('₸12,000')).toBeInTheDocument();
-      expect(screen.getByText('On the road')).toBeInTheDocument();
+      expect(figure('That day')).toHaveTextContent('Worked');
       expect(figure('Trips')).toHaveTextContent('21');
       expect(figure('Distance')).toHaveTextContent('168 km');
       expect(screen.getByText(/day 2 of the car's chain/)).toBeInTheDocument();

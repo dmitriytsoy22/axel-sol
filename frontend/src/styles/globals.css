@@ -150,9 +150,14 @@
        arrived: WebKit took a reader of the fleet to the Verify section, 4 000 px further.
        Without it the offset lands where the reader left. */
     overflow-anchor: none;
-    /* The bar is fixed, 64 px: keyboard focus and in-page links stop below it, not under it.
-       Sections add only their own breathing room (scroll-mt-*). */
-    scroll-padding-top: 4rem;
+    /* The bar is fixed, 64 px and a 1 px border. Keyboard focus and in-page links stop below
+       it, with room for the 4 px focus ring and for WebKit, which brings a focused text field's
+       line of text, 14 px inside its box, to this edge rather than the box. Headings that links
+       point to add only their own breathing room (scroll-mt-*); full-bleed sections sit flush
+       under the bar (scroll-mt-flush). */
+    --bar-height: 4rem;
+    --focus-room: 1.5rem;
+    scroll-padding-top: calc(var(--bar-height) + var(--focus-room));
   }
 
   body {
@@ -277,6 +282,12 @@
 }
 
 @layer utilities {
+  /* A full-bleed section a link points to (/#vehicles) has its own padding: without the focus
+     room above it, the bar doesn't sit on a strip of the section before. */
+  .scroll-mt-flush {
+    scroll-margin-top: calc(-1 * var(--focus-room));
+  }
+
   /* Semantic tokens, so the shimmer also reads on ink surfaces. */
   .skeleton-shimmer {
     background: linear-gradient(

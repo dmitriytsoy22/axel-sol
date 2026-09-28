@@ -61,10 +61,12 @@ describe('SolvencyView', () => {
     expect(carCard(/Kia Rio/).getByText('Closed')).toBeInTheDocument();
     // Cars that pass stay folded to their verdict.
     expect(isOpen(/Kia Rio/)).toBe(false);
-    expect(carCard(/Kia Rio/).getByRole('link', { name: 'Open the Kia Rio page' })).toHaveAttribute(
-      'href',
-      `/assets/${fixture.projects.operating.shareMint}`,
-    );
+    // Named with its share symbol, as the card under the name shows it.
+    const heading = carCard(/Kia Rio/).getByRole('heading', { name: /Kia Rio/ });
+    const symbol = heading.nextElementSibling?.textContent;
+    expect(
+      carCard(/Kia Rio/).getByRole('link', { name: `Open the Kia Rio ${symbol} page` }),
+    ).toHaveAttribute('href', `/assets/${fixture.projects.operating.shareMint}`);
   });
 
   it('says an income vault holding less than the program owes fails', async () => {
