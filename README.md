@@ -20,6 +20,7 @@
 | Name | Role | GitHub | Based in |
 |------|------|--------|----------|
 | Dmitriy Tsoy | Founder, frontend & product | [@dmitriytsoy22](https://github.com/dmitriytsoy22) | Almaty, Kazakhstan |
+| Andrey S | On-chain & backend | [@ndrkbrg](https://github.com/ndrkbrg) | Kazakhstan |
 
 AXEL existed before the hackathon. See [Prior Work and Hackathon Scope](#prior-work-and-hackathon-scope) for what was built when and by whom.
 
@@ -492,7 +493,7 @@ axel-sol/
 AXEL was started before Crypto World's Fair. Only work done during the event is judged, so the boundary is marked in git with the tag **`pre-hackathon`** (commit `cd2c12c`, 2026-04-07).
 
 **Before the hackathon (Mar 28 – Apr 7, 2026)**
-- Written by two people:
+- Written by the two team members:
   - Dmitriy Tsoy: frontend, 36 commits.
   - Andrey S ([@ndrkbrg](https://github.com/ndrkbrg)): Anchor programs, backend and chain integration, 22 commits.
 - Scope: the specification and plans, the v1 Anchor programs and their integration tests, the devnet deployment with the two test projects above, the NestJS backend, and the Next.js frontend wired to v1.
@@ -583,12 +584,6 @@ Full roadmap: [docs/roadmap.md](docs/roadmap.md)
 - [Colosseum project page](https://colosseum.com/arena/projects/axel-1)
 - [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md)
 - Logo: [assets/logo.png](assets/logo.png) · [assets/logo-wordmark.png](assets/logo-wordmark.png)
-
----
-
-## Acknowledgements
-
-- **Andrey S ([@ndrkbrg](https://github.com/ndrkbrg))** wrote the v1 Anchor programs, the NestJS backend and the chain integration of the frontend before the hackathon.
 
 ---
 
