@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
-import { captionHtml, endHtml, titleHtml } from './cards';
+import { BAND_HEIGHT, captionHtml, endHtml, titleHtml } from './cards';
 import type { Caption, Timeline } from './director';
 import { mediaSeconds, Narration } from './narration';
 
@@ -11,7 +11,8 @@ import { mediaSeconds, Narration } from './narration';
  * Turns the recorder's raw.webm and timeline.json into the finished videos:
  *
  * 1. cuts every wait the timeline marks, and the time before the first caption and after the last;
- * 2. burns in the captions, drawn as PNGs (this needs no libass or drawtext in ffmpeg);
+ * 2. puts the recording above a caption strip and burns the captions into it, drawn as PNGs (this
+ *    needs no libass or drawtext in ffmpeg), so no caption ever covers the app;
  * 3. adds the title and end cards;
  * 4. muxes the narration, one `say` clip per caption, and a copy with a silent track.
  *
@@ -19,14 +20,16 @@ import { mediaSeconds, Narration } from './narration';
  */
 
 const FPS = 25;
-const TITLE_SECONDS = 3.5;
-const END_SECONDS = 4.5;
+const WIDTH = 1920;
+const HEIGHT = 1080;
+const TITLE_SECONDS = 3;
+const END_SECONDS = 3;
 const FADE_SECONDS = 0.4;
 /** Kept pieces shorter than this would flash; they are cut too. */
 const MIN_PIECE = 0.12;
 /** How long the edit holds before the first caption and after the last one. */
 const LEAD_IN = 0.4;
-const LEAD_OUT = 1.2;
+const LEAD_OUT = 0.6;
 /** Where each clip starts after its caption appears. */
 const VOICE_DELAY = 0.15;
 const MAX_SECONDS = 180;
@@ -94,10 +97,10 @@ interface EditedCaption extends Pick<Caption, 'text' | 'say'> {
 
 async function renderPngs(
   captions: EditedCaption[],
-  note: { title: string; end: string },
+  note: { title: string; end: string; badge: [string, string] },
 ): Promise<void> {
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT } });
   const shoot = async (html: string, file: string, transparent: boolean): Promise<void> => {
     const source = join(work, 'card.html');
     writeFileSync(source, html);
@@ -107,14 +110,14 @@ async function renderPngs(
   };
   await shoot(titleHtml(note.title), 'title.png', false);
   await shoot(endHtml(note.end), 'end.png', false);
-  await shoot('<!doctype html><html><body></body></html>', 'blank.png', true);
+  await shoot(captionHtml('', note.badge), 'blank.png', true);
   for (const [index, caption] of captions.entries()) {
-    await shoot(captionHtml(caption.text), `caption-${index}.png`, true);
+    await shoot(captionHtml(caption.text, note.badge), `caption-${index}.png`, true);
   }
   await browser.close();
 }
 
-/** The captions as one image stream: each caption for its time, a blank frame in between. */
+/** The captions as one image stream: each caption for its time, an empty strip in between. */
 function captionTrack(captions: EditedCaption[], length: number): string {
   const lines: string[] = [];
   let at = 0;
@@ -161,6 +164,7 @@ async function main(): Promise<void> {
 
   const local = timeline.cluster === 'localnet';
   await renderPngs(captions, {
+    badge: [local ? 'Local Solana validator' : `Solana ${timeline.cluster}`, 'Test tokens · fictional fleet'],
     title: local
       ? 'Recorded on a local Solana validator with fictional demo data'
       : `Recorded on Solana ${timeline.cluster} with fictional demo data and test tokens`,
@@ -178,11 +182,12 @@ async function main(): Promise<void> {
     .join(';');
   const joined = pieces.map((_, index) => `[p${index}]`).join('');
   const card = (input: number, seconds: number, label: string) =>
-    `[${input}:v]fps=${FPS},scale=1920:1080,format=yuv420p,trim=duration=${seconds},` +
+    `[${input}:v]fps=${FPS},scale=${WIDTH}:${HEIGHT},format=yuv420p,trim=duration=${seconds},` +
     `fade=t=in:st=0:d=${FADE_SECONDS},fade=t=out:st=${(seconds - FADE_SECONDS).toFixed(2)}:d=${FADE_SECONDS}[${label}]`;
   const filter = [
     trims,
-    `${joined}concat=n=${pieces.length}:v=1:a=0,scale=1920:1080,format=yuv420p[edit]`,
+    `${joined}concat=n=${pieces.length}:v=1:a=0,scale=${WIDTH}:${HEIGHT - BAND_HEIGHT},` +
+      `pad=${WIDTH}:${HEIGHT}:0:0:color=0x081014,format=yuv420p[edit]`,
     `[1:v]format=rgba[caps]`,
     `[edit][caps]overlay=0:0:eof_action=repeat,format=yuv420p,setsar=1[body]`,
     card(2, TITLE_SECONDS, 'title'),

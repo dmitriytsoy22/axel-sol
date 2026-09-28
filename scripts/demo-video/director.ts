@@ -56,8 +56,8 @@ function inDialog(target: Locator): Promise<boolean> {
 
 /** The part of the viewport the sticky header covers, plus some air. */
 const HEADER_OFFSET = 112;
-/** The bottom of the viewport the producer's caption band covers, plus some air. */
-const CAPTION_CLEARANCE = 150;
+/** Air kept below a framed element; the captions go in a strip under the page, not over it. */
+const CAPTION_CLEARANCE = 24;
 
 /**
  * Drives the page at a pace a viewer can follow and keeps the timeline the edit is cut from:
@@ -190,6 +190,12 @@ export class Director {
     }
   }
 
+  /** Puts `text` into `field` at once, as a paste would. */
+  async paste(field: Locator, text: string): Promise<void> {
+    await this.click(field, { settle: 250 });
+    await field.fill(text);
+  }
+
   /** Types `text` into `field` at a readable speed. */
   async type(field: Locator, text: string): Promise<void> {
     await this.click(field, { settle: 150 });
@@ -228,7 +234,7 @@ export class Director {
 
   /**
    * Frames `targets`, together, until the caption ends. On the page, it first scrolls them
-   * between the header and the caption band; a frame that doesn't fit there starts at the top.
+   * below the header; a frame that doesn't fit there starts at the top.
    */
   async frame(...targets: Locator[]): Promise<void> {
     const fixed = await inDialog(targets[0]);

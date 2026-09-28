@@ -4,25 +4,26 @@ Records the product demo for Colosseum: a paced walk through the live app in Chr
 
 The walkthrough, in order:
 
-1. The home page: the hero, the demo-data notice, the live chain figures, and the fleet with a car in every state.
-2. A car that is still raising: the on-chain metadata, the illustrative photo, raise progress, the live escrow and the state timeline.
+1. The home page: the hero and the live chain figures, then a car that is still raising.
+2. That car: the on-chain metadata, the illustrative photo, raise progress with the live escrow, and the state timeline.
 3. Demo access for a wallet: a signed message gives the wallet a demo KYC record and test tenge.
 4. Buying two shares in the open raise, with the purchase dialog's escrow and refund explanation.
 5. Five shares of a car on the road from the demo desk.
-6. A simulated month of income, the portfolio with both positions and what a claim pays, and the claim.
-7. "Check the car's data yourself": the browser rebuilds the telemetry hash chain and matches every report hash.
-8. The proof of solvency.
-9. The console as the platform admin: a funded car's release and the protocol config.
+6. A simulated month of income and the claim, then the wallet's tKZT balance before and after it.
+7. The portfolio with both positions, and a transfer to a wallet without KYC that the app stops, because the transfer hook would refuse it.
+8. "Check the car's data yourself": the browser rebuilds the telemetry hash chain and matches every report hash.
+9. The proof of solvency.
+10. The console as the platform admin: a funded car's raise released with a purchase-papers hash, the emptied escrow, and the fees.
 
-The captions are written in [`storyline.ts`](storyline.ts). They name the cluster and the fictional demo fleet, and they claim nothing about users, partners or revenue.
+The captions are written in [`storyline.ts`](storyline.ts). Figures in them, such as the balance and the fees, are read from the page. They claim nothing about users, partners or revenue. The cluster and the fictional demo fleet are named on the title card, on a badge in the caption strip for the whole video, and on the end card.
 
 ## How it works
 
-- **`record.ts`** drives the app with Playwright and records a 1920x1080 WebM. The page is laid out at 1280x720 and rendered at 1.5x, so the text reads like a laptop screen. A drawn pointer follows the mouse, and a cyan frame marks what each caption talks about ([`browser/overlay.js`](browser/overlay.js)).
+- **`record.ts`** drives the app with Playwright and records a 1920x960 WebM. The page is laid out at 1280x640 and rendered at 1.5x, so the text reads like a laptop screen. A drawn pointer follows the mouse, and a cyan frame marks what each caption talks about ([`browser/overlay.js`](browser/overlay.js)).
 - **`director.ts`** keeps the timeline while it records. Each caption stores when it starts and ends, and each wait nobody needs to watch is marked as a cut: page loads, transactions, wallet approvals. A caption stays on screen for its reading time, or for its narration if that is longer, counting only the time the edit keeps. The captions therefore stay in sync after the cuts.
 - **`produce.ts`** makes the videos from `raw.webm` and `timeline.json`:
   1. it drops the cuts and the time before the first caption and after the last;
-  2. it burns in the captions, drawn as PNGs with the app's fonts, so ffmpeg needs neither libass nor drawtext;
+  2. it puts the recording above a 120-pixel strip for a 1920x1080 frame, and burns the captions into the strip, drawn as PNGs with the app's fonts, so no caption covers the app and ffmpeg needs neither libass nor drawtext;
   3. it adds a title card and an end card.
 - **Narration.** On macOS, `say` (voice Samantha) reads each caption. The recorder measures each clip before it records, and the producer lays the clips under the edit. `--no-voice`, or any system without `say`, gives captions only.
 
@@ -46,7 +47,7 @@ npm run record     # terminal 2: about 3 minutes; writes out/raw.webm and out/ti
 npm run produce -- --name AXEL-demo-localnet
 ```
 
-`npm run record -- --stack` starts the stack, records and stops it in one go. Each recording uses a fresh burner wallet, so it can run again and again against the same stack.
+`npm run record -- --stack` starts the stack, records and stops it in one go. Each recording uses a fresh burner wallet. The console scene releases the stack's funded raise, so a second take against the same stack finds no funded car and shows only the fees; restart the stack for a full take.
 
 `produce` writes these files to `--dest`, or to `out/` without it:
 
@@ -91,7 +92,7 @@ The burner wallet exists only in a build made with `NEXT_PUBLIC_E2E=1`, which no
    ```
    Approve in Phantom when the terminal asks: connect, sign the demo access message, confirm the purchase, and confirm the claim. If the site uses Cloudflare Turnstile, pass its check in the window when the demo step shows it.
 
-   Before the console scene, the terminal asks you to switch Phantom to the platform admin's account. The console then opens as that account. Without the admin key in Phantom, record with `--no-console`.
+   Before the console scene, the terminal asks you to switch Phantom to the platform admin's account. The console then opens as that account, and releasing a funded raise needs one more approval. Without the admin key in Phantom, record with `--no-console`.
 4. **Produce.** `npm run produce -- --name AXEL-demo-devnet`. The cards then say Solana devnet instead of localnet.
 
 Demo access is granted once per wallet, so each take needs a new Phantom account (Phantom → Add / Connect Wallet → Create new account). The limits of the demo routes are in [docs/api.md](../../docs/api.md#judge-demo-api): three accesses per IP address a day, and one simulated month a minute across all wallets.

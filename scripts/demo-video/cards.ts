@@ -38,16 +38,29 @@ function escape(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** A transparent frame with one caption in a band near the bottom. */
-export function captionHtml(text: string): string {
+/** The strip under the app that carries the captions; the recording fills the rest of the frame. */
+export const BAND_HEIGHT = 120;
+
+/**
+ * A frame that is transparent above the caption strip. The strip holds the caption, if any, and
+ * a badge naming what the recording runs on, so that stays on screen for the whole walkthrough.
+ */
+export function captionHtml(text: string, badge: [string, string]): string {
   return `<!doctype html><html><head><meta charset="utf-8"><style>${BASE_CSS}
     html, body { background: transparent; }
-    .band { position: absolute; left: 50%; bottom: 54px; transform: translateX(-50%);
-      max-width: 1500px; width: max-content; padding: 20px 36px 22px;
-      background: rgba(8, 16, 20, 0.86); border-radius: 18px;
-      color: #F8FBFB; font-size: 42px; line-height: 1.32; font-weight: 500; text-align: center;
-      letter-spacing: -0.005em; text-wrap: balance; }
-  </style></head><body><div class="band">${escape(text)}</div></body></html>`;
+    .band { position: absolute; left: 0; right: 0; bottom: 0; height: ${BAND_HEIGHT}px;
+      background: #081014; border-top: 1px solid #212D33;
+      display: flex; align-items: center; justify-content: center; }
+    .text { max-width: 1320px; color: #F8FBFB; font-size: 34px; line-height: 1.25; font-weight: 500;
+      text-align: center; letter-spacing: -0.005em; text-wrap: balance; }
+    .badge { position: absolute; left: 40px; top: 50%; transform: translateY(-50%); width: 230px;
+      color: #9CA7AB; font-size: 18px; line-height: 1.4; }
+    .badge b { display: block; color: #C9D3D6; font-weight: 600; }
+    .badge b::before { content: '\u25CF'; color: #F2AF48; margin-right: 8px; }
+  </style></head><body><div class="band">
+    <div class="badge"><b>${escape(badge[0])}</b>${escape(badge[1])}</div>
+    <div class="text">${escape(text)}</div>
+  </div></body></html>`;
 }
 
 /** The first seconds: the name, what it is, and what the recording runs on. */

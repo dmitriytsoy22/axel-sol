@@ -9,11 +9,12 @@ import { tell } from './storyline';
 import { APPROVAL_TIMEOUT, BurnerWallet, PhantomWallet, type Wallet } from './wallet';
 
 /*
- * Records the product walkthrough as a 1920x1080 video with its timeline. The page is laid out
- * at 1280x720 and rendered at 1.5x, so the text reads like a laptop screen, not a wall. The scale
- * is the browser's own (--force-device-scale-factor): Chromium's screencast, which Playwright
- * records, sends frames at the emulated viewport's size in CSS pixels, so an emulated
- * deviceScaleFactor would give 1280x720 frames.
+ * Records the product walkthrough as a 1920x960 video with its timeline; the producer adds the
+ * 120-pixel caption strip below it for a 1920x1080 frame. The page is laid out at 1280x640 and
+ * rendered at 1.5x, so the text reads like a laptop screen, not a wall. The scale is the
+ * browser's own (--force-device-scale-factor): Chromium's screencast, which Playwright records,
+ * sends frames at the emulated viewport's size in CSS pixels, so an emulated deviceScaleFactor
+ * would give 1280x640 frames.
  *
  *   npm run record -- --stack                  the local stack: start, record, stop
  *   npm run record                             a local stack `npm run stack` already runs
@@ -23,8 +24,8 @@ import { APPROVAL_TIMEOUT, BurnerWallet, PhantomWallet, type Wallet } from './wa
  */
 
 const HERE = __dirname;
-const VIEWPORT = { width: 1280, height: 720 };
-const VIDEO = { width: 1920, height: 1080 };
+const VIEWPORT = { width: 1280, height: 640 };
+const VIDEO = { width: 1920, height: 960 };
 
 const { values } = parseArgs({
   options: {
@@ -179,7 +180,7 @@ async function main(): Promise<void> {
     const director = new Director(page, values.rehearse ? () => 0 : narration.holdTime, VIEWPORT);
     console.log(`Recording ${baseUrl} (${cluster}, ${walletKind} wallet${voice ? ', narrated' : ''})`);
     try {
-      await tell(director, { cluster, wallet, console: !values['no-console'] });
+      await tell(director, { wallet, console: !values['no-console'] });
     } catch (error) {
       await page.screenshot({ path: join(out, 'failure.png') });
       throw error;
