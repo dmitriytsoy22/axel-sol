@@ -84,7 +84,7 @@ export function StateTimeline({
 
   return (
     <section aria-labelledby="timeline-title">
-      <h2 id="timeline-title" className="text-h4 font-semibold text-foreground">
+      <h2 id="timeline-title" className="scroll-mt-24 text-h4 font-semibold text-foreground">
         {t('title')}
       </h2>
       <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">{t('lead')}</p>

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { ExplorerLink } from '@/components/ui/ExplorerLink';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -17,8 +17,17 @@ import type { Project } from '@/types/project';
 export function EscrowBalance({ project }: { project: Project }): JSX.Element {
   const t = useTranslations('Raise');
   const locale = useLocale();
-  const { balances, error } = useVaultBalances(project);
-  const shares = project.sharesSold - project.sharesRefunded;
+  const { balances, error, updatedAt, refetch } = useVaultBalances(project);
+  const sold = project.sharesSold - project.sharesRefunded;
+  // The balance and the shares sold are separate reads, and a purchase reads the shares again
+  // first. Until the balance is read again it is compared with the count it was read beside,
+  // so a sound escrow never shows a shortfall right after a purchase (decision 24).
+  const [read, setRead] = useState({ at: updatedAt, shares: sold });
+  if (read.at !== updatedAt) setRead({ at: updatedAt, shares: sold });
+  useEffect(() => {
+    if (read.shares !== sold) refetch();
+  }, [read.shares, sold, refetch]);
+  const shares = read.shares;
   const owed = sharesValue(shares, project.pricePerShare);
   const balance = balances?.escrow ?? null;
   const amount = (value: bigint) => formatTokenAmount(value, project.payment, locale);
@@ -39,9 +48,11 @@ export function EscrowBalance({ project }: { project: Project }): JSX.Element {
   return (
     <div data-testid="escrow-balance" className="rounded-control bg-muted px-4 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span className="inline-flex items-center gap-2 whitespace-nowrap text-small text-muted-foreground">
+        {/* "Сейчас в эскроу • В реальном времени" is wider than the panel on a phone: "Live"
+            drops to its own line instead of pushing the page sideways. */}
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2 text-small text-muted-foreground">
           {t('inEscrow')}
-          <span className="inline-flex items-center gap-1 text-small text-success">
+          <span className="inline-flex items-center gap-1 whitespace-nowrap text-small text-success">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
             {t('live')}
           </span>

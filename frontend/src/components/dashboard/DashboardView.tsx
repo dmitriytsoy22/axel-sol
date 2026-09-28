@@ -10,6 +10,7 @@ import { INDEXER_URL } from '@/lib/api/indexer';
 import { canClaim } from '@/lib/solana/lifecycle';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
+import { useWalletConnecting } from '@/components/wallet/useWalletConnecting';
 import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -42,7 +43,8 @@ export function DashboardView({
   indexerUrl?: string | null;
 }): JSX.Element {
   const t = useTranslations('Dashboard');
-  const { connected, connecting, publicKey } = useWallet();
+  const { connected, publicKey } = useWallet();
+  const connecting = useWalletConnecting();
   const { holdings, summary, isLoading, error, refetch } = usePositions();
   const [transferring, setTransferring] = useState<Holding | null>(null);
 

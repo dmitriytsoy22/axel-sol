@@ -9,6 +9,7 @@ import { INDEXER_URL } from '@/lib/api/indexer';
 import { usePositions, type TokenTotal } from '@/hooks/usePositions';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
+import { useWalletConnecting } from '@/components/wallet/useWalletConnecting';
 import { PayoutHistoryTable } from '@/components/features/payouts/PayoutHistoryTable';
 import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
@@ -25,7 +26,8 @@ export function PayoutsView({
 }): JSX.Element {
   const t = useTranslations('Payouts');
   const locale = useLocale();
-  const { connected, connecting } = useWallet();
+  const { connected } = useWallet();
+  const connecting = useWalletConnecting();
   // With an indexer every figure comes from its one snapshot; the chain alone needs the positions.
   const positions = usePositions({ enabled: indexerUrl === null });
   const payouts = usePayoutHistory(indexerUrl);

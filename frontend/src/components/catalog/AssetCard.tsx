@@ -63,22 +63,25 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
           <span className="font-mono">{car.symbol}</span>
         </p>
 
-        <dl className="mt-5 grid grid-cols-2 gap-4">
-          <div className="flex flex-col-reverse justify-end gap-1">
+        {/* Half a card is 110 px at 320 px and 124 px beside the fleet's heading at 1024 px,
+            less than "12 нояб. 2026 г." needs at this size, so a figure wraps between words, in
+            balanced lines, rather than run into its neighbour or out of the card. */}
+        <dl className="mt-5 grid grid-cols-2 gap-x-3 gap-y-4">
+          <div className="flex min-w-0 flex-col-reverse justify-end gap-1">
             <dt className="text-small text-muted-foreground">{t('pricePerToken')}</dt>
-            <dd className="whitespace-nowrap text-title font-semibold tabular-nums text-foreground">
+            <dd className="text-balance break-words text-title font-semibold tabular-nums text-foreground">
               {formatTokenAmount(project.pricePerShare, payment, locale)}
             </dd>
           </div>
           {project.status === 'fundraising' ? (
-            <div className="flex flex-col-reverse justify-end gap-1">
+            <div className="flex min-w-0 flex-col-reverse justify-end gap-1">
               <dt className="text-small text-muted-foreground">{t('raiseCloses')}</dt>
-              <dd className="whitespace-nowrap text-title font-semibold tabular-nums text-foreground">
+              <dd className="text-balance break-words text-title font-semibold tabular-nums text-foreground">
                 {formatDate(project.raiseDeadline, locale)}
               </dd>
             </div>
           ) : (
-            <div className="flex flex-col-reverse justify-end gap-1">
+            <div className="flex min-w-0 flex-col-reverse justify-end gap-1">
               <dt className="text-small text-muted-foreground">{t('payoutPeriods')}</dt>
               <dd className="text-title font-semibold tabular-nums text-foreground">
                 {formatNumber(project.periodCount, locale)}

@@ -218,14 +218,17 @@ buttons carry an `aria-label` and a 44×44 hit area.
 
 ### Mobile rules
 
-- Breakpoints: Tailwind sm 640, md 768 and lg 1024, `min-width` only. One local exception:
+- Breakpoints: Tailwind sm 640, md 768 and lg 1024, `min-width` only. Two local exceptions:
   the asset page's bottom bar hides its price below 360 px (`min-[360px]`), since at 320 px
-  the 48 px button needs the whole row.
+  the 48 px button needs the whole row; and the payouts ledger is a table only from `xl`
+  (1280 px), since its seven columns of Russian amounts and dates need the full 1200 px
+  container.
 - Type steps down one level below `md`: hero `text-h2` (40) instead of `text-display`, section
   headings `text-h3` (32) instead of `text-h2`.
 - Sections: 56 px vertical padding, 24 px gutters.
 - Hero: art-directed photo, `hero/almaty-night-traffic-portrait.webp` below `md`.
-- Tables become stacked rows of label and value (the holdings table already does this).
+- Tables become stacked rows of label and value: the holdings table below `lg`, the payouts
+  ledger below `xl`, where a table would be cut off at the card's edge.
 - The invest action on the asset page becomes a sticky bottom bar with a 48 px button. The
   body reserves the bar's height below `md` (`[data-mobile-invest-bar]` in `globals.css`), so
   the bar never covers the end of the footer.
@@ -289,8 +292,9 @@ product rule, never a placeholder.
   cross, the rebuilt and on-chain heads in mono, and one pill row per deposit.
 - **Dashboard (built, stage 3):** page header (overline, serif H1, a lead that names the
   connected wallet) → a ruled summary card with three equal figures (value at current price,
-  shares held "in N cars", not claimed yet) → holdings table (car with thumbnail, shares and
-  "x% of the car", value, status; stacked rows below `sm`) → payouts list, newest first, each
+  shares held "in N cars", not claimed yet) → holdings table (car with thumbnail and its status
+  under the name, shares and "x% of the car", value, to claim, actions; stacked rows below
+  `lg`) → payouts list, newest first, each
   naming its car, number and date, with a status pill, the amount and a Claim button, plus
   "Claim all" (the page's one primary action) only when something is claimable. Disconnected:
   a two-part panel (why a wallet is needed + "Connect wallet", and what the page shows once
@@ -301,8 +305,9 @@ product rule, never a placeholder.
   burned, destination account) before the wallet is asked. The send dialog checks the
   recipient while the address is typed and says in green or red what the hook will do.
 - **Payouts (built, stage 3):** page header → the same ruled summary (claimed so far, not
-  claimed yet, payouts) → a sortable ledger (payout, date, paid in, your share, your amount,
-  status, record link; stacked label/value rows below `sm`). Disconnected, loading, empty and
+  claimed yet, payouts) → a sortable ledger (payout, period on two lines, date, paid in, per
+  share, your part, record link; stacked label/value rows below `xl`). Disconnected, loading,
+  empty and
   error states as on the dashboard; the old endless "Loading payout history…" with no wallet
   is gone.
 - **Admin (built, stage 3):** an ink header naming the managed car (overline "Operator
@@ -501,6 +506,14 @@ product rule, never a placeholder.
 - Screen-reader text inside a horizontal scroller needs a positioned scroller: the
   `sr-only` label of an Explorer link escaped the payouts table's `overflow-x-auto` and
   widened the page by 20 px at 640–767 px until the scroller became `relative`.
+- Scroll anchoring is off (`overflow-anchor: none` on `html`). Pages render skeletons first,
+  so Back restores the offset over them, and anchoring then followed whatever sat at that
+  offset while the content above arrived. A link to a section of a car page
+  (`#verify-data-title`) is scrolled to by the page once the car is read, and held there
+  while the sections above fill in, until the reader scrolls.
+- The wallet pages (portfolio, payouts, verification, demo) show their loading state, not
+  "Connect wallet", during hydration and while a wallet remembered from an earlier visit
+  reconnects (`wallet/useWalletConnecting`).
 - The adapter's wallet modal title ("Connect a wallet on Solana to continue") is hard-coded
   in English by `@solana/wallet-adapter-react-ui`; translating it needs a custom modal.
 - Screenshots: `Google Chrome --headless=new` clamps the window to at least 500 px on macOS, so

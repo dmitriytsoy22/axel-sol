@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PublicKey } from '@solana/web3.js';
@@ -66,6 +66,47 @@ describe('DashboardView', () => {
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Connect wallet' }));
     expect(setVisible).toHaveBeenCalledWith(true);
+  });
+
+  describe('for a reader whose wallet was connected on an earlier visit', () => {
+    const connectHeading = { name: 'Connect a wallet to see your shares' };
+    const dashboard = (wallet: ReturnType<typeof testWallet>) => (
+      <AppProviders connection={new FixtureNode()} wallet={wallet}>
+        <DashboardView indexerUrl={null} />
+      </AppProviders>
+    );
+
+    afterEach(() => {
+      window.localStorage.clear();
+      vi.useRealTimers();
+    });
+
+    it('shows the loading state, not "Connect wallet", until the wallet reconnects or fails', () => {
+      window.localStorage.setItem('walletName', JSON.stringify('Phantom'));
+      const { rerender } = render(dashboard(testWallet(null)));
+
+      expect(screen.getByTestId('dashboard-loading')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', connectHeading)).not.toBeInTheDocument();
+
+      rerender(dashboard(testWallet(null, { connecting: true })));
+      expect(screen.getByTestId('dashboard-loading')).toBeInTheDocument();
+
+      // The wallet refused to reconnect: now the page asks for one.
+      rerender(dashboard(testWallet(null)));
+      expect(screen.getByRole('heading', connectHeading)).toBeInTheDocument();
+    });
+
+    it('asks for a wallet once a remembered one never turns up', () => {
+      vi.useFakeTimers();
+      window.localStorage.setItem('walletName', JSON.stringify('Uninstalled Wallet'));
+      render(dashboard(testWallet(null)));
+      expect(screen.getByTestId('dashboard-loading')).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(3_000);
+      });
+      expect(screen.getByRole('heading', connectHeading)).toBeInTheDocument();
+    });
   });
 
   it("shows a holder's cars, their value and exactly what a claim pays now", async () => {

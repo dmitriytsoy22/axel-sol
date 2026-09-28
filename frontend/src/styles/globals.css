@@ -145,6 +145,11 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Pages read the chain after they render, so Back restores the offset over skeletons.
+       Scroll anchoring then followed whatever sat at that offset while the content above
+       arrived: WebKit took a reader of the fleet to the Verify section, 4 000 px further.
+       Without it the offset lands where the reader left. */
+    overflow-anchor: none;
   }
 
   body {

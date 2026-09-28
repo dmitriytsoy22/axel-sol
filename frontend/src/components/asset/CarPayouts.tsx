@@ -168,7 +168,7 @@ export function CarPayouts({ project }: CarPayoutsProps): JSX.Element {
 
   return (
     <section aria-labelledby="payouts-title">
-      <h2 id="payouts-title" className="text-h4 font-semibold text-foreground">
+      <h2 id="payouts-title" className="scroll-mt-24 text-h4 font-semibold text-foreground">
         {t('payoutsTitle')}
       </h2>
       <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">{t('payoutsLead')}</p>

@@ -53,7 +53,7 @@ export function PayoutCalculator({ project }: PayoutCalculatorProps): JSX.Elemen
 
   return (
     <section aria-labelledby="calc-title">
-      <h2 id="calc-title" className="text-h4 font-semibold text-foreground">
+      <h2 id="calc-title" className="scroll-mt-24 text-h4 font-semibold text-foreground">
         {t('calcTitle')}
       </h2>
       <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">{t('calcLead')}</p>

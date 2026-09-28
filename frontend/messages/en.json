@@ -235,7 +235,6 @@
     "tokens": "Shares",
     "ofCar": "{percent} of the car",
     "value": "Value",
-    "status": "Status",
     "noInvestments": "This wallet holds no shares yet",
     "noInvestmentsDesc": "Buy shares in a car and they'll show up here, with their value and payouts.",
     "exploreCatalog": "Browse the cars",

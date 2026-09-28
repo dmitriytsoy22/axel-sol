@@ -25,6 +25,12 @@ interface DataTableProps<T> {
   pageSize?: number;
   emptyMessage?: React.ReactNode;
   labels?: DataTableLabels;
+  /**
+   * Below this breakpoint each row is a stack of label and value. A table whose columns need
+   * more room passes a wider one, so narrower screens get the stacks instead of a table cut
+   * off at the card's edge.
+   */
+  stackBelow?: 'sm' | 'xl';
   className?: string;
 }
 
@@ -35,6 +41,9 @@ const DEFAULT_LABELS: DataTableLabels = {
   next: 'Next Page',
 };
 
+const TABLE_FROM = { sm: 'sm:block', xl: 'xl:block' } as const;
+const STACKS_UNTIL = { sm: 'sm:hidden', xl: 'xl:hidden' } as const;
+
 const pagerButton =
   'inline-flex h-11 w-11 items-center justify-center rounded-control border border-border bg-card text-foreground transition-colors duration-fast ease-move hover:bg-secondary disabled:pointer-events-none disabled:opacity-40 md:h-10 md:w-10';
 
@@ -44,6 +53,7 @@ export function DataTable<T>({
   pageSize = 10,
   emptyMessage = 'No data available',
   labels = DEFAULT_LABELS,
+  stackBelow = 'sm',
   className = '',
 }: DataTableProps<T>): JSX.Element {
   const [currentPage, setCurrentPage] = useState(1);
@@ -100,7 +110,7 @@ export function DataTable<T>({
     >
       {/* relative: screen-reader-only text inside cells is absolutely positioned; without a
           containing block here it escapes the scroller and widens the whole page. */}
-      <div className="relative hidden overflow-x-auto sm:block">
+      <div className={`relative hidden overflow-x-auto ${TABLE_FROM[stackBelow]}`}>
         <table className="w-full whitespace-nowrap text-left text-small">
           <thead className="border-b border-border bg-muted">
             <tr>
@@ -167,7 +177,7 @@ export function DataTable<T>({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-6 py-10 text-center text-muted-foreground"
+                  className="whitespace-normal px-6 py-10 text-center text-muted-foreground"
                 >
                   {emptyMessage}
                 </td>
@@ -177,8 +187,8 @@ export function DataTable<T>({
         </table>
       </div>
 
-      {/* Below sm each row becomes a stack of label and value. */}
-      <div className="flex flex-col divide-y divide-border sm:hidden">
+      {/* Below `stackBelow` each row becomes a stack of label and value. */}
+      <div className={`flex flex-col divide-y divide-border ${STACKS_UNTIL[stackBelow]}`}>
         {currentData.length > 0 ? (
           currentData.map((row, rowIndex) => (
             <dl key={rowIndex} className="flex flex-col gap-2 p-4">

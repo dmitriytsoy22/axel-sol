@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, RotateCw } from 'lucide-react';
@@ -43,6 +43,31 @@ function AssetSkeleton(): JSX.Element {
   );
 }
 
+/**
+ * A link to one section of the car (`#verify-data-title`, step 6 of the judge demo) arrives
+ * before the car is read, so the browser finds nothing to scroll to. Once the car is on the
+ * page this goes to the section, and keeps it in place while the sections above fill in from
+ * their own reads, until the reader scrolls or presses a key.
+ */
+function useSectionFromHash(): void {
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    const target = id ? document.getElementById(id) : null;
+    if (!target) return;
+    const align = () => target.scrollIntoView({ behavior: 'instant' });
+    align();
+    const observer = new ResizeObserver(align);
+    observer.observe(document.body);
+    const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
+    const release = () => {
+      observer.disconnect();
+      for (const type of inputs) window.removeEventListener(type, release);
+    };
+    for (const type of inputs) window.addEventListener(type, release, { passive: true });
+    return release;
+  }, []);
+}
+
 function AssetDetails({ project, onChanged }: { project: Project; onChanged: () => void }) {
   const tNav = useTranslations('Navigation');
   const tAsset = useTranslations('Asset');
@@ -54,6 +79,7 @@ function AssetDetails({ project, onChanged }: { project: Project; onChanged: () 
   const saleState = saleStateOf(project, now);
   const carName = `${carTitle(project.car)} ${project.car.year ?? ''}`.trim();
   const openInvest = () => setIsInvestModalOpen(true);
+  useSectionFromHash();
   const refresh = () => {
     onChanged();
     refetchPosition();
@@ -82,12 +108,13 @@ function AssetDetails({ project, onChanged }: { project: Project; onChanged: () 
         <AssetHeader project={project} />
       </div>
 
-      {/* DOM order is the mobile order: photo, then the invest panel, then the details. */}
+      {/* DOM order is the mobile order: photo, then the invest panel, then the details. The
+          columns are min-w-0 so no line of text inside can widen its track past the page. */}
       <div className="mt-8 grid gap-10 md:mt-10 md:grid-cols-12 md:gap-x-6 md:gap-y-16 lg:gap-x-12">
-        <div className="md:col-span-7">
+        <div className="min-w-0 md:col-span-7">
           <AssetPhoto project={project} />
         </div>
-        <div className="md:col-span-5 md:col-start-8 md:row-start-1 lg:row-span-2">
+        <div className="min-w-0 md:col-span-5 md:col-start-8 md:row-start-1 lg:row-span-2">
           <div className="lg:sticky lg:top-24">
             <InvestPanel
               project={project}
@@ -100,7 +127,7 @@ function AssetDetails({ project, onChanged }: { project: Project; onChanged: () 
             />
           </div>
         </div>
-        <div className="flex flex-col gap-16 md:col-span-12 lg:col-span-7">
+        <div className="flex min-w-0 flex-col gap-16 md:col-span-12 lg:col-span-7">
           <StateTimeline project={project} saleState={saleState} />
           <div className="flex flex-col gap-4">
             <ProjectTerms project={project} />

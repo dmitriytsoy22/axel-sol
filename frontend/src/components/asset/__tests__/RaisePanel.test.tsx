@@ -2,7 +2,14 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { PublicKey, Transaction, type TransactionSignature } from '@solana/web3.js';
+import {
+  PublicKey,
+  Transaction,
+  type AccountInfo,
+  type Commitment,
+  type GetAccountInfoConfig,
+  type TransactionSignature,
+} from '@solana/web3.js';
 import { PROGRAM_ID } from '@/lib/solana/connection';
 import { escrowAddress, projectAddress } from '@/lib/solana/pda';
 import {
@@ -40,6 +47,35 @@ function withEscrowAmount(amount: bigint): FixtureAccount[] {
     data.writeBigUInt64LE(amount, 64);
     return { ...account, data: data.toString('base64') };
   });
+}
+
+/** A node whose escrow balance the test sets, and whose escrow reads it can hold back. */
+class EscrowNode extends FixtureConnection {
+  balance = 120_000_000_000n;
+  private held: Promise<void> = Promise.resolve();
+  private release = (): void => undefined;
+
+  holdEscrowReads(): void {
+    this.held = new Promise((resolve) => {
+      this.release = resolve;
+    });
+  }
+
+  releaseEscrowReads(): void {
+    this.release();
+  }
+
+  override async getAccountInfo(
+    publicKey: PublicKey,
+    commitment?: Commitment | GetAccountInfoConfig,
+  ): Promise<AccountInfo<Buffer> | null> {
+    const info = await super.getAccountInfo(publicKey, commitment);
+    if (info === null || !publicKey.equals(raiseEscrow)) return info;
+    await this.held;
+    const data = Buffer.from(info.data);
+    data.writeBigUInt64LE(this.balance, 64);
+    return { ...info, data };
+  }
 }
 
 describe('RaiseProgress', () => {
@@ -94,6 +130,36 @@ describe('EscrowBalance', () => {
     expect(
       await screen.findByText('Less than the 120,000 tKZT buyers paid in'),
     ).toBeInTheDocument();
+  });
+
+  it('holds a new purchase against the escrow only once the escrow is read again', async () => {
+    const connection = new EscrowNode();
+    const project = await fixtureProject('fundraising', connection);
+    const panel = (sharesSold: bigint) => (
+      <AppProviders connection={connection} wallet={testWallet(null)}>
+        <EscrowBalance project={{ ...project, sharesSold }} />
+      </AppProviders>
+    );
+    const { rerender } = render(panel(12n));
+    expect(
+      await screen.findByText('12 × 10,000 tKZT per share: exactly what buyers paid'),
+    ).toBeInTheDocument();
+
+    // One more share is bought; the page reads the sold count again before the escrow.
+    connection.balance = 130_000_000_000n;
+    connection.holdEscrowReads();
+    rerender(panel(13n));
+
+    expect(
+      screen.getByText('12 × 10,000 tKZT per share: exactly what buyers paid'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Less than/)).not.toBeInTheDocument();
+
+    connection.releaseEscrowReads();
+    expect(
+      await screen.findByText('13 × 10,000 tKZT per share: exactly what buyers paid'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('130,000 tKZT')).toBeInTheDocument();
   });
 });
 

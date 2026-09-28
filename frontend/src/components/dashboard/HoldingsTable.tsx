@@ -37,6 +37,29 @@ function CarThumb({ holding }: { holding: Holding }): JSX.Element {
   );
 }
 
+/**
+ * The car a row is about: thumbnail, name, year and share symbol, and where its project
+ * stands. The status sits under the name rather than beside it, so a long status such as
+ * "Жинау жүріп жатыр" never squeezes the name, and the table needs no column for it.
+ */
+function CarLink({ holding, href }: { holding: Holding; href: string }): JSX.Element {
+  const { car, status } = holding.project;
+  return (
+    <Link href={href} className="group inline-flex items-center gap-3 text-foreground">
+      <CarThumb holding={holding} />
+      <span className="min-w-0">
+        <span className="block break-words font-medium underline-offset-4 group-hover:underline">
+          {carTitle(car)}
+        </span>
+        <span className="block whitespace-nowrap font-mono text-small tabular-nums text-muted-foreground">
+          {[car.year, car.symbol].filter(Boolean).join(' · ')}
+        </span>
+        <ProjectStatusBadge status={status} className="mt-1.5" />
+      </span>
+    </Link>
+  );
+}
+
 /** What a holder can do with one car right now: claim, get a refund, or send shares. */
 function Actions({
   holding,
@@ -94,8 +117,6 @@ export function HoldingsTable({
       holding,
       key: project.address.toBase58(),
       href: `/assets/${project.shareMint.toBase58()}`,
-      name: carTitle(project.car),
-      detail: [project.car.year, project.car.symbol].filter(Boolean).join(' · '),
       shares: formatCount(position.shares, locale),
       part: t('ofCar', {
         percent: formatPercent(Number(position.shares), Number(project.totalShares), locale),
@@ -116,7 +137,7 @@ export function HoldingsTable({
       </h2>
 
       <div className="mt-6 overflow-hidden rounded-card border border-border bg-card shadow-sm">
-        <table className="hidden w-full text-left text-small md:table">
+        <table className="hidden w-full text-left text-small lg:table">
           <thead className="border-b border-border bg-muted text-muted-foreground">
             <tr>
               <th scope="col" className="py-3 pl-6 pr-4 font-medium">
@@ -131,9 +152,6 @@ export function HoldingsTable({
               <th scope="col" className="px-4 py-3 text-right font-medium">
                 {t('toClaim')}
               </th>
-              <th scope="col" className="px-4 py-3 font-medium">
-                {t('status')}
-              </th>
               <th scope="col" className="py-3 pl-4 pr-6 text-right font-medium">
                 <span className="sr-only">{t('actions')}</span>
               </th>
@@ -143,33 +161,17 @@ export function HoldingsTable({
             {rows.map((row) => (
               <tr key={row.key}>
                 <td className="py-3 pl-6 pr-4">
-                  <Link
-                    href={row.href}
-                    className="group inline-flex items-center gap-3 text-foreground"
-                  >
-                    <CarThumb holding={row.holding} />
-                    <span>
-                      <span className="block font-medium underline-offset-4 group-hover:underline">
-                        {row.name}
-                      </span>
-                      <span className="block font-mono tabular-nums text-muted-foreground">
-                        {row.detail}
-                      </span>
-                    </span>
-                  </Link>
+                  <CarLink holding={row.holding} href={row.href} />
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums">
+                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
                   <span className="block font-medium text-foreground">{row.shares}</span>
                   <span className="block text-muted-foreground">{row.part}</span>
                 </td>
-                <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">
+                <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-foreground">
                   {row.value}
                 </td>
-                <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">
+                <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-foreground">
                   {row.pending}
-                </td>
-                <td className="px-4 py-3">
-                  <ProjectStatusBadge status={row.holding.project.status} />
                 </td>
                 <td className="py-3 pl-4 pr-6">
                   <Actions holding={row.holding} onChanged={onChanged} onTransfer={onTransfer} />
@@ -179,32 +181,23 @@ export function HoldingsTable({
           </tbody>
         </table>
 
-        <ul className="divide-y divide-border md:hidden">
+        <ul className="divide-y divide-border lg:hidden">
           {rows.map((row) => (
             <li key={row.key} className="flex flex-col gap-3 px-5 py-4">
-              <Link href={row.href} className="flex items-center gap-3 text-foreground">
-                <CarThumb holding={row.holding} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{row.name}</span>
-                  <span className="block font-mono text-small text-muted-foreground">
-                    {row.detail}
-                  </span>
-                </span>
-                <ProjectStatusBadge status={row.holding.project.status} />
-              </Link>
-              <dl className="grid grid-cols-3 gap-2 text-small tabular-nums">
-                <div>
-                  <dt className="text-muted-foreground">{t('tokens')}</dt>
-                  <dd className="font-medium text-foreground">{row.shares}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">{t('value')}</dt>
-                  <dd className="font-medium text-foreground">{row.value}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">{t('toClaim')}</dt>
-                  <dd className="font-medium text-foreground">{row.pending}</dd>
-                </div>
+              <CarLink holding={row.holding} href={row.href} />
+              {/* A phone has no room for three amounts side by side: label and value rows,
+                  as the other tables do there, and three columns from sm. */}
+              <dl className="grid gap-2 text-small tabular-nums sm:grid-cols-3 sm:gap-4">
+                {[
+                  { label: t('tokens'), value: row.shares },
+                  { label: t('value'), value: row.value },
+                  { label: t('toClaim'), value: row.pending },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex items-baseline justify-between gap-4 sm:block">
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="whitespace-nowrap font-medium text-foreground">{value}</dd>
+                  </div>
+                ))}
               </dl>
               <Actions holding={row.holding} onChanged={onChanged} onTransfer={onTransfer} />
             </li>

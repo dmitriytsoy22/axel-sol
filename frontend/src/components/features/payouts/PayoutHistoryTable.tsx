@@ -23,7 +23,9 @@ interface PayoutView {
   symbol: string;
   index: number;
   final: boolean;
-  days: string;
+  /** First and last day of the period, as two lines in the table. */
+  from: string;
+  to: string;
   /** Sorts the rows; 0 when the block time is unknown. */
   depositedAt: number;
   date: string;
@@ -41,7 +43,8 @@ function toView(row: PayoutRow, locale: string): PayoutView {
     symbol: row.project.car.symbol,
     index: row.index,
     final: row.kind === 'final',
-    days: `${formatDay(row.periodStart, locale)} – ${formatDay(row.periodEnd, locale)}`,
+    from: formatDay(row.periodStart, locale),
+    to: formatDay(row.periodEnd, locale),
     depositedAt: row.depositedAt ?? 0,
     date: row.depositedAt === null ? '—' : formatDate(row.depositedAt, locale),
     net: row.net,
@@ -85,8 +88,13 @@ export function PayoutHistoryTable({
       },
       {
         header: t('tableDays'),
-        accessorKey: 'days',
-        cell: (item) => <span className="text-muted-foreground">{item.days}</span>,
+        accessorKey: 'from',
+        cell: (item) => (
+          <span className="flex flex-col text-muted-foreground">
+            <span>{item.from} –</span>
+            <span>{item.to}</span>
+          </span>
+        ),
       },
       {
         header: t('tableDate'),
@@ -130,7 +138,7 @@ export function PayoutHistoryTable({
             href={item.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center gap-1 font-medium text-primary underline-offset-4 transition-colors duration-fast ease-move hover:text-primary-hover hover:underline sm:min-h-0"
+            className="inline-flex min-h-11 items-center gap-1 font-medium text-primary underline-offset-4 transition-colors duration-fast ease-move hover:text-primary-hover hover:underline xl:min-h-0"
           >
             {t('viewRecord')}
             <ArrowUpRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
@@ -160,6 +168,8 @@ export function PayoutHistoryTable({
       data={data}
       columns={columns}
       pageSize={10}
+      // Seven columns of Russian amounts and dates need 1 160 px: the full container, from xl.
+      stackBelow="xl"
       emptyMessage={t('noPayouts')}
       labels={{
         page: t('page'),

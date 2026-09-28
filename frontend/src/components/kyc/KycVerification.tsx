@@ -9,6 +9,7 @@ import { Button, buttonClasses } from '@/components/ui/Button';
 import { Pill, type PillTone } from '@/components/ui/Pill';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
+import { useWalletConnecting } from '@/components/wallet/useWalletConnecting';
 import { useInvestorOf } from '@/hooks/useInvestor';
 import { useKycVerification, type KycFlow } from '@/hooks/useKycVerification';
 import { useUnixNow } from '@/hooks/useUnixNow';
@@ -222,7 +223,8 @@ export function KycVerification({
   loadSdk?: () => Promise<SumsubWebSdk>;
 }): JSX.Element {
   const t = useTranslations('Kyc');
-  const { publicKey, connected, connecting } = useWallet();
+  const { publicKey, connected } = useWallet();
+  const connecting = useWalletConnecting();
   const now = useUnixNow();
   const record = useInvestorOf(publicKey, { refreshMs: apiUrl ? RECORD_POLL_MS : undefined });
 

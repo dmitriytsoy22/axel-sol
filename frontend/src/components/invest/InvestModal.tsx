@@ -112,11 +112,13 @@ export function InvestModal({
               <p className="max-w-[36ch] text-center text-body text-muted-foreground">
                 {t('successBody', { count: Number(shares ?? 0n) })}
               </p>
+              {/* flex-1 only in the row: in the column a zero basis would squash the
+                  buttons to one line of text. */}
               <div className="flex w-full flex-col gap-3 sm:flex-row">
-                <Link href="/dashboard" className={buttonClasses({ className: 'flex-1' })}>
+                <Link href="/dashboard" className={buttonClasses({ className: 'sm:flex-1' })}>
                   {t('toPortfolio')}
                 </Link>
-                <Button variant="secondary" onClick={onClose} className="flex-1">
+                <Button variant="secondary" onClick={onClose} className="sm:flex-1">
                   {t('close')}
                 </Button>
               </div>

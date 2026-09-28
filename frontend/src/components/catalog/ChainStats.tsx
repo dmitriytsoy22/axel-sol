@@ -14,14 +14,16 @@ export function ChainStats({ projects, isLoading, error, onRetry }: CatalogFeed)
   const locale = useLocale();
   const stats = catalogStats(projects);
 
+  // `wide` figures are phrases or amounts rather than a count, and take a whole row on phones.
   const items = [
-    { label: t('statCars'), value: formatNumber(stats.vehicles, locale) },
+    { label: t('statCars'), value: formatNumber(stats.vehicles, locale), wide: false },
     {
       label: t('statShares'),
       value: t('ofTotal', {
         part: formatCount(stats.sharesSold, locale),
         whole: formatCount(stats.sharesTotal, locale),
       }),
+      wide: true,
     },
     {
       label: t('statSoldValue'),
@@ -30,8 +32,9 @@ export function ChainStats({ projects, isLoading, error, onRetry }: CatalogFeed)
         stats.soldValue.length > 0
           ? formatTokenTotals(stats.soldValue, locale)
           : formatNumber(0, locale),
+      wide: true,
     },
-    { label: t('statPayouts'), value: formatNumber(stats.deposits, locale) },
+    { label: t('statPayouts'), value: formatNumber(stats.deposits, locale), wide: false },
   ];
 
   const state = error ? 'error' : isLoading ? 'loading' : 'live';
@@ -58,17 +61,21 @@ export function ChainStats({ projects, isLoading, error, onRetry }: CatalogFeed)
       </div>
 
       {!error && (
+        /* Phones: the two counts share a row and the wide figures take one each (dense flow
+            fills the gap). From sm a 2 × 2 grid; from lg four ruled columns, each as wide as its
+            figure, since "7 709 ішінен 6 458" is many times "8". Digit groups are joined by
+            no-break spaces, so a figure that still runs out of room wraps between words only. */
         <dl
           aria-busy={isLoading}
-          className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4 md:gap-x-0"
+          className="mt-5 grid grid-flow-row-dense grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-[repeat(4,auto)] lg:gap-x-0"
         >
-          {items.map(({ label, value }) => (
+          {items.map(({ label, value, wide }) => (
             <div
               key={label}
-              className="flex flex-col-reverse justify-end gap-1 md:border-l md:border-foreground/15 md:px-6 md:first:border-l-0 md:first:pl-0"
+              className={`flex min-w-0 flex-col-reverse justify-end gap-1 lg:border-l lg:border-foreground/15 lg:px-6 lg:first:border-l-0 lg:first:pl-0 ${wide ? 'col-span-2 sm:col-span-1' : ''}`}
             >
               <dt className="text-small text-muted-foreground">{label}</dt>
-              <dd className="whitespace-nowrap text-title font-semibold tabular-nums text-foreground md:text-h4">
+              <dd className="text-balance break-words text-title font-semibold tabular-nums text-foreground md:text-h4">
                 {isLoading ? <Skeleton className="h-8 w-24" /> : value}
               </dd>
             </div>

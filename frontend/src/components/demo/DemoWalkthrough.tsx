@@ -23,6 +23,7 @@ import type { Project } from '@/types/project';
 import { saleStateOf } from '@/components/asset/saleState';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
+import { useWalletConnecting } from '@/components/wallet/useWalletConnecting';
 import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { Pill } from '@/components/ui/Pill';
@@ -239,6 +240,7 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
         {(progress.access !== 'done' || !demo.session) && (
           <Button
             variant={progress.access === 'done' ? 'secondary' : 'primary'}
+            wrap
             onClick={access}
             disabled={demo.busy !== null || (needsTurnstile && !turnstileToken)}
           >
@@ -280,6 +282,7 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
         {progress.shares !== 'done' && (
           <Button
             variant={progress.shares === 'current' ? 'primary' : 'secondary'}
+            wrap
             onClick={shares}
             disabled={demo.busy !== null || !verified || !demo.session}
           >
@@ -305,6 +308,7 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
         )}
         <Button
           variant={progress.simulate === 'current' ? 'primary' : 'secondary'}
+          wrap
           onClick={simulate}
           disabled={
             demo.busy !== null || progress.shares !== 'done' || !demo.session || cooldown !== null
@@ -336,6 +340,7 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
         {fleetHolding && fleetHolding.pending > 0n && (
           <Button
             variant={progress.claim === 'current' ? 'primary' : 'secondary'}
+            wrap
             onClick={claimFleet}
             disabled={
               claimStatus === 'preflight' ||
@@ -407,11 +412,23 @@ export function DemoWalkthrough({ api }: { api?: DemoApi }): JSX.Element {
   const t = useTranslations('DemoAccess');
   const tErrors = useTranslations('DemoErrors');
   const { connected } = useWallet();
+  const connecting = useWalletConnecting();
   const demo = useDemoAccess(api);
+
+  // One placeholder per step, so the page keeps its length when the steps arrive.
+  const loading = (
+    <div aria-busy="true" className="flex flex-col gap-4">
+      {Array.from({ length: 7 }, (_, i) => (
+        <Skeleton key={i} className="h-32 w-full rounded-card" />
+      ))}
+    </div>
+  );
 
   let body: React.ReactNode;
   if (!connected) {
-    body = (
+    body = connecting ? (
+      loading
+    ) : (
       <ConnectWalletPanel
         title={t('connectTitle')}
         body={t('connectBody', { network: NETWORK_NAME })}
@@ -434,12 +451,7 @@ export function DemoWalkthrough({ api }: { api?: DemoApi }): JSX.Element {
       />
     );
   } else if (!demo.status) {
-    body = (
-      <div aria-busy="true" className="flex flex-col gap-4">
-        <Skeleton className="h-32 w-full rounded-card" />
-        <Skeleton className="h-32 w-full rounded-card" />
-      </div>
-    );
+    body = loading;
   } else if (!demo.status.available && demo.status.code) {
     body = (
       <Notice
@@ -472,4 +484,3 @@ export function DemoWalkthrough({ api }: { api?: DemoApi }): JSX.Element {
     </>
   );
 }
-
