@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import type { Project } from '@/types/project';
 import { ProjectStatusBadge } from '@/components/catalog/ProjectStatusBadge';
 import { ExplorerLink } from '@/components/ui/ExplorerLink';
+import { Select } from '@/components/ui/Select';
 import { formatCount, formatNumber, formatTokenAmount } from '@/lib/format';
 import { outstandingShares } from '@/lib/solana/accounts';
 import { sharesValue } from '@/lib/solana/math';
@@ -64,18 +65,17 @@ export function AdminMetrics({ project, projects, onSelect }: AdminMetricsProps)
               className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1"
             >
               {t('selectCar')}
-              <select
+              <Select
                 id={selectId}
                 value={project.address.toBase58()}
                 onChange={(e) => onSelect(e.target.value)}
-                className="h-11 min-w-0 max-w-full rounded-control border border-border bg-card px-3 text-body text-foreground md:h-10 md:text-small"
               >
                 {projects.map((entry) => (
                   <option key={entry.address.toBase58()} value={entry.address.toBase58()}>
                     {carTitle(entry.car)} · {entry.car.symbol}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
           <span className="flex flex-wrap items-center gap-x-2">

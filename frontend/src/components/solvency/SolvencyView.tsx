@@ -47,9 +47,12 @@ function Check({
   links?: React.ReactNode;
 }): JSX.Element {
   const t = useTranslations('Solvency');
+  // Four columns need lg: at 768 they left 123 px per figure, which split "554 484,85 / tKZT"
+  // and stood the note up as a nine-line column. Between md and lg the title takes the row
+  // over "Holds" and "Owes", and the verdict keeps its column on the right.
   return (
-    <div className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,13rem)_1fr_1fr_9rem] md:items-start md:gap-6 md:px-6">
-      <div>
+    <div className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem] md:items-start md:gap-x-6 md:gap-y-3 md:px-6 lg:grid-cols-[minmax(0,13rem)_1fr_1fr_9rem] lg:gap-6">
+      <div className="md:col-span-2 lg:col-span-1">
         <p className="text-small font-medium text-foreground">{title}</p>
         <p className="mt-0.5 text-small text-muted-foreground">{rule}</p>
       </div>
@@ -62,7 +65,7 @@ function Check({
         <p className="text-body font-semibold tabular-nums text-foreground">{owes}</p>
         {note && <p className="mt-0.5 text-small text-muted-foreground">{note}</p>}
       </div>
-      <div className="flex flex-col items-start gap-1 md:items-end">
+      <div className="flex flex-col items-start gap-1 md:col-start-3 md:row-span-2 md:row-start-1 md:items-end lg:col-start-4 lg:row-span-1">
         {ok === null ? (
           <Pill tone="neutral">{t('notApplicable')}</Pill>
         ) : (
@@ -77,8 +80,9 @@ function Check({
 function ProjectLedger({ project, solvency }: Entry): JSX.Element {
   const t = useTranslations('Solvency');
   const locale = useLocale();
+  // The notes carry amounts inside sentences; a token never starts a line on its own.
   const amount = (value: bigint | null) =>
-    value === null ? '—' : formatTokenAmount(value, project.payment, locale);
+    value === null ? '—' : formatTokenAmount(value, project.payment, locale, 2, { keepUnit: true });
   const count = (value: bigint | null) => (value === null ? '—' : formatCount(value, locale));
   const link = (address: Project['revenueVault']) => (
     <ExplorerLink address={address.toBase58()} srLabel={t('openInExplorer')} />
@@ -94,8 +98,11 @@ function ProjectLedger({ project, solvency }: Entry): JSX.Element {
       {/* A car that fails opens by itself; the ones that pass stay folded to their verdict.
           The card clips its corners, so the row's focus ring is drawn inside it, on its curve. */}
       <details open={!solvency.ok} className="group">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 rounded-[calc(var(--radius)-1px)] bg-muted px-5 py-4 focus-visible:outline-offset-[-2px] group-open:rounded-b-none group-open:border-b group-open:border-border md:px-6 [&::-webkit-details-marker]:hidden">
-          <div className="min-w-0">
+        {/* The car takes the first row below md; its pills and the chevron share the next, the
+            chevron in a column of its own at the right edge, so it never drops to a line alone
+            or moves with the pills' width. From md all three share one row. */}
+        <summary className="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[calc(var(--radius)-1px)] bg-muted px-5 py-4 focus-visible:outline-offset-[-2px] group-open:rounded-b-none group-open:border-b group-open:border-border md:grid-cols-[minmax(0,1fr)_auto_auto] md:px-6 [&::-webkit-details-marker]:hidden">
+          <div className="col-span-2 min-w-0 md:col-span-1">
             <h3 className="text-title font-semibold text-foreground">
               {carTitle(project.car)}{' '}
               <span className="tabular-nums text-muted-foreground">{project.car.year}</span>
@@ -107,12 +114,12 @@ function ProjectLedger({ project, solvency }: Entry): JSX.Element {
             <Pill tone={solvency.ok ? 'success' : 'danger'}>
               {t(solvency.ok ? 'carPasses' : 'carFails')}
             </Pill>
-            <ChevronDown
-              aria-hidden="true"
-              className="h-5 w-5 text-muted-foreground transition-transform duration-fast ease-move group-open:rotate-180 motion-reduce:transition-none"
-              strokeWidth={1.75}
-            />
           </div>
+          <ChevronDown
+            aria-hidden="true"
+            className="h-5 w-5 text-muted-foreground transition-transform duration-fast ease-move group-open:rotate-180 motion-reduce:transition-none"
+            strokeWidth={1.75}
+          />
         </summary>
         <div className="divide-y divide-border">
           <Check

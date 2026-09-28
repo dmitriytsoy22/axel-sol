@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonClasses } from '@/components/ui/Button';
 import { ExplorerLink } from '@/components/ui/ExplorerLink';
 import { Pill, type PillTone } from '@/components/ui/Pill';
 import { useTransactionSender } from '@/hooks/useTransactionSender';
@@ -79,7 +79,7 @@ const BACKEND_TITLE: Record<number, string> = {
 };
 
 /** An item's fields share a row from md, the remove button in a column of its own width. */
-const EXPENSE_COLUMNS = 'md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)_3.5rem]';
+const EXPENSE_COLUMNS = 'md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)_3rem]';
 
 const EXPENSE_FIELDS = [
   { field: 'description', label: 'itemDescription', mono: false },
@@ -114,12 +114,14 @@ function ExpenseList({
           <span key={field}>{t(label)}</span>
         ))}
       </div>
+      {/* Below md an item's fields stack, so each item is a bordered group that ends in a
+          worded remove button; from md it is one row with an icon button as tall as its fields. */}
       {items.map((item, index) => (
         <div
           key={index}
           role="group"
           aria-label={t('itemLabel', { list: legend, number: index + 1 })}
-          className={`grid gap-3 md:items-center md:gap-2 ${EXPENSE_COLUMNS}`}
+          className={`grid gap-3 rounded-control border border-border p-4 md:items-center md:gap-2 md:rounded-none md:border-0 md:p-0 ${EXPENSE_COLUMNS}`}
         >
           {EXPENSE_FIELDS.map(({ field, label, mono }) => (
             <div key={field} className="flex flex-col gap-1.5">
@@ -141,7 +143,8 @@ function ExpenseList({
           ))}
           <Button
             variant="ghost"
-            aria-label={t('removeItem')}
+            size="sm"
+            className="justify-self-end md:h-12 md:w-12 md:px-0"
             onClick={() =>
               onChange(
                 items.length > 1 ? items.filter((_, i) => i !== index) : [{ ...EMPTY_EXPENSE }],
@@ -149,6 +152,7 @@ function ExpenseList({
             }
           >
             <Trash2 aria-hidden="true" strokeWidth={1.75} />
+            <span className="md:sr-only">{t('removeItem')}</span>
           </Button>
         </div>
       ))}
@@ -174,11 +178,13 @@ function Row({
   children: React.ReactNode;
   strong?: boolean;
 }) {
+  // As in the operator's panel: the figure keeps its line ("187 654,32 / tKZT" split at 320)
+  // and the label wraps, or the figure takes the next line where the label's words can't.
   return (
-    <div className="flex items-baseline justify-between gap-4 py-2">
-      <dt className="text-small text-muted-foreground">{label}</dt>
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2">
+      <dt className="flex-1 text-small text-muted-foreground">{label}</dt>
       <dd
-        className={`text-right tabular-nums text-foreground ${strong ? 'text-body font-semibold' : 'text-small font-medium'}`}
+        className={`ml-auto shrink-0 whitespace-nowrap text-right tabular-nums text-foreground ${strong ? 'text-body font-semibold' : 'text-small font-medium'}`}
       >
         {children}
       </dd>
@@ -231,11 +237,11 @@ function DraftReview({
         <Row label={t('rent', { days: report.income.days_active, total: report.period.days })}>
           {tenge(report.income.rent)}
         </Row>
-        <Row label={t('tripsKm')}>
-          {t('tripsKmValue', {
-            trips: formatNumber(report.income.trips, locale),
-            km: formatNumber(report.income.km, locale),
-          })}
+        {/* A bare count needs no agreement: "361 поездок" read wrong, and ICU's "#" writes
+            "1,250" for Kazakh in Chrome. */}
+        <Row label={t('trips')}>{formatNumber(report.income.trips, locale)}</Row>
+        <Row label={t('distance')}>
+          {t('distanceValue', { km: formatNumber(report.income.km, locale) })}
         </Row>
         <Row label={t('parkFee', { rate: formatBps(report.expenses.park_fee.bps, locale) })}>
           −{tenge(report.expenses.park_fee.amount)}
@@ -455,23 +461,35 @@ export function DepositDraftPanel({
           </p>
         )}
         <div className="flex flex-col gap-2">
-          <label
-            htmlFor={`${formId}-file`}
-            className="inline-flex items-center gap-2 text-small font-medium text-foreground"
-          >
-            <FileUp aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
-            {t('loadFile')}
-          </label>
-          <input
-            id={`${formId}-file`}
-            type="file"
-            accept="application/json,.json"
-            onChange={(e) => {
-              void load(e.target.files?.[0]);
-              e.target.value = '';
-            }}
-            className="text-small text-muted-foreground file:mr-3 file:h-10 file:cursor-pointer file:rounded-control file:border file:border-border file:bg-card file:px-4 file:text-small file:font-medium file:text-foreground"
-          />
+          {/* The browser's own file control spoke its language ("Choose File", "no file
+              selected") inside a Russian form; the input stays for the picker and the keyboard,
+              and its label is the button. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <input
+              id={`${formId}-file`}
+              type="file"
+              accept="application/json,.json"
+              onChange={(e) => {
+                void load(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+              className="peer sr-only"
+            />
+            <label
+              htmlFor={`${formId}-file`}
+              className={buttonClasses({
+                variant: 'outline',
+                size: 'sm',
+                wrap: true,
+                className:
+                  'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring',
+              })}
+            >
+              <FileUp aria-hidden="true" strokeWidth={1.75} />
+              {t('loadFile')}
+            </label>
+            {!file && <span className="text-small text-muted-foreground">{t('noFile')}</span>}
+          </div>
           {file?.problem && (
             <p role="alert" className="text-small text-destructive">
               {t(`file_${file.problem}`, { name: file.name })}

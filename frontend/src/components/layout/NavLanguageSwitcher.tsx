@@ -60,7 +60,7 @@ export const NavLanguageSwitcher = (): JSX.Element => {
       {open && (
         <ul
           id={menuId}
-          className="absolute right-0 top-full z-dropdown mt-2 w-44 animate-slide-down rounded-card border border-border bg-popover p-1 text-popover-foreground shadow-md"
+          className="absolute right-0 top-full z-dropdown mt-2 w-44 animate-slide-down rounded-card border border-border bg-popover p-1 text-popover-foreground shadow-md motion-reduce:animate-none"
         >
           {LOCALE_OPTIONS.map(({ code, label }) => (
             <li key={code}>

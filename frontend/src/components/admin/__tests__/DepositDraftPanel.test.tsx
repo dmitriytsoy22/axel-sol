@@ -370,6 +370,21 @@ describe('DepositDraftPanel', () => {
     expect(alert).toHaveTextContent('totals.distributable');
   });
 
+  it("shows the month's trips as a bare count, which needs no plural", async () => {
+    const car = await operatedCar();
+    const september = septemberReport(car.project);
+    const report = { ...september, income: { ...september.income, trips: 1 } };
+    fetchMock.mockResolvedValue(json(await draftOf(car, { report })));
+    renderPanel(car);
+
+    await fillSeptember();
+    await userEvent.click(screen.getByRole('button', { name: 'Request the deposit' }));
+
+    const trips = (await screen.findByText('Trips')).closest('div');
+    expect(trips).toHaveTextContent(/^Trips1$/);
+    expect(screen.getByText('Distance').closest('div')).toHaveTextContent(/^Distance3,890 km$/);
+  });
+
   it('asks for the period before it asks the backend', async () => {
     const car = await operatedCar();
     renderPanel(car);

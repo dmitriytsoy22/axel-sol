@@ -218,18 +218,24 @@ between the lines, whenever the label wrapped.
   flag, content is plainly visible. This avoids the framer-motion `useInView` bug that leaves
   content at opacity 0 in WKWebView. No scroll-triggered animation, no framer-motion reveals.
 - No count-up tickers on money: financial numbers appear exact and static.
-- Linear easing only for the skeleton shimmer. `prefers-reduced-motion` turns reveals off.
+- Linear easing only for the skeleton shimmer. `prefers-reduced-motion` turns reveals off, and
+  every entrance animation with them: the language and wallet menus open without their slide,
+  the mobile menu and modals without their fade, toasts without their slide
+  (`motion-reduce:animate-none` next to each `animate-*`).
 
 ### Mobile rules
 
-- Breakpoints: Tailwind sm 640, md 768 and lg 1024, `min-width` only. Three local exceptions:
+- Breakpoints: Tailwind sm 640, md 768 and lg 1024, `min-width` only. Four local exceptions:
   the asset page's bottom bar hides its price below 360 px (`min-[360px]`), since at 320 px
   the 48 px button needs the whole row; the payout calculator's results share a row only from
-  360 px, since half its card at 320 px is narrower than "18,000,000" at `text-title`; and the
+  360 px, since half its card at 320 px is narrower than "18,000,000" at `text-title`; a page
+  title is `text-h2` only from 360 px, since 272 px holds 12 letters of the 40 px serif, less
+  than "Инвесторларды", and neither engine hyphenates Kazakh; and the
   payouts ledger is a table only from `xl` (1280 px), since its seven columns of Russian
   amounts and dates need the full 1200 px container.
 - Type steps down one level below `md`: hero `text-h2` (40) instead of `text-display`, section
-  headings `text-h3` (32) instead of `text-h2`.
+  headings `text-h3` (32) instead of `text-h2`, page titles (`layout/PageHeader`) `text-h2`
+  instead of `text-h1`, and `text-h3` below 360 px.
 - Sections: 56 px vertical padding, 24 px gutters.
 - Hero: art-directed photo, `hero/almaty-night-traffic-portrait.webp` below `md`.
 - Tables become stacked rows of label and value: the holdings table below `lg`, the payouts
@@ -366,11 +372,16 @@ product rule, never a placeholder.
   time of the last check → a verdict panel (green, or red naming how many cars fail) → three
   ruled totals (income vaults, owed to holders now, raise escrows) → "What is checked", four
   numbered rule cards → one card per car, failing cars first and open, passing cars folded
-  into a `<details>` whose summary is the car, its state and a "Passes" pill. An open card
+  into a `<details>` whose summary is the car, its state and a "Passes" pill. The summary's
+  chevron has a column of its own at the right edge; below `md` the car takes the first row
+  and the pills the next, beside the chevron. An open card
   has four rows (income vault, raise escrow, shares, revenue checkpoints), each with the rule
-  in words, "Holds" and "Owes" figures, a pill and the account link. An income vault that
-  holds less than it owes names the shortfall as a positive amount instead of a negative
-  "surplus". It reads again every 30 s while the tab is visible.
+  in words, "Holds" and "Owes" figures, a pill and the account link: four columns from `lg`;
+  between `md` and `lg` the rule takes the row over the two figures and the verdict keeps a
+  9rem column, since four columns at 768 px left 123 px per figure. Amounts there keep their
+  token on their line, in the notes' sentences too (`formatTokenAmount`'s `keepUnit`). An
+  income vault that holds less than it owes names the shortfall as a positive amount instead
+  of a negative "surplus". It reads again every 30 s while the tab is visible.
 - **Console by role (frontend stage 2):** a paper strip under the bar says which wallet is
   signed in and, for a wallet with several keys, switches roles with a segmented control
   (`role="tablist"`). Platform admin: the ink car header, then car status, operator and
@@ -384,9 +395,18 @@ product rule, never a placeholder.
   inside its column. Irreversible confirmations and the recovery list name the car with its
   share symbol (decision 34). Each recovery field says under itself what is wrong with it
   (`aria-invalid`, `aria-describedby`), and the release step's hash rule turns red with an
-  invalid hash. The operator's expense rows have labels, not placeholders: column heads from
-  `md`, a label over each field below it. In the draft review, the checks' icons keep their
-  16 px and sit on the first line of a sentence that wraps.
+  invalid hash. The car-status actions keep their own width, like the other console forms; the
+  hash field and an open confirmation take the row. The operator's figures keep their line
+  (an amount never leaves "tKZT" on a line of its own): the label wraps beside them, and where
+  even its longest word can't fit, the figure takes the next line. The report file is picked
+  with a translated outline button and "No file chosen" beside it, since the browser's own
+  control spoke its language inside a Russian form. The operator's expense rows have labels,
+  not placeholders: column heads from `md`, a label over each field below it; below `md` each
+  item is a bordered group that ends in a worded "Remove this item", from `md` one row with a
+  48 px icon button as tall as its fields. In the draft review, trips and distance are two
+  rows of bare figures, since "361 поездок" needs a plural and ICU's "#" writes "1,250" for
+  Kazakh in Chrome; the checks' icons keep their 16 px and sit on the first line of a
+  sentence that wraps.
 - **Judge demo (`/demo`, frontend stage 3):** page header (overline "Judge demo · Solana devnet",
   serif H1, lead) → an ordered list of seven step cards (number in a circle, `text-title` heading,
   one explaining paragraph, then the step's action): get demo access, buy in an open raise (the
@@ -410,7 +430,9 @@ product rule, never a placeholder.
 - **Shared states:** `ui/Notice` (empty, error, not found), `wallet/ConnectWalletPanel`
   (disconnected), `ui/SummaryStats` (ruled figures with placeholders), `ui/Pill` (status dot +
   word; `Badge` maps project status onto it; `wrap` lets a sentence-long result wrap in
-  balanced lines with the dot on the first), `layout/PageHeader`. An address no page answers
+  balanced lines with the dot on the first), `layout/PageHeader`, `ui/Select` (a native select
+  with the browser's arrow replaced by one chevron, so Safari and Chrome draw the fleet
+  filters and the console's car picker alike). An address no page answers
   gets a localized "Page not found" notice inside the header and footer
   (`app/[locale]/not-found.tsx`, reached through `app/[locale]/[...rest]`); addresses the i18n
   middleware never sees get an English one (`app/not-found.tsx`). Modal is a paper dialog and a

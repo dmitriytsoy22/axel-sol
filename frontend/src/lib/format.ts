@@ -47,6 +47,12 @@ export interface TokenAmountOptions {
   padFraction?: boolean;
   /** False for a column whose header already names the token. */
   withSymbol?: boolean;
+  /**
+   * Joins the symbol with a no-break space, for an amount inside a sentence, where "сейчас:
+   * 0 / tKZT" left the token alone on the next line. Off by default: a card's narrow price
+   * wraps before its token rather than inside a word.
+   */
+  keepUnit?: boolean;
 }
 
 /**
@@ -60,7 +66,7 @@ export function formatTokenAmount(
   unit: TokenUnit,
   locale: string,
   maxFractionDigits = 2,
-  { padFraction = false, withSymbol = true }: TokenAmountOptions = {},
+  { padFraction = false, withSymbol = true, keepUnit = false }: TokenAmountOptions = {},
 ): string {
   // BigInt division and remainder keep the sign, so the digits are cut from the magnitude.
   const magnitude = amount < 0n ? -amount : amount;
@@ -75,7 +81,8 @@ export function formatTokenAmount(
   const sign = amount < 0n && (whole > 0n || /[1-9]/.test(cut)) ? part(-1, 'minusSign', '-') : '';
   const decimals = fraction ? `${part(1.5, 'decimal', '.')}${fraction}` : '';
   const text = `${sign}${format.format(whole)}${decimals}`;
-  return withSymbol ? `${text} ${unit.symbol}` : text;
+  if (!withSymbol) return text;
+  return `${text}${keepUnit ? '\u00a0' : ' '}${unit.symbol}`;
 }
 
 /** Amounts in several tokens, one per token: "1,250 tKZT · 10 USDC". */

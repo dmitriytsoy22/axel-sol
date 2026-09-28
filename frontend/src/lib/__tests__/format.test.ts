@@ -58,6 +58,14 @@ describe('formatTokenAmount', () => {
     expect(formatTokenAmount(1_250_500_000n, TKZT, 'en', 2, { withSymbol: false })).toBe('1,250.5');
   });
 
+  it('can glue the symbol to the amount, so a sentence never leaves the token on a line alone', () => {
+    expect(formatTokenAmount(0n, TKZT, 'ru', 2, { keepUnit: true })).toBe(`0${NBSP}tKZT`);
+    expect(formatTokenAmount(554_484_850_000n, TKZT, 'ru', 2, { keepUnit: true })).toBe(
+      `554${NBSP}484,85${NBSP}tKZT`,
+    );
+    expect(formatTokenAmount(10_000_000_000n, TKZT, 'en')).toBe('10,000 tKZT');
+  });
+
   it('stays exact beyond the precision of a JavaScript number', () => {
     expect(formatTokenAmount(18_446_744_073_709_551_615n, { decimals: 0, symbol: 'X' }, 'en')).toBe(
       '18,446,744,073,709,551,615 X',

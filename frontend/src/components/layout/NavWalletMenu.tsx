@@ -97,7 +97,7 @@ export const NavWalletMenu = (): JSX.Element => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-dropdown mt-2 w-72 animate-slide-down rounded-card border border-border bg-popover p-2 text-popover-foreground shadow-md">
+        <div className="absolute right-0 top-full z-dropdown mt-2 w-72 animate-slide-down rounded-card border border-border bg-popover p-2 text-popover-foreground shadow-md motion-reduce:animate-none">
           <p className="break-all px-2 pb-2 pt-1 font-mono text-small text-muted-foreground">
             {publicKey}
           </p>

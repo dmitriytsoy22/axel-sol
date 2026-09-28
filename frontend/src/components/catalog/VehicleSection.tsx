@@ -6,6 +6,7 @@ import { Camera, RotateCw } from 'lucide-react';
 import { PROJECT_STATUSES, type ProjectStatus } from '@/lib/solana/accounts';
 import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
+import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatNumber } from '@/lib/format';
 import { NETWORK_NAME } from '@/lib/network';
@@ -20,9 +21,6 @@ type Filter = ProjectStatus | 'all';
 function distinct(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
-
-const selectClass =
-  'h-11 rounded-control border border-input bg-card px-3 text-body text-foreground transition-colors duration-fast ease-move focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 md:h-10 md:text-small';
 
 function CardSkeleton(): JSX.Element {
   return (
@@ -141,11 +139,10 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
                   className="flex items-center gap-2 text-small text-muted-foreground"
                 >
                   {t('filterCity')}
-                  <select
+                  <Select
                     id={`${selectId}-city`}
                     value={activeCity}
                     onChange={(e) => setCity(e.target.value)}
-                    className={selectClass}
                   >
                     <option value="">{t('filterAll')}</option>
                     {cities.map((value) => (
@@ -153,7 +150,7 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
                         {labels.city(value)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
               )}
               {classes.length > 1 && (
@@ -162,11 +159,10 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
                   className="flex items-center gap-2 text-small text-muted-foreground"
                 >
                   {t('filterClass')}
-                  <select
+                  <Select
                     id={`${selectId}-class`}
                     value={activeClass}
                     onChange={(e) => setCarClass(e.target.value)}
-                    className={selectClass}
                   >
                     <option value="">{t('filterAll')}</option>
                     {classes.map((value) => (
@@ -174,7 +170,7 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
                         {labels.carClass(value)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
               )}
             </div>

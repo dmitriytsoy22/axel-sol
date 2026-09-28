@@ -129,7 +129,7 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
           {project.status === 'fundraising' ? t('investBtn') : t('viewBtn')}
           <ArrowRight
             aria-hidden="true"
-            className="h-4 w-4 transition-transform duration-fast ease-move group-hover:translate-x-0.5"
+            className="h-4 w-4 transition-transform duration-fast ease-move group-hover:translate-x-0.5 motion-reduce:transition-none"
             strokeWidth={1.75}
           />
         </span>

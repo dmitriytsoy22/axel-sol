@@ -131,7 +131,7 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
           role="dialog"
           aria-modal="true"
           aria-label={tNav('main')}
-          className="fixed inset-x-0 bottom-0 top-16 z-sticky flex animate-fade-in flex-col overflow-y-auto border-t border-border bg-background md:hidden"
+          className="fixed inset-x-0 bottom-0 top-16 z-sticky flex animate-fade-in flex-col overflow-y-auto border-t border-border bg-background motion-reduce:animate-none md:hidden"
         >
           <nav aria-label={tNav('main')} className="page-container flex flex-col pt-4">
             {NAV_LINKS.map(({ href, labelKey }) => (

@@ -8,11 +8,16 @@ import { useVaultBalances } from '@/hooks/useVaultBalances';
 import { formatNumber, formatTokenAmount } from '@/lib/format';
 import type { Project } from '@/types/project';
 
+/* An amount or a key keeps its line and the label wraps beside it: a Russian label pushed
+   "tKZT" onto a line of its own. Where even the label's longest word doesn't fit beside the
+   value ("держателям" beside "1 127 744,05 tKZT" at 320), the value takes the next line. */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-11 items-center justify-between gap-4 py-2">
-      <dt className="text-small text-muted-foreground">{label}</dt>
-      <dd className="text-right text-small font-medium tabular-nums text-foreground">{children}</dd>
+    <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
+      <dt className="flex-1 text-small text-muted-foreground">{label}</dt>
+      <dd className="ml-auto shrink-0 whitespace-nowrap text-right text-small font-medium tabular-nums text-foreground">
+        {children}
+      </dd>
     </div>
   );
 }

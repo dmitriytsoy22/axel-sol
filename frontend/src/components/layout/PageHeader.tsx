@@ -14,7 +14,9 @@ export function PageHeader({ overline, title, lead, children }: PageHeaderProps)
     <header className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
       <div className="max-w-[65ch]">
         <p className="text-overline uppercase text-muted-foreground">{overline}</p>
-        <h1 className="mt-3 font-heading text-h2 font-medium text-foreground md:text-h1">
+        {/* 272 px at 320 holds 12 letters of the 40 px serif, less than "Инвесторларды", and
+            neither engine hyphenates Kazakh, so the narrowest phones get one step less. */}
+        <h1 className="mt-3 font-heading text-h3 font-medium text-foreground min-[360px]:text-h2 md:text-h1">
           {title}
         </h1>
         {lead && <p className="mt-4 text-lead text-muted-foreground">{lead}</p>}

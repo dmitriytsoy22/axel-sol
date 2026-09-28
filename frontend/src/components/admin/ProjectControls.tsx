@@ -35,7 +35,9 @@ function Step({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 py-6 first:pt-0 last:pb-0">
+    // Buttons keep their own width, like the console's other forms; the hash field and an
+    // open confirmation still take the row.
+    <div className="flex flex-col items-start gap-3 py-6 first:pt-0 last:pb-0">
       <div>
         <h3 className="text-body font-semibold text-foreground">{title}</h3>
         <p className="mt-1 text-small text-muted-foreground">{body}</p>
@@ -79,7 +81,7 @@ export function ProjectControls({ project, treasury, onChanged }: ProjectControl
     <div
       role="alertdialog"
       aria-labelledby={`${titleId}-${action}`}
-      className="rounded-control border border-destructive/40 bg-destructive-muted p-4"
+      className="self-stretch rounded-control border border-destructive/40 bg-destructive-muted p-4"
     >
       <p id={`${titleId}-${action}`} className="text-small font-medium text-foreground">
         {prompt}
