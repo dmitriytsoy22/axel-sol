@@ -34,7 +34,7 @@ export function ProjectTerms({ project }: ProjectTermsProps): JSX.Element {
 
   return (
     <section aria-labelledby="terms-title">
-      <h2 id="terms-title" className="scroll-mt-24 text-h4 font-semibold text-foreground">
+      <h2 id="terms-title" className="scroll-mt-8 text-h4 font-semibold text-foreground">
         {t('termsTitle')}
       </h2>
       <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">{t('termsLead')}</p>

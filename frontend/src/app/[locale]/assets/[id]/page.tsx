@@ -205,5 +205,12 @@ export default function AssetDetailsPage(): JSX.Element {
     );
   }
 
-  return <div className="page-container pb-32 pt-6 md:pb-24 md:pt-8">{content}</div>;
+  // Until the car is on the page, the page holds at least a screen's height, so the footer
+  // stays below the fold: the skeleton giving way to the car, or to a short notice for an
+  // address that is no car, moves nothing the reader can see.
+  return (
+    <div className={`page-container pb-32 pt-6 md:pb-24 md:pt-8 ${project ? '' : 'min-h-screen'}`}>
+      {content}
+    </div>
+  );
 }

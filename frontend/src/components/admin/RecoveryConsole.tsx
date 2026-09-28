@@ -89,24 +89,12 @@ function PendingRequest({
 }
 
 /**
- * Share recovery for a holder who lost a wallet: the admin proposes moving the shares to the
- * same holder's new verified wallet, the old wallet can veto during the config's delay, and
- * then anyone can run it. The pending list covers every car.
+ * A new proposal for one car. It holds what the admin typed about one holder of that car, so
+ * the console renders it keyed by the car: a switch to another car starts it empty.
  */
-export function RecoveryConsole({
-  project,
-  projects,
-  recoveryDelay,
-}: {
-  /** The car a new proposal is for. */
-  project: Project;
-  projects: Project[];
-  recoveryDelay: number;
-}): JSX.Element {
+function ProposalForm({ project, onProposed }: { project: Project; onProposed: () => void }) {
   const t = useTranslations('Recovery');
-  const tCommon = useTranslations('Common');
   const formId = useId();
-  const { requests, refetch } = useRecoveryRequests('all');
   const { propose } = useRecoveryActions();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -123,7 +111,6 @@ export function RecoveryConsole({
   else if (shares.trim() && (count === null || count === 0n)) problem = t('wholeShares');
   else if (hash.trim() && !HASH_HEX.test(hash.trim())) problem = t('badHash');
   const ready = Boolean(fromKey && toKey && count && HASH_HEX.test(hash.trim()) && !problem);
-  const delay = durationParts(recoveryDelay);
 
   const submit = async () => {
     if (!fromKey || !toKey || !count) return;
@@ -141,7 +128,7 @@ export function RecoveryConsole({
       setTo('');
       setShares('');
       setHash('');
-      refetch();
+      onProposed();
     }
   };
 
@@ -170,11 +157,54 @@ export function RecoveryConsole({
   );
 
   return (
+    <div className="mt-6 grid gap-5 md:grid-cols-2">
+      {field('from', t('fromLabel'), from, setFrom)}
+      {field('to', t('toLabel'), to, setTo)}
+      {field('shares', t('sharesLabel'), shares, setShares, false)}
+      {field('hash', t('hashLabel'), hash, setHash)}
+      <div className="flex flex-col gap-2 md:col-span-2">
+        {problem && (
+          <p role="alert" className="text-small text-destructive">
+            {problem}
+          </p>
+        )}
+        <Button variant="outline" onClick={submit} disabled={!ready || busy} className="self-start">
+          {busy && <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />}
+          {t('propose')}
+        </Button>
+        <p className="text-small text-muted-foreground">{t('proposeHint')}</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Share recovery for a holder who lost a wallet: the admin proposes moving the shares to the
+ * same holder's new verified wallet, the old wallet can veto during the config's delay, and
+ * then anyone can run it. The pending list covers every car.
+ */
+export function RecoveryConsole({
+  project,
+  projects,
+  recoveryDelay,
+}: {
+  /** The car a new proposal is for. */
+  project: Project;
+  projects: Project[];
+  recoveryDelay: number;
+}): JSX.Element {
+  const t = useTranslations('Recovery');
+  const tCommon = useTranslations('Common');
+  const titleId = useId();
+  const { requests, refetch } = useRecoveryRequests('all');
+  const delay = durationParts(recoveryDelay);
+
+  return (
     <section
-      aria-labelledby={`${formId}-title`}
+      aria-labelledby={titleId}
       className="rounded-card border border-border bg-card p-6 shadow-sm md:p-8"
     >
-      <h2 id={`${formId}-title`} className="text-title font-semibold text-foreground">
+      <h2 id={titleId} className="text-title font-semibold text-foreground">
         {t('consoleTitle')}
       </h2>
       <p className="mt-2 max-w-[62ch] text-body text-muted-foreground">
@@ -184,29 +214,7 @@ export function RecoveryConsole({
         })}
       </p>
 
-      <div className="mt-6 grid gap-5 md:grid-cols-2">
-        {field('from', t('fromLabel'), from, setFrom)}
-        {field('to', t('toLabel'), to, setTo)}
-        {field('shares', t('sharesLabel'), shares, setShares, false)}
-        {field('hash', t('hashLabel'), hash, setHash)}
-        <div className="flex flex-col gap-2 md:col-span-2">
-          {problem && (
-            <p role="alert" className="text-small text-destructive">
-              {problem}
-            </p>
-          )}
-          <Button
-            variant="outline"
-            onClick={submit}
-            disabled={!ready || busy}
-            className="self-start"
-          >
-            {busy && <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />}
-            {t('propose')}
-          </Button>
-          <p className="text-small text-muted-foreground">{t('proposeHint')}</p>
-        </div>
-      </div>
+      <ProposalForm key={project.address.toBase58()} project={project} onProposed={refetch} />
 
       <div className="mt-8 border-t border-border pt-6">
         <h3 className="text-body font-semibold text-foreground">

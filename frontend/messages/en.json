@@ -152,6 +152,10 @@
     "calcEmpty": "Enter a monthly payout to see your part.",
     "calcAssumption": "Assumes all {total} shares are sold. The program splits each payout across the shares that exist at that moment, so while fewer are sold, each share gets more.",
     "raiseClosesIn": "Raise closes {date}",
+    "timerUnit_days": "d",
+    "timerUnit_hours": "h",
+    "timerUnit_minutes": "m",
+    "timerUnit_seconds": "s",
     "raiseEnded": "Raise ended",
     "raiseFunded": "Fully funded",
     "raiseComplete": "Raise complete",
@@ -1107,5 +1111,26 @@
     "attestorChecked": "Checked in this browser: a valid signature of this car's oracle on exactly this deposit.",
     "expiryNote": "The oracle signed a transaction that can land until block {height}, about a minute from now. If it expires, request the deposit again.",
     "file_unreadable": "Couldn't read {name}."
+  },
+  "NotFound": {
+    "title": "Page not found",
+    "body": "There's nothing at this address. It may have a typo, or the page may have moved.",
+    "action": "See all cars"
+  },
+  "WalletPicker": {
+    "title": "Connect a Solana wallet",
+    "noWalletTitle": "You need a Solana wallet",
+    "noWalletBody": "Install one of these wallets in your browser or on your phone, then come back to this page.",
+    "detected": "Installed",
+    "otherWallets": "Other wallets",
+    "close": "Close"
+  },
+  "CarMetadata": {
+    "city_almaty": "Almaty",
+    "city_astana": "Astana",
+    "city_shymkent": "Shymkent",
+    "class_economy": "Economy",
+    "class_comfort": "Comfort",
+    "class_comfort_plus": "Comfort+"
   }
 }

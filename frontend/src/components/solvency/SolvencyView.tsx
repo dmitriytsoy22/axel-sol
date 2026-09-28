@@ -87,7 +87,7 @@ function ProjectLedger({ project, solvency }: Entry): JSX.Element {
   return (
     <li
       id={mint}
-      className="scroll-mt-24 overflow-hidden rounded-card border border-border bg-card shadow-sm"
+      className="scroll-mt-8 overflow-hidden rounded-card border border-border bg-card shadow-sm"
     >
       {/* A car that fails opens by itself; the ones that pass stay folded to their verdict. */}
       <details open={!solvency.ok} className="group">
@@ -153,7 +153,7 @@ function ProjectLedger({ project, solvency }: Entry): JSX.Element {
         <div className="border-t border-border px-5 py-3 md:px-6">
           <Link
             href={`/assets/${mint}`}
-            className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 hover:underline md:min-h-0"
+            className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 hover:underline lg:min-h-0"
           >
             {t('viewCar', { car: carTitle(project.car) })}
             <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />

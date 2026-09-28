@@ -118,7 +118,7 @@ function DayFigures({
               href={getExplorerUrl(source.signature, 'tx')}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center gap-1 font-medium text-primary underline-offset-4 hover:underline md:min-h-0"
+              className="inline-flex min-h-11 items-center gap-1 font-medium text-primary underline-offset-4 hover:underline lg:min-h-0"
             >
               {t('recordedOnChain')}
               <ArrowUpRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
@@ -202,7 +202,7 @@ export function TelemetryWidget({
 
   return (
     <section aria-labelledby="trip-data-title">
-      <h2 id="trip-data-title" className="scroll-mt-24 text-h4 font-semibold text-foreground">
+      <h2 id="trip-data-title" className="scroll-mt-8 text-h4 font-semibold text-foreground">
         {t('title')}
       </h2>
       <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">{t('lead')}</p>

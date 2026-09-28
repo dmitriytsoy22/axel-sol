@@ -114,25 +114,33 @@ function DepositRow({ deposit, behind }: { deposit: DepositCheck; behind: boolea
   const { snapshot } = deposit;
   let snapshotPill: React.ReactNode;
   if (snapshot === 'none') {
-    snapshotPill = <Pill tone="neutral">{t('snapshotNone')}</Pill>;
+    snapshotPill = (
+      <Pill tone="neutral" wrap>
+        {t('snapshotNone')}
+      </Pill>
+    );
   } else if (snapshot) {
     snapshotPill = (
-      <Pill tone="success">{t('snapshotThrough', { date: formatDay(snapshot.date, locale) })}</Pill>
+      <Pill tone="success" wrap>
+        {t('snapshotThrough', { date: formatDay(snapshot.date, locale) })}
+      </Pill>
     );
   } else {
     snapshotPill = (
-      <Pill tone={behind ? 'neutral' : 'danger'}>
+      <Pill tone={behind ? 'neutral' : 'danger'} wrap>
         {t(behind ? 'snapshotUnpublished' : 'snapshotMissing')}
       </Pill>
     );
   }
   return (
-    <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-small font-medium text-foreground">
+    <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <span className="shrink-0 text-small font-medium text-foreground">
         {t('payout', { index: deposit.period.index })}
       </span>
-      <span className="flex flex-wrap gap-2">
-        <Pill tone={REPORT_TONE[deposit.report]}>{t(`report_${deposit.report}`)}</Pill>
+      <span className="flex flex-wrap gap-2 sm:justify-end">
+        <Pill tone={REPORT_TONE[deposit.report]} wrap>
+          {t(`report_${deposit.report}`)}
+        </Pill>
         {snapshotPill}
       </span>
     </li>
@@ -158,9 +166,11 @@ function Result({ result }: { result: VerificationResult }): JSX.Element {
         </div>
       )}
       {result.acquisition && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-small font-medium text-foreground">{t('acquisitionTitle')}</span>
-          <Pill tone={DOCUMENT_TONE[result.acquisition]}>
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <span className="shrink-0 text-small font-medium text-foreground">
+            {t('acquisitionTitle')}
+          </span>
+          <Pill tone={DOCUMENT_TONE[result.acquisition]} wrap>
             {t(`acquisition_${result.acquisition}`)}
           </Pill>
         </div>
@@ -253,7 +263,7 @@ export function VerifyData({
 
   return (
     <section aria-labelledby="verify-data-title">
-      <h2 id="verify-data-title" className="scroll-mt-24 text-h4 font-semibold text-foreground">
+      <h2 id="verify-data-title" className="scroll-mt-8 text-h4 font-semibold text-foreground">
         {t('title')}
       </h2>
       <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">{t('lead')}</p>
@@ -287,7 +297,7 @@ export function VerifyData({
                   href={folder}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 hover:underline md:min-h-0"
+                  className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 hover:underline lg:min-h-0"
                 >
                   {t('publishedFiles')}
                   <ArrowUpRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />

@@ -41,14 +41,21 @@ export function PlatformConsole({ roles }: { roles: AdminRoles }): JSX.Element {
       )}
       <div className="page-container grid gap-8 pb-24 pt-10 md:pt-12 lg:grid-cols-12">
         <div className="flex flex-col gap-8 lg:col-span-8">
+          {/* Keyed by the car: an open confirmation or a typed wallet is about the car it was
+              opened on, and must not carry over when the admin switches to another. */}
           {project && config && (
             <>
               <ProjectControls
+                key={`controls-${project.address.toBase58()}`}
                 project={project}
                 treasury={config.treasury}
                 onChanged={roles.refetch}
               />
-              <RolesForm project={project} onChanged={roles.refetch} />
+              <RolesForm
+                key={`roles-${project.address.toBase58()}`}
+                project={project}
+                onChanged={roles.refetch}
+              />
               <RecoveryConsole
                 project={project}
                 projects={roles.projects}

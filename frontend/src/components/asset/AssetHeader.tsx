@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Project } from '@/types/project';
 import { ProjectStatusBadge } from '@/components/catalog/ProjectStatusBadge';
+import { useCarLabels } from '@/components/catalog/useCarLabels';
 import { carTitle } from '@/lib/solana/tokens';
 
 interface AssetHeaderProps {
@@ -10,7 +11,13 @@ interface AssetHeaderProps {
 /** The car's name, status and where it works, all from its share mint's metadata. */
 export function AssetHeader({ project }: AssetHeaderProps): JSX.Element {
   const { car } = project;
-  const details = [car.city, car.carClass, car.park].filter(Boolean);
+  const labels = useCarLabels();
+  // The park is a name, and stays as the share mint spells it.
+  const details = [
+    car.city && labels.city(car.city),
+    car.carClass && labels.carClass(car.carClass),
+    car.park,
+  ].filter(Boolean);
 
   return (
     <header>

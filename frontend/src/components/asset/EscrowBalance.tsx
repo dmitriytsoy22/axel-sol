@@ -3,11 +3,25 @@
 import React, { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { ExplorerLink } from '@/components/ui/ExplorerLink';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { useVaultBalances } from '@/hooks/useVaultBalances';
 import { formatCount, formatTokenAmount } from '@/lib/format';
 import { sharesValue } from '@/lib/solana/math';
 import type { Project } from '@/types/project';
+
+/*
+ * Stands in for text that is still being read: a shimmer the exact shape of the text the
+ * escrow is expected to show, line by line, so nothing below moves when the real text arrives.
+ * The shape is drawn from generated content, so the page holds no figure before it is read.
+ */
+function Expected({ text }: { text: string }): JSX.Element {
+  return (
+    <span
+      aria-hidden="true"
+      data-expected={text}
+      className="select-none text-transparent before:skeleton-shimmer before:rounded-control before:box-decoration-clone before:content-[attr(data-expected)]"
+    />
+  );
+}
 
 /*
  * The raise escrow's balance, read from its token account and refreshed while the page is
@@ -32,13 +46,19 @@ export function EscrowBalance({ project }: { project: Project }): JSX.Element {
   const balance = balances?.escrow ?? null;
   const amount = (value: bigint) => formatTokenAmount(value, project.payment, locale);
 
+  const matches = t('escrowMatches', {
+    shares: formatCount(shares, locale),
+    price: amount(project.pricePerShare),
+  });
   let status: React.ReactNode;
   if (balance === null) {
-    status = error ? t('escrowUnread') : null;
+    status = error ? t('escrowUnread') : <Expected text={matches} />;
   } else if (balance < owed) {
     status = <span className="text-destructive">{t('escrowShort', { owed: amount(owed) })}</span>;
+  } else if (balance === owed) {
+    status = matches;
   } else {
-    status = t(balance === owed ? 'escrowMatches' : 'escrowExtra', {
+    status = t('escrowExtra', {
       shares: formatCount(shares, locale),
       price: amount(project.pricePerShare),
       extra: amount(balance - owed),
@@ -58,7 +78,7 @@ export function EscrowBalance({ project }: { project: Project }): JSX.Element {
           </span>
         </span>
         <span className="whitespace-nowrap text-body font-semibold tabular-nums text-foreground">
-          {balance !== null ? amount(balance) : error ? '—' : <Skeleton className="h-5 w-28" />}
+          {balance !== null ? amount(balance) : error ? '—' : <Expected text={amount(owed)} />}
         </span>
       </div>
       <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-4 text-small text-muted-foreground">

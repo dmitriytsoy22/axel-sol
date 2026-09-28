@@ -63,6 +63,28 @@ describe('Admin console', () => {
     expect(screen.getByText(/This raise failed/)).toBeInTheDocument();
   });
 
+  it('starts every form empty and every confirmation closed on the car the admin switches to', async () => {
+    renderConsole(key(fixture.admin));
+    const cars = await screen.findByLabelText('Car');
+    const typed = PublicKey.unique().toBase58();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close project…' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Kia Rio');
+    await userEvent.type(screen.getByLabelText('New operator wallet'), typed);
+    await userEvent.type(screen.getByLabelText('Lost wallet'), typed);
+
+    await userEvent.selectOptions(
+      cars,
+      screen.getByRole('option', { name: 'Hyundai Accent · AXHA003' }),
+    );
+    await userEvent.selectOptions(cars, screen.getByRole('option', { name: 'Kia Rio · AXKR017' }));
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close project…' })).toBeInTheDocument();
+    expect(screen.getByLabelText('New operator wallet')).toHaveValue('');
+    expect(screen.getByLabelText('Lost wallet')).toHaveValue('');
+  });
+
   it("shows the operator its cars and explains deposits, without the admin's controls", async () => {
     renderConsole(key(fixture.operator));
 

@@ -30,7 +30,7 @@ function RecordLink({
       href={getExplorerUrl(period.address.toBase58())}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 transition-colors duration-fast ease-move hover:text-primary-hover hover:underline md:min-h-0"
+      className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 transition-colors duration-fast ease-move hover:text-primary-hover hover:underline lg:min-h-0"
     >
       {label}
       <ArrowUpRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
@@ -168,7 +168,7 @@ export function CarPayouts({ project }: CarPayoutsProps): JSX.Element {
 
   return (
     <section aria-labelledby="payouts-title">
-      <h2 id="payouts-title" className="scroll-mt-24 text-h4 font-semibold text-foreground">
+      <h2 id="payouts-title" className="scroll-mt-8 text-h4 font-semibold text-foreground">
         {t('payoutsTitle')}
       </h2>
       <p className="mt-2 max-w-[60ch] text-body text-muted-foreground">{t('payoutsLead')}</p>

@@ -6,6 +6,13 @@ import { DEMO_ACCESS_SHOWN } from '@/lib/demo/config';
 import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
 import { DEMO_PATH, SEED_URL } from './constants';
 
+/*
+ * Both links sit in running text at 14 px. Below lg, where a finger taps them, padding grows
+ * each one to a 44 px target and an equal negative margin keeps the lines where they are;
+ * the gap between the two lines keeps the targets apart.
+ */
+const TOUCH_TARGET = '-my-3 py-3 lg:my-0 lg:py-0';
+
 /**
  * Says on every page of a test-network deployment that the cars, parks and investors are the
  * demo seed's fiction. On the home page the hero carries the same words on its photo. On a
@@ -27,7 +34,7 @@ export function DemoBanner({
       href={SEED_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-0.5 font-medium underline decoration-current/40 underline-offset-4 transition-colors duration-fast ease-move hover:decoration-current"
+      className={`inline-flex items-center gap-0.5 font-medium underline decoration-current/40 underline-offset-4 transition-colors duration-fast ease-move hover:decoration-current ${TOUCH_TARGET}`}
     >
       {t('link')}
       <ArrowUpRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
@@ -38,7 +45,7 @@ export function DemoBanner({
   const demoAccess = DEMO_ACCESS_SHOWN && (
     <Link
       href={DEMO_PATH}
-      className="inline-flex shrink-0 items-center gap-1 font-semibold underline md:whitespace-nowrap decoration-current/40 underline-offset-4 transition-colors duration-fast ease-move hover:decoration-current"
+      className={`inline-flex shrink-0 items-center gap-1 font-semibold underline decoration-current/40 underline-offset-4 transition-colors duration-fast ease-move hover:decoration-current md:whitespace-nowrap ${TOUCH_TARGET}`}
     >
       {t('demoAccess')}
       <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
@@ -47,7 +54,7 @@ export function DemoBanner({
 
   if (variant === 'hero') {
     return (
-      <div className={`flex flex-col gap-2 text-small text-muted-foreground ${className}`}>
+      <div className={`flex flex-col gap-6 text-small text-muted-foreground lg:gap-2 ${className}`}>
         <p className="flex items-start gap-2">
           <FlaskConical aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
           <span>
@@ -67,7 +74,7 @@ export function DemoBanner({
       aria-label={t('label')}
       className="border-b border-border bg-accent text-accent-foreground"
     >
-      <div className="page-container flex flex-col gap-1 py-2.5 text-small md:flex-row md:items-start md:justify-between md:gap-6">
+      <div className="page-container flex flex-col gap-6 py-2.5 text-small md:flex-row md:items-start md:justify-between">
         <p className="flex items-start gap-2">
           <FlaskConical aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
           <span>

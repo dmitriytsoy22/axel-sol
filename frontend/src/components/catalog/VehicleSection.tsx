@@ -11,6 +11,7 @@ import { formatNumber } from '@/lib/format';
 import { NETWORK_NAME } from '@/lib/network';
 import { AssetCard } from './AssetCard';
 import { statusLabelKey } from './ProjectStatusBadge';
+import { useCarLabels } from './useCarLabels';
 import type { CatalogFeed } from './types';
 
 type Filter = ProjectStatus | 'all';
@@ -41,6 +42,7 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
   const t = useTranslations('Catalog');
   const locale = useLocale();
   const selectId = useId();
+  const labels = useCarLabels();
   const [filter, setFilter] = useState<Filter>('all');
   const [city, setCity] = useState('');
   const [carClass, setCarClass] = useState('');
@@ -109,7 +111,7 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
   }
 
   return (
-    <section id="vehicles" aria-labelledby="vehicles-title" className="section-y scroll-mt-16">
+    <section id="vehicles" aria-labelledby="vehicles-title" className="section-y">
       <div className="page-container grid gap-10 lg:grid-cols-12 lg:gap-8">
         <div className="lg:col-span-4">
           <div className="lg:sticky lg:top-28">
@@ -148,7 +150,7 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
                     <option value="">{t('filterAll')}</option>
                     {cities.map((value) => (
                       <option key={value} value={value}>
-                        {value}
+                        {labels.city(value)}
                       </option>
                     ))}
                   </select>
@@ -169,7 +171,7 @@ export function VehicleSection({ projects, isLoading, error, onRetry }: CatalogF
                     <option value="">{t('filterAll')}</option>
                     {classes.map((value) => (
                       <option key={value} value={value}>
-                        {value}
+                        {labels.carClass(value)}
                       </option>
                     ))}
                   </select>

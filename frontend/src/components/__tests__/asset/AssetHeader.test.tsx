@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { describe, it, expect } from 'vitest';
 import messagesEn from '../../../../messages/en.json';
+import messagesRu from '../../../../messages/ru.json';
 import { makeCar, makeProject } from '@/components/catalog/__tests__/fixtures';
 import { AssetHeader } from '../../asset/AssetHeader';
 
@@ -25,6 +26,30 @@ describe('AssetHeader', () => {
     expect(screen.getByText('On the road')).toBeInTheDocument();
     expect(screen.getByText(car.symbol)).toBeInTheDocument();
     expect(screen.getByText('Almaty')).toBeInTheDocument();
-    expect(screen.getByText('economy')).toBeInTheDocument();
+    expect(screen.getByText('Economy')).toBeInTheDocument();
+  });
+
+  it("names the city and the ride class in the reader's language, and keeps unknown ones", () => {
+    const car = makeCar({ city: 'Shymkent', class: 'comfort+', park: 'Demo Park Shymkent' });
+    const { rerender } = render(
+      <NextIntlClientProvider locale="ru" messages={messagesRu}>
+        <AssetHeader project={makeProject({ car })} />
+      </NextIntlClientProvider>,
+    );
+
+    expect(screen.getByText('Шымкент')).toBeInTheDocument();
+    expect(screen.getByText('Комфорт+')).toBeInTheDocument();
+    expect(screen.getByText('Demo Park Shymkent')).toBeInTheDocument();
+
+    rerender(
+      <NextIntlClientProvider locale="ru" messages={messagesRu}>
+        <AssetHeader
+          project={makeProject({ car: makeCar({ city: 'Karaganda', class: 'business' }) })}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(screen.getByText('Karaganda')).toBeInTheDocument();
+    expect(screen.getByText('business')).toBeInTheDocument();
   });
 });

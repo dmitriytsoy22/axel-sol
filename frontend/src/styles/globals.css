@@ -150,6 +150,9 @@
        arrived: WebKit took a reader of the fleet to the Verify section, 4 000 px further.
        Without it the offset lands where the reader left. */
     overflow-anchor: none;
+    /* The bar is fixed, 64 px: keyboard focus and in-page links stop below it, not under it.
+       Sections add only their own breathing room (scroll-mt-*). */
+    scroll-padding-top: 4rem;
   }
 
   body {
@@ -261,6 +264,14 @@
   @media (max-width: 767px) {
     body:has([data-mobile-invest-bar]) {
       padding-bottom: calc(0.75rem + 3rem + 1px + max(0.75rem, env(safe-area-inset-bottom)));
+    }
+
+    /* The same bar would hide a link that keyboard focus scrolls to the bottom edge: focus
+       stops 16 px above it instead. */
+    html:has([data-mobile-invest-bar]) {
+      scroll-padding-bottom: calc(
+        0.75rem + 3rem + 1px + max(0.75rem, env(safe-area-inset-bottom)) + 1rem
+      );
     }
   }
 }

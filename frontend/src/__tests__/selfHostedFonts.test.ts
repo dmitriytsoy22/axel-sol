@@ -41,7 +41,9 @@ describe('fonts', () => {
       /@import\s+url\(\s*['"]?https?:/.test(withoutComments(readFileSync(resolveCss(specifier), 'utf8'))),
     );
 
-    expect(imported).toContain('@/styles/wallet-modal.css');
+    expect(imported).toContain('@/styles/globals.css');
+    // The wallet adapter's stylesheet pulls DM Sans from Google; the app draws its own picker.
+    expect(imported).not.toContain('@solana/wallet-adapter-react-ui/styles.css');
     expect(remote).toEqual([]);
   });
 });

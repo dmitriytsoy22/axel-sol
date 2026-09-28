@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import localFont from 'next/font/local';
 import '@/styles/globals.css';
 import WalletProvider from '@/providers/WalletProvider';
 import { Navbar } from '@/components/layout';
@@ -11,31 +10,7 @@ import { getMessages, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
 import { REVEAL_GATE_SCRIPT } from '@/lib/revealGate';
-
-// Self-hosted subsets (see src/fonts/README.md): the build never calls Google Fonts.
-const sans = localFont({
-  src: '../../fonts/Onest-Variable.woff2',
-  weight: '400 700',
-  display: 'swap',
-  variable: '--font-sans',
-});
-
-const serif = localFont({
-  src: '../../fonts/AxelSerif-Variable.woff2',
-  weight: '400 600',
-  display: 'swap',
-  variable: '--font-serif',
-  fallback: ['Georgia', 'Times New Roman', 'serif'],
-  adjustFontFallback: 'Times New Roman',
-});
-
-const mono = localFont({
-  src: '../../fonts/JetBrainsMono-Variable.woff2',
-  weight: '400 600',
-  display: 'swap',
-  variable: '--font-mono',
-  preload: false,
-});
+import { fontVariables } from '../fonts';
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'Metadata' });
@@ -75,7 +50,7 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${sans.variable} ${serif.variable} ${mono.variable}`}>
+    <html lang={locale} className={fontVariables}>
       <body className="font-sans bg-background text-foreground min-h-screen flex flex-col">
         <script dangerouslySetInnerHTML={{ __html: REVEAL_GATE_SCRIPT }} />
         <NextIntlClientProvider messages={messages}>

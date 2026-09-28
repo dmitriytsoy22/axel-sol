@@ -232,7 +232,10 @@ buttons carry an `aria-label` and a 44×44 hit area.
 - The invest action on the asset page becomes a sticky bottom bar with a 48 px button. The
   body reserves the bar's height below `md` (`[data-mobile-invest-bar]` in `globals.css`), so
   the bar never covers the end of the footer.
-- Tap targets are at least 44×44 with 8 px between them.
+- Tap targets are at least 44×44 with 8 px between them. Text links (Explorer addresses,
+  record links, "Published files") keep a 44 px tall box up to `lg`, since a 768 px tablet is
+  touched too; from `lg` they are as tall as their text. The demo banner's links sit in running
+  text, so padding grows their target and an equal negative margin keeps the lines in place.
 
 ## Structure
 
@@ -259,7 +262,8 @@ product rule, never a placeholder.
   numbered steps (verify once → buy shares → the car earns → claim), each of which leaves a
   record on Solana, with the Almaty taxi photo → verify on ink: four claims the code enforces
   (one token per car, verified holders only, payouts split by the program, open source) beside
-  a ledger panel with the program, each car's share token and income vault as Explorer links →
+  a ledger panel with the program, each car's share token and income vault as Explorer links
+  (the first two cars open, the rest folded to their name, decision 28) →
   a "before you invest" panel: the devnet disclosure, four plain risks, and the page's closing
   CTA → footer. Every section has its own loading, empty and error state; one chain read feeds
   them all.
@@ -283,7 +287,9 @@ product rule, never a placeholder.
   raising cards in the catalog use the same bar at `sm`. While the escrow holds money
   (raising, funded, failed) the panel shows `asset/EscrowBalance`, the escrow's token balance
   read every 15 s with a green "Live" dot and "sold × price: exactly what buyers paid" under
-  it. A raise whose outcome is certain gets an outline "Settle the raise" button for any
+  it; until the balance is read, a shimmer the shape of that line holds its place. The raise
+  countdown reads "44d 07h 18m 09s" with muted unit letters, and names the units in full to
+  screen readers. A raise whose outcome is certain gets an outline "Settle the raise" button for any
   connected wallet. The details column now opens with `asset/StateTimeline` (a vertical list
   of milestones: filled check = done, ringed dot = current, hollow = next, amber cross =
   missed; amber ring while paused) and adds, after the payout history, "Check the car's data
@@ -351,7 +357,13 @@ product rule, never a placeholder.
   line of its own below), which is how every page reaches `/demo`.
 - **Shared states:** `ui/Notice` (empty, error, not found), `wallet/ConnectWalletPanel`
   (disconnected), `ui/SummaryStats` (ruled figures with placeholders), `ui/Pill` (status dot +
-  word; `Badge` maps project status onto it), `layout/PageHeader`. Modal is a paper dialog and a
+  word; `Badge` maps project status onto it; `wrap` lets a sentence-long result wrap in
+  balanced lines with the dot on the first), `layout/PageHeader`. An address no page answers
+  gets a localized "Page not found" notice inside the header and footer
+  (`app/[locale]/not-found.tsx`, reached through `app/[locale]/[...rest]`); addresses the i18n
+  middleware never sees get an English one (`app/not-found.tsx`). The car page holds at least a
+  screen's height until the car is read, so neither the car nor a "not listed" notice moves
+  the footer into view. Modal is a paper dialog and a
   bottom sheet below `sm`; toasts sit top-right above modals; transaction progress reads
   "Approve it in your wallet → Sending to Solana → Waiting for confirmation → Confirmed on
   Solana".
@@ -438,10 +450,11 @@ product rule, never a placeholder.
     simulates a browser without Kazakh data. ← review rubric "stress states: only real
     content", decision 13.
 20. **The wallet picker is ours too.** The adapter's modal was a navy dialog in DM Sans that
-    loaded the font from `fonts.googleapis.com` on every page. `src/styles/wallet-modal.css`
-    replaces the adapter stylesheet: a paper dialog on the theme tokens, Onest, 44 px close
-    target, a bottom sheet below 640 px. A test fails if any imported stylesheet loads
-    anything remotely. ← checklist "fonts: families and loading", anti-slop "mixed assets",
+    loaded the font from `fonts.googleapis.com` on every page, and its title and labels were
+    hard-coded in English. `wallet/WalletPicker` serves the adapter's `useWalletModal()`
+    context with the app's own `ui/Modal` (paper dialog, bottom sheet below 640 px): installed
+    wallets first with an "Installed" tag, the rest behind "Other wallets", every word from the
+    messages. A test fails if any imported stylesheet loads anything remotely. ← checklist "fonts: families and loading", anti-slop "mixed assets",
     this file's shared states (modal).
 21. **Every working screen opens the same way.** The operator console's disconnected and
     wrong-wallet states had only a hidden H1; they now open with the same page header as
@@ -485,6 +498,14 @@ product rule, never a placeholder.
     what the period account records; the verify panel rebuilds it and shows the deposit as
     "Simulated demo month" (an info pill), not as a missing report or a real one.
     ← decisions 10 and 23.
+32. **Metadata speaks the reader's language where it can.** Share mints name the city and
+    the ride class in English ("Almaty", "comfort+"); cards, the car header and the catalog
+    filters show them from `CarMetadata` messages ("Алматы", "Комфорт+"), keep the raw value
+    for filtering, and show a value the app has no word for as the mint has it. Park names are
+    names and stay as written. ← review rubric "untranslated text".
+33. **A date never ends a Russian or Kazakh sentence.** "28 сент. 2026 г." and "2026 ж. 28
+    қыр." already end in a dot, so a message that put a period after `{date}` printed "г..".
+    Such messages are rephrased, and a test rejects `{date}.` or `{due}.` in either language.
 
 ## Constraints
 
@@ -514,8 +535,13 @@ product rule, never a placeholder.
 - The wallet pages (portfolio, payouts, verification, demo) show their loading state, not
   "Connect wallet", during hydration and while a wallet remembered from an earlier visit
   reconnects (`wallet/useWalletConnecting`).
-- The adapter's wallet modal title ("Connect a wallet on Solana to continue") is hard-coded
-  in English by `@solana/wallet-adapter-react-ui`; translating it needs a custom modal.
+- The fixed 64 px bar is cleared once, by `scroll-padding-top` on `html`; a section heading
+  that links point to adds only its breathing room (`scroll-mt-8`, landing at 96 px). Below
+  `md` a car page also sets `scroll-padding-bottom` to the purchase bar's height, so keyboard
+  focus never lands under the bar.
+- Next 14 renders a page's `notFound()` in the browser from the page's payload: the 404
+  answers with status 404 and a localized title, but its HTML shell carries no content or
+  `lang` until the script runs.
 - Screenshots: `Google Chrome --headless=new` clamps the window to at least 500 px on macOS, so
   a 390 px capture is really a crop of a 500 px layout. Use Playwright's
   `chrome-headless-shell` for mobile widths.

@@ -120,7 +120,7 @@ export function PayoutsView({
                       href={getExplorerUrl(claim.signature, 'tx')}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 hover:underline md:min-h-0"
+                      className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 hover:underline lg:min-h-0"
                     >
                       {t('viewRecord')}
                       <ArrowUpRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />

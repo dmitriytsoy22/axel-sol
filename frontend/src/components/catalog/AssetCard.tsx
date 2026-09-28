@@ -11,6 +11,7 @@ import { holdsEscrow } from '@/lib/solana/solvency';
 import { sharesValue } from '@/lib/solana/math';
 import { carTitle } from '@/lib/solana/tokens';
 import { ProjectStatusBadge } from './ProjectStatusBadge';
+import { useCarLabels } from './useCarLabels';
 import { vehiclePhoto } from './vehiclePhoto';
 
 interface AssetCardProps {
@@ -21,6 +22,7 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
   const t = useTranslations('Catalog');
   const locale = useLocale();
   const { car, payment } = project;
+  const labels = useCarLabels();
 
   const sold = Number(project.sharesSold);
   const total = Number(project.totalShares);
@@ -56,7 +58,7 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
           {car.city && (
             <>
               <span aria-hidden="true">·</span>
-              <span>{car.city}</span>
+              <span>{labels.city(car.city)}</span>
             </>
           )}
           <span aria-hidden="true">·</span>

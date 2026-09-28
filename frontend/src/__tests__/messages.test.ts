@@ -33,4 +33,10 @@ describe.each([
 
     expect(mismatched).toEqual([]);
   });
+
+  it('never end a sentence right after a date, which already ends in a dot ("2026 г.", "қыр.")', () => {
+    const doubled = Object.keys(translated).filter((key) => /\{(date|due)\}\./.test(translated[key]));
+
+    expect(doubled).toEqual([]);
+  });
 });

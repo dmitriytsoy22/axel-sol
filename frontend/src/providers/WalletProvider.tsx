@@ -5,13 +5,11 @@ import {
   ConnectionProvider,
   WalletProvider as SolanaWalletProvider,
 } from '@solana/wallet-adapter-react';
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import type { Adapter } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import type { ConnectionConfig } from '@solana/web3.js';
 import { SOLANA_RPC_URL } from '@/lib/solana/connection';
-
-import '@/styles/wallet-modal.css';
+import { WalletPickerProvider } from '@/components/wallet/WalletPicker';
 
 /*
  * One object for the whole app: ConnectionProvider opens a new Connection whenever its config
@@ -63,7 +61,7 @@ const WalletProvider = ({ children }: WalletProviderProps): JSX.Element => {
   return (
     <ConnectionProvider endpoint={SOLANA_RPC_URL} config={CONNECTION_CONFIG}>
       <SolanaWalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
+        <WalletPickerProvider>{children}</WalletPickerProvider>
       </SolanaWalletProvider>
     </ConnectionProvider>
   );

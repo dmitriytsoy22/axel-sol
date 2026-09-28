@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowUpRight, Code2, Coins, Landmark, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Code2, Coins, Landmark, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ExplorerLink } from '@/components/ui/ExplorerLink';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -18,9 +18,16 @@ const CLAIMS: { key: string; icon: LucideIcon }[] = [
   { key: 'code', icon: Code2 },
 ];
 
+/*
+ * The first cars show what the ledger holds for each; the rest fold to their name, as passing
+ * cars do on the solvency page (decision 28). Eight open cars made a 2 000 px list on a phone
+ * and left an empty column beside it on a desktop.
+ */
+const OPEN_CARS = 2;
+
 function LedgerRow({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
   return (
-    <div className="flex min-h-11 items-center justify-between gap-4 md:min-h-9">
+    <div className="flex min-h-11 items-center justify-between gap-4 lg:min-h-9">
       <dt className="text-small text-muted-foreground">{label}</dt>
       <dd className="text-right text-small tabular-nums text-foreground">{children}</dd>
     </div>
@@ -50,29 +57,38 @@ export function VerifySection({ projects, isLoading, error }: CatalogFeed): JSX.
   } else {
     cars = (
       <ul>
-        {projects.map((project) => (
-          <li key={project.address.toBase58()} className="border-t border-border px-5 py-5 md:px-6">
-            <p className="text-body font-semibold text-foreground">
-              {carTitle(project.car)}{' '}
-              <span className="font-normal text-muted-foreground">{project.car.year}</span>
-            </p>
-            <dl className="mt-2">
-              <LedgerRow label={t('shareToken')}>
-                <ExplorerLink address={project.shareMint.toBase58()} srLabel={explorer} />
-              </LedgerRow>
-              <LedgerRow label={t('vault')}>
-                <ExplorerLink address={project.revenueVault.toBase58()} srLabel={explorer} />
-              </LedgerRow>
-              <LedgerRow label={t('sharesSold')}>
-                {t('ofTotal', {
-                  part: formatCount(project.sharesSold, locale),
-                  whole: formatCount(project.totalShares, locale),
-                })}
-              </LedgerRow>
-              <LedgerRow label={tCatalog('payoutPeriods')}>
-                {formatNumber(project.periodCount, locale)}
-              </LedgerRow>
-            </dl>
+        {projects.map((project, index) => (
+          <li key={project.address.toBase58()} className="border-t border-border">
+            <details open={index < OPEN_CARS} className="group">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 px-5 py-3 md:px-6 [&::-webkit-details-marker]:hidden">
+                <span className="text-body font-semibold text-foreground">
+                  {carTitle(project.car)}{' '}
+                  <span className="font-normal text-muted-foreground">{project.car.year}</span>
+                </span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-fast ease-move group-open:rotate-180 motion-reduce:transition-none"
+                  strokeWidth={1.75}
+                />
+              </summary>
+              <dl className="px-5 pb-4 md:px-6">
+                <LedgerRow label={t('shareToken')}>
+                  <ExplorerLink address={project.shareMint.toBase58()} srLabel={explorer} />
+                </LedgerRow>
+                <LedgerRow label={t('vault')}>
+                  <ExplorerLink address={project.revenueVault.toBase58()} srLabel={explorer} />
+                </LedgerRow>
+                <LedgerRow label={t('sharesSold')}>
+                  {t('ofTotal', {
+                    part: formatCount(project.sharesSold, locale),
+                    whole: formatCount(project.totalShares, locale),
+                  })}
+                </LedgerRow>
+                <LedgerRow label={tCatalog('payoutPeriods')}>
+                  {formatNumber(project.periodCount, locale)}
+                </LedgerRow>
+              </dl>
+            </details>
           </li>
         ))}
       </ul>

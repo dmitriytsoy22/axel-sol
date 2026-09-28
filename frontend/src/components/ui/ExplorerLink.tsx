@@ -18,7 +18,7 @@ export function ExplorerLink({ address, srLabel, className = '' }: ExplorerLinkP
       target="_blank"
       rel="noopener noreferrer"
       title={address}
-      className={`inline-flex min-h-11 items-center gap-1 font-mono md:min-h-0 text-small text-primary underline-offset-4 transition-colors duration-fast ease-move hover:text-primary-hover hover:underline ${className}`}
+      className={`inline-flex min-h-11 items-center gap-1 font-mono lg:min-h-0 text-small text-primary underline-offset-4 transition-colors duration-fast ease-move hover:text-primary-hover hover:underline ${className}`}
     >
       {shortAddress(address)}
       <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
