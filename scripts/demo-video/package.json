@@ -1,0 +1,16 @@
+{
+  "name": "axel-demo-video",
+  "private": true,
+  "scripts": {
+    "stack": "node --no-deprecation --import tsx stack.ts",
+    "record": "node --no-deprecation --import tsx record.ts",
+    "produce": "node --no-deprecation --import tsx produce.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.2",
+    "playwright": "1.63.0",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

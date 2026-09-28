@@ -52,6 +52,9 @@ frontend/e2e/.stack/
 frontend/playwright-report/
 frontend/test-results/
 
+# Demo video recorder: the Phantom profile it keeps between takes (its recordings go to out/)
+scripts/demo-video/.phantom-profile/
+
 # Seed script: devnet results in scripts/seed-devnet/out are committed, local runs are not
 !scripts/seed-devnet/out/
 scripts/seed-devnet/out/localnet*

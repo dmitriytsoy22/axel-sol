@@ -3,10 +3,10 @@ import { join, resolve } from 'node:path';
 
 /*
  * The local stack the e2e suite runs against, started by global-setup.ts: a solana-test-validator
- * with axel_v2, the demo seed at --scale tiny, the backend, a file server for the seed's
- * published data, and `next dev` with the burner wallet. Fixed ports keep the URLs known to
- * playwright.config.ts; they sit away from the tools' defaults (8899, 3000) so the suite runs
- * next to a developer's own validator and servers.
+ * with axel_v2, the demo seed at --scale tiny (E2E_SEED_SCALE picks another), the backend, a file
+ * server for the seed's published data, and `next dev` with the burner wallet. Fixed ports keep
+ * the URLs known to playwright.config.ts; they sit away from the tools' defaults (8899, 3000) so
+ * the suite runs next to a developer's own validator and servers.
  */
 
 export const FRONTEND_DIR = resolve(__dirname, '..', '..');

@@ -116,7 +116,7 @@ async function startValidator(payer: Keypair): Promise<Service> {
   return validator;
 }
 
-async function seed(secret: string, payerPath: string): Promise<void> {
+async function seed(secret: string, scale: string, payerPath: string): Promise<void> {
   await run('seed-deps', 'npm', ['run', 'seed:deps'], { cwd: REPO_ROOT, env: childEnv() });
   await run(
     'seed',
@@ -128,7 +128,7 @@ async function seed(secret: string, payerPath: string): Promise<void> {
       '--cluster',
       'localnet',
       '--scale',
-      'tiny',
+      scale,
       '--rpc',
       URLS.rpc,
       '--payer',
@@ -355,14 +355,17 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     const payer = Keypair.generate();
     const payerPath = join(STACK_DIR, 'payer.json');
     writeFileSync(payerPath, JSON.stringify(Array.from(payer.secretKey)));
-    const secret = randomBytes(32).toString('hex');
+    // The suite seeds the tiny fleet with a fresh secret. The demo video (scripts/demo-video)
+    // seeds the small one and passes its secret, from which it derives the admin's key.
+    const scale = process.env.E2E_SEED_SCALE ?? 'tiny';
+    const secret = process.env.E2E_SEED_SECRET ?? randomBytes(32).toString('hex');
 
     progress(`starting solana-test-validator on ${URLS.rpc}`);
     await startValidator(payer);
 
-    progress('seeding the demo fleet (--scale tiny) and building the backend');
+    progress(`seeding the demo fleet (--scale ${scale}) and building the backend`);
     await Promise.all([
-      seed(secret, payerPath),
+      seed(secret, scale, payerPath),
       run('backend-build', 'npm', ['run', 'build'], { cwd: BACKEND_DIR, env: childEnv() }),
     ]);
     const info = stackInfo(JSON.parse(readFileSync(SEED_OUT, 'utf8')) as SeedOutput);

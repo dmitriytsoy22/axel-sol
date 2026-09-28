@@ -12,6 +12,7 @@ Issues and pull requests are welcome. For security problems, follow [SECURITY.md
 | `tests-v2/` | v2 program tests (`node:test`) on LiteSVM, with their own `package.json` |
 | `scripts/` | `init-project.ts` (creates a v1 project on a cluster), `generate-clients.ts` (Codama client of the v2 program into `sdk/axel-v2`) |
 | `scripts/seed-devnet/` | Demo seed for v2: a fictional fleet in every project state, with its own `package.json` ([README](scripts/seed-devnet/README.md)) |
+| `scripts/demo-video/` | Records the product demo video: Playwright walks the app on the e2e suite's local stack or a deployed site, and ffmpeg cuts and captions it ([README](scripts/demo-video/README.md)) |
 | `sdk/axel-v2/` | Generated TypeScript client of `axel_v2` (`@solana/kit`), with tests against the IDL |
 | `backend/` | NestJS service: the v2 oracle (published telemetry, `record_telemetry` batches, attested revenue reports), wallet sign-in and Sumsub KYC webhook (v2 `set_investor`), and the v2 event indexer |
 | `frontend/` | Next.js 14 app on `axel_v2`, with the judge demo routes, the Solana Actions and the Playwright suite in `frontend/e2e` |
