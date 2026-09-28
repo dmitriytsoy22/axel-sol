@@ -18,13 +18,15 @@ const TOUCH_TARGET = '-my-3 py-3 lg:my-0 lg:py-0';
  * Says on every page of a test-network deployment that the cars, parks and investors are the
  * demo seed's fiction. On the home page the hero carries the same words on its photo. On a
  * deployment with the judges' demo path it also leads there: the one place under the bar that
- * every page has, so the bar itself keeps its room.
+ * every page has, so the bar itself keeps its room. On `/demo` itself it leaves that link out.
  */
 export function DemoBanner({
   variant = 'strip',
+  onDemoPage = false,
   className = '',
 }: {
   variant?: 'strip' | 'hero';
+  onDemoPage?: boolean;
   className?: string;
 }): JSX.Element | null {
   const t = useTranslations('DemoBanner');
@@ -43,10 +45,12 @@ export function DemoBanner({
     </a>
   );
 
-  const demoAccess = DEMO_ACCESS_SHOWN && (
+  // Beside the note from md, the link wraps within 18rem until lg: unwrapped, the Kazakh one
+  // took 405 of 720 px at 768 and squeezed the note into six lines.
+  const demoAccess = DEMO_ACCESS_SHOWN && !onDemoPage && (
     <Link
       href={DEMO_PATH}
-      className={`inline-flex shrink-0 items-center font-semibold underline decoration-current/40 underline-offset-4 transition-colors duration-fast ease-move hover:decoration-current md:whitespace-nowrap ${TOUCH_TARGET}`}
+      className={`inline-flex items-center font-semibold underline decoration-current/40 underline-offset-4 transition-colors duration-fast ease-move hover:decoration-current md:max-w-[18rem] md:text-right lg:max-w-none lg:whitespace-nowrap ${TOUCH_TARGET}`}
     >
       <TrailingIcon icon={ArrowRight}>{t('demoAccess')}</TrailingIcon>
     </Link>
@@ -82,7 +86,7 @@ export function DemoBanner({
             {t('body')} {link}
           </span>
         </p>
-        {demoAccess && <p className="pl-6 md:pl-0">{demoAccess}</p>}
+        {demoAccess && <p className="pl-6 md:shrink-0 md:pl-0">{demoAccess}</p>}
       </div>
     </aside>
   );

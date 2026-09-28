@@ -114,6 +114,24 @@ describe('VerifyData', () => {
     ).toBeInTheDocument();
   });
 
+  it('counts the months downloaded so far, so it never reads "month 0"', async () => {
+    const { files, head } = publishedDays();
+    let releaseMonth = () => {};
+    const monthHeld = new Promise<void>((resolve) => {
+      releaseMonth = resolve;
+    });
+    const fetcher: JsonFetcher = async (url) => {
+      if (url.includes('/telemetry/')) await monthHeld;
+      return fetcherOf(files)(url);
+    };
+    await renderVerify(await nodeWithChain(head, 2, 20261202), fetcher);
+    await userEvent.click(verifyButton());
+
+    expect(await screen.findByText('Months downloaded: 0 of 1…')).toBeInTheDocument();
+    releaseMonth();
+    expect(await screen.findByText('Trip data verified')).toBeInTheDocument();
+  });
+
   it('names the day whose published figures were changed after the chain recorded them', async () => {
     const { files, head } = publishedDays();
     const month = files[`${BASE}/${MINT}/telemetry/2026-12.json`] as {

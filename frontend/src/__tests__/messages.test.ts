@@ -35,8 +35,22 @@ describe.each([
   });
 
   it('never end a sentence right after a date, which already ends in a dot ("2026 г.", "қыр.")', () => {
-    const doubled = Object.keys(translated).filter((key) => /\{(date|due)\}\./.test(translated[key]));
+    const doubled = Object.keys(translated).filter((key) =>
+      /\{(date|due)\}\./.test(translated[key]),
+    );
 
     expect(doubled).toEqual([]);
+  });
+
+  it('glue a dash to the word before it, so no line starts with "—"', () => {
+    const loose = Object.keys(translated).filter((key) => / —/.test(translated[key]));
+
+    expect(loose).toEqual([]);
+  });
+
+  it('never open with the network name, which is lowercase ("localnet", "devnet")', () => {
+    const lowercase = Object.keys(translated).filter((key) => /^\{network\}/.test(translated[key]));
+
+    expect(lowercase).toEqual([]);
   });
 });

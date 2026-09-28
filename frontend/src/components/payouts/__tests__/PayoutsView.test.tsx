@@ -165,6 +165,47 @@ describe('PayoutsView', () => {
     expect(screen.queryByText(/Read straight from Solana/)).not.toBeInTheDocument();
   });
 
+  it('writes the one day of a car sale once, not as a range from that day to itself', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          wallet: alice.toBase58(),
+          slot: 3_120_560,
+          projects: [
+            {
+              project: operating,
+              mint: fixture.projects.operating.shareMint,
+              shares: '43',
+              claimed: '0',
+              pending: '10000001',
+            },
+          ],
+          periods: [
+            {
+              id: 9,
+              project: operating,
+              index: 2,
+              periodStart: 20260731,
+              periodEnd: 20260731,
+              kind: 'final',
+              net: '1049382708',
+              supply: '100',
+              depositedAt: 1_790_900_000,
+              signature: 'SaleSig',
+              earned: '10000001',
+            },
+          ],
+          claims: [],
+        }),
+      ),
+    );
+    renderView(alice, INDEXER);
+
+    const [sale] = await bodyRows();
+    expect(within(sale).getByText('Jul 31, 2026')).toBeInTheDocument();
+    expect(within(sale).queryByText(/–/)).not.toBeInTheDocument();
+  });
+
   it('offers a retry when the history cannot be read', async () => {
     fetchMock.mockResolvedValue(new Response('busy', { status: 503 }));
     renderView(alice, INDEXER);
@@ -186,9 +227,32 @@ describe('PayoutsView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(
+      await screen.findByRole('heading', { name: 'No payouts for this wallet yet' }),
+    ).toBeInTheDocument();
+  });
+
+  it('points a wallet that never held a share to the cars instead of three zeros', async () => {
+    renderView(key(fixture.stranger));
+
+    expect(
+      await screen.findByRole('heading', { name: 'No payouts for this wallet yet' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Browse the cars' })).toHaveAttribute(
+      'href',
+      '/#vehicles',
+    );
+    expect(screen.queryByLabelText('Payout summary')).not.toBeInTheDocument();
+  });
+
+  it("names the token of a total with nothing in it yet, from the wallet's cars", async () => {
+    // Shares in an open raise only: nothing can be claimed there yet.
+    renderView(key(fixture.projects.fundraising.holders[0]));
+
+    expect(
       await within(await screen.findByRole('table')).findByText(
         /No deposits for this wallet's cars yet/,
       ),
     ).toBeInTheDocument();
+    expect(figure('Ready to claim')).toHaveTextContent(/^Ready to claim0 tKZT$/);
   });
 });

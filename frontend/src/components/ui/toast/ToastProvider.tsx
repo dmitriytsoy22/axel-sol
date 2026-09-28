@@ -35,16 +35,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }): JSX.
         setTimeout(() => removeToast(id), duration);
       }
     },
-    [removeToast]
+    [removeToast],
   );
 
   return (
     <ToastContext.Provider value={{ addToast, removeToast }}>
       {children}
-      {/* Above modals, so a transaction result is visible while its dialog is still open. */}
+      {/* Above modals, so a transaction result is visible while its dialog is still open, and
+          under the bar, whose menu, language and wallet buttons stay in reach while it shows. */}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 top-0 z-toast flex flex-col items-center gap-3 p-4 sm:items-end sm:p-6">
+        className="pointer-events-none fixed inset-x-0 top-16 z-toast flex flex-col items-center gap-3 p-4 sm:items-end sm:p-6"
+      >
         {toasts.map((toast) => (
           <Toast key={toast.id} {...toast} onClose={removeToast} />
         ))}

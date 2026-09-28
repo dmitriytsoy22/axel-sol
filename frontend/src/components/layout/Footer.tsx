@@ -1,6 +1,7 @@
 import { useTranslations } from 'next-intl';
 import { ArrowUpRight } from 'lucide-react';
 import { Link } from '@/i18n/routing';
+import { TrailingIcon } from '@/components/ui/TrailingIcon';
 import { connectionConfig, getExplorerUrl } from '@/lib/solana/connection';
 import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
 import { Logo } from './Logo';
@@ -59,12 +60,7 @@ const Footer = (): JSX.Element => {
                 {verifyLinks.map(({ href, label }) => (
                   <li key={href}>
                     <a href={href} target="_blank" rel="noopener noreferrer" className={linkClass}>
-                      {label}
-                      <ArrowUpRight
-                        aria-hidden="true"
-                        className="-mt-0.5 ml-1 inline h-4 w-4"
-                        strokeWidth={1.75}
-                      />
+                      <TrailingIcon icon={ArrowUpRight}>{label}</TrailingIcon>
                       <span className="sr-only">{tCommon('opensInNewTab')}</span>
                     </a>
                   </li>

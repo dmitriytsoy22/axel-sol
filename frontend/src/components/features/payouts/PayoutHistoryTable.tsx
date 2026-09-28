@@ -23,9 +23,9 @@ interface PayoutView {
   symbol: string;
   index: number;
   final: boolean;
-  /** First and last day of the period, as two lines in the table. */
+  /** First and last day of the period, as two lines in the table; one day is one date. */
   from: string;
-  to: string;
+  to: string | null;
   /** Sorts the rows; 0 when the block time is unknown. */
   depositedAt: number;
   date: string;
@@ -44,7 +44,7 @@ function toView(row: PayoutRow, locale: string): PayoutView {
     index: row.index,
     final: row.kind === 'final',
     from: formatDay(row.periodStart, locale),
-    to: formatDay(row.periodEnd, locale),
+    to: row.periodEnd === row.periodStart ? null : formatDay(row.periodEnd, locale),
     depositedAt: row.depositedAt ?? 0,
     date: row.depositedAt === null ? '—' : formatDate(row.depositedAt, locale),
     net: row.net,
@@ -98,12 +98,15 @@ export function PayoutHistoryTable({
       {
         header: t('tableDays'),
         accessorKey: 'from',
-        cell: (item) => (
-          <span className="flex flex-col text-muted-foreground">
-            <span>{item.from} –</span>
-            <span>{item.to}</span>
-          </span>
-        ),
+        cell: (item) =>
+          item.to === null ? (
+            <span className="text-muted-foreground">{item.from}</span>
+          ) : (
+            <span className="flex flex-col text-muted-foreground">
+              <span>{item.from} –</span>
+              <span>{item.to}</span>
+            </span>
+          ),
       },
       {
         header: t('tableDate'),

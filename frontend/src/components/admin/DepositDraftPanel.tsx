@@ -258,8 +258,12 @@ function DraftReview({
         <div>
           <p className="text-small font-medium text-foreground">{t('reportHash')}</p>
           <p className="mt-1 break-all font-mono text-small text-foreground">{draft.reportHash}</p>
-          <p className="mt-1 inline-flex items-center gap-2 text-small text-muted-foreground">
-            <CircleCheck aria-hidden="true" className="h-4 w-4 text-success" strokeWidth={1.75} />
+          <p className="mt-1 flex items-start gap-2 text-small text-muted-foreground">
+            <CircleCheck
+              aria-hidden="true"
+              className="mt-0.5 h-4 w-4 shrink-0 text-success"
+              strokeWidth={1.75}
+            />
             {t('reportHashChecked')}
           </p>
           <a
@@ -280,8 +284,12 @@ function DraftReview({
               {checked.oracleSignature}
             </span>
           </p>
-          <p className="mt-1 inline-flex items-center gap-2 text-small text-muted-foreground">
-            <ShieldCheck aria-hidden="true" className="h-4 w-4 text-success" strokeWidth={1.75} />
+          <p className="mt-1 flex items-start gap-2 text-small text-muted-foreground">
+            <ShieldCheck
+              aria-hidden="true"
+              className="mt-0.5 h-4 w-4 shrink-0 text-success"
+              strokeWidth={1.75}
+            />
             {t('attestorChecked')}
           </p>
         </div>

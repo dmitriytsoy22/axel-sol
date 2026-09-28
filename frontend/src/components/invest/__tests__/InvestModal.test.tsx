@@ -65,12 +65,20 @@ describe('InvestModal', () => {
   it.each([
     ['more shares than are left', '89', 'Only 88 shares are left.'],
     ['a part of a share', '1.5', 'Enter a whole number of shares.'],
+    ['no shares at all', '0', 'Enter at least 1 share.'],
   ])('refuses %s before anything is signed', async (_case, typed, message) => {
     await renderModal(buyer);
     await userEvent.type(sharesInput(), typed);
 
     expect(screen.getByRole('alert')).toHaveTextContent(message);
     expect(confirmButton()).toBeDisabled();
+  });
+
+  it('prices no more shares than are left', async () => {
+    await renderModal(buyer);
+    await userEvent.type(sharesInput(), '999999999999999999999999');
+
+    expect(screen.getByText('You pay').nextSibling).toHaveTextContent(/^—$/);
   });
 
   it('refuses a purchase the wallet cannot pay for', async () => {

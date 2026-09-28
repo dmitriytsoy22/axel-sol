@@ -245,7 +245,10 @@ between the lines, whenever the label wrapped.
 - Tap targets are at least 44×44 with 8 px between them. Text links (Explorer addresses,
   record links, "Published files") keep a 44 px tall box up to `lg`, since a 768 px tablet is
   touched too; from `lg` they are as tall as their text. The demo banner's links sit in running
-  text, so padding grows their target and an equal negative margin keeps the lines in place.
+  text, so padding grows their target and an equal negative margin keeps the lines in place;
+  an Explorer link inside a sentence (the purchase dialog's escrow, `inText`) keeps its 44 px
+  box with the same negative margin, instead of opening a blank band between two lines. A
+  short address never breaks at its ellipsis ("2B99…" / "v9Ux" read as two addresses).
 
 ## Structure
 
@@ -283,7 +286,9 @@ product rule, never a placeholder.
   CTA → footer. Every section has its own loading, empty and error state; one chain read feeds
   them all.
 - **Asset page (built, stage 3):** breadcrumb (Cars / car name) → status badge, serif H1 with
-  the year muted, VIN in mono → a 12-column grid: the model photo with its "Illustrative photo"
+  the year muted, then the share symbol in mono, city, class and park separated by "·"; each dot
+  sits in the gap before its detail and is clipped at the start of a wrapped line, so no line
+  starts or ends with a separator → a 12-column grid: the model photo with its "Illustrative photo"
   caption (7 columns) and, beside it from `md`, the invest panel (5 columns; from `lg` it spans
   both rows and is sticky):
   price per share, "x of y shares sold" with a bar, shares left, the purchase button and one
@@ -302,7 +307,11 @@ product rule, never a placeholder.
   never like the car's badge, and a day turns stale 30 h after it ends in the fleet's zone,
   once the next one should have been collected). Below `md` the purchase button moves to a fixed bottom bar with the
   price and a 48 px button; DOM order is the mobile order (photo, panel, details). The page
-  keeps showing the car while it re-reads after a purchase.
+  keeps showing the car while it re-reads after a purchase. When Solana doesn't answer, the
+  notice offers "Try again" and "See all cars", since the breadcrumb needs the car it can't
+  read. The purchase dialog prices only shares that can be bought: "You pay —" until a whole
+  number within what is left ("0" reads "Enter at least 1 share"), and a total too wide for
+  the label's row takes the next line whole.
   **v2 screens (frontend stage 2):** the panel's bar is `asset/RaiseProgress`, a track with a
   2 px tick at the soft cap and the goal in words under it ("Goal: 1,173", "Goal of 1,173 met");
   raising cards in the catalog use the same bar at `sm`. Above a card's bar "21% sold" and
@@ -317,7 +326,8 @@ product rule, never a placeholder.
   of milestones: filled check = done, ringed dot = current, hollow = next, amber cross =
   missed; amber ring while paused) and adds, after the payout history, "Check the car's data
   yourself" (`asset/VerifyData`): four figures from the project account, one outline
-  "Verify in this browser" button, then a verdict line with a check, amber triangle or red
+  "Verify in this browser" button, a progress line that counts the months downloaded so far
+  ("Months downloaded: 0 of 8…", never "month 0"), then a verdict line with a check, amber triangle or red
   cross, the rebuilt and on-chain heads in mono, and one pill row per deposit.
 - **Dashboard (built, stage 3):** page header (overline, serif H1, a lead that names the
   connected wallet; its wording before and after the wallet connects shares one grid cell, so a
@@ -325,11 +335,13 @@ product rule, never a placeholder.
   shares held "in N cars", not claimed yet) → holdings table (car with thumbnail and its status
   under the name, shares and "x% of the car", value, to claim, actions; stacked rows below
   `lg`) → payouts list, newest first, each
-  naming its car, number and date, with a status pill, the amount and a Claim button, plus
+  naming its car, number and period as one range (a car sale's one day is one date), with a
+  status pill, the amount and a Claim button, plus
   "Claim all" (the page's one primary action) only when something is claimable. Disconnected:
   a two-part panel (why a wallet is needed + "Connect wallet", and what the page shows once
-  connected). Empty: "This wallet holds no shares yet" with "Browse the cars". Loading keeps the
-  summary labels with placeholder values. Error: retry. A pending recovery of the wallet's shares
+  connected). Empty: "This wallet holds no shares yet" with "Browse the cars". A total with
+  nothing in it names the token of the wallet's cars ("0 tKZT"), like every other amount.
+  Loading keeps the summary labels with placeholder values. Error: retry. A pending recovery of the wallet's shares
   is the first block: an amber panel naming the car, the shares and the new wallet, with a red
   outline "Veto the recovery" until the delay ends. A refund opens a dialog (amount, shares
   burned, destination account) before the wallet is asked, and its result stays on screen
@@ -338,10 +350,11 @@ product rule, never a placeholder.
   recipient while the address is typed and says in green or red what the hook will do.
 - **Payouts (built, stage 3):** page header → the same ruled summary (claimed so far, not
   claimed yet, payouts) → a sortable ledger (payout, period on two lines, date, paid in, per
-  share, your part, record link; stacked label/value rows below `xl`). Disconnected, loading,
-  empty and
-  error states as on the dashboard; the old endless "Loading payout history…" with no wallet
-  is gone.
+  share, your part, record link; stacked label/value rows below `xl`; a one-day period, a car
+  sale, is one date). Disconnected, loading and error states as on the dashboard; the old
+  endless "Loading payout history…" with no wallet is gone. A wallet that never held a share
+  gets "No payouts for this wallet yet" with "Browse the cars" instead of three bare zeros; one
+  whose cars haven't paid yet sees "0 tKZT" totals over the empty ledger.
 - **Admin (built, stage 3):** an ink header naming the managed car (overline "Operator
   console", serif H1, share token link) with four figures (status, shares sold, payouts made,
   income vault) → paper cards in an 8 + 4 grid: deposit income (three amounts in SOL, the
@@ -362,7 +375,8 @@ product rule, never a placeholder.
   signed in and, for a wallet with several keys, switches roles with a segmented control
   (`role="tablist"`). Platform admin: the ink car header, then car status, operator and
   oracle, and share recovery (propose, run, withdraw) in 8 columns beside a sticky
-  protocol-config ledger. Operator: the ink header over a deposits card (open or closed pill,
+  protocol-config ledger, whose short values ("60 days", an address) keep their line while
+  the labels wrap in its 300 px column at 1024. Operator: the ink header over a deposits card (open or closed pill,
   paid in, claimed, live income vault, both keys) and the car's payout history. KYC: a page
   header over the registry card, which shows the wallet's current record before approve and
   revoke, and stops the demo key before a record it may not change. In the car header the car
@@ -371,7 +385,8 @@ product rule, never a placeholder.
   share symbol (decision 34). Each recovery field says under itself what is wrong with it
   (`aria-invalid`, `aria-describedby`), and the release step's hash rule turns red with an
   invalid hash. The operator's expense rows have labels, not placeholders: column heads from
-  `md`, a label over each field below it.
+  `md`, a label over each field below it. In the draft review, the checks' icons keep their
+  16 px and sit on the first line of a sentence that wraps.
 - **Judge demo (`/demo`, frontend stage 3):** page header (overline "Judge demo · Solana devnet",
   serif H1, lead) → an ordered list of seven step cards (number in a circle, `text-title` heading,
   one explaining paragraph, then the step's action): get demo access, buy in an open raise (the
@@ -388,8 +403,10 @@ product rule, never a placeholder.
 - **Demo banner (frontend stage 2):** on every test network, a cyan accent strip under the bar
   ("Solana devnet demo data, generated by scripts/seed-devnet. …") with a link to the seed's
   README; on the home page the hero carries the same words, since the bar sits over it there.
-  On a demo deployment it ends with "Judging? Get demo access →" (right-aligned from `md`, a
-  line of its own below), which is how every page reaches `/demo`.
+  On a demo deployment it ends with "Judging? Get demo access →" (a line of its own below `md`;
+  right-aligned from `md`, wrapping within 18rem until `lg`, where the Kazakh link would
+  otherwise take 405 of 720 px, and on one line from `lg`), which is how every page reaches
+  `/demo`. On `/demo` itself the banner and the mobile menu leave that call out.
 - **Shared states:** `ui/Notice` (empty, error, not found), `wallet/ConnectWalletPanel`
   (disconnected), `ui/SummaryStats` (ruled figures with placeholders), `ui/Pill` (status dot +
   word; `Badge` maps project status onto it; `wrap` lets a sentence-long result wrap in
@@ -401,7 +418,9 @@ product rule, never a placeholder.
   dialog's action outside the scrolling content, so the purchase button is in view when the
   sheet opens on a phone and nothing, keyboard focus included, slides under it. Tab moves only
   through the dialog's enabled controls, and closing it returns focus to the control that
-  opened it. Toasts sit top-right above modals; transaction progress reads
+  opened it. Toasts sit under the bar (top-right from `sm`, centred below) and above modals,
+  so the bar's menu, language and wallet buttons stay in reach while one shows; transaction
+  progress reads
   "Approve it in your wallet → Sending to Solana → Waiting for confirmation → Confirmed on
   Solana".
 
@@ -564,6 +583,10 @@ product rule, never a placeholder.
     car page showed "#0" while its terms said "9 payouts". Every screen (car page, portfolio,
     payouts, verify panel, console) shows `payoutNumber(index)`, so the last number is the
     count. ← review rubric "consistency".
+38. **A Russian or Kazakh dash stays with the word before it.** Messages put a no-break space
+    before "—", so no line starts with a dash ("…каждого зачисления / — ваши доли"), and no
+    sentence opens with the lowercase network name ("localnet желісіне…"). A test rejects
+    " —" and a leading `{network}` in either language. ← anti-slop "typographic dirt", decision 33.
 
 ## Constraints
 

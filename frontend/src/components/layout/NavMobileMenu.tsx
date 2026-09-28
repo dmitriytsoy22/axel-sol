@@ -147,12 +147,12 @@ export const NavMobileMenu = ({ isOpen, setIsOpen }: NavMobileMenuProps): JSX.El
             ))}
           </nav>
 
-          {DEMO_ACCESS_SHOWN && (
+          {/* A call to the demo, so not on the demo's own page. */}
+          {DEMO_ACCESS_SHOWN && pathname !== DEMO_PATH && (
             <div className="page-container mt-6">
               <Link
                 href={DEMO_PATH}
                 onClick={() => setIsOpen(false)}
-                aria-current={pathname === DEMO_PATH ? 'page' : undefined}
                 className={buttonClasses({ variant: 'outline', size: 'lg', className: 'w-full' })}
               >
                 <FlaskConical aria-hidden="true" strokeWidth={1.75} />

@@ -157,13 +157,18 @@ export function CarPayouts({ project }: CarPayoutsProps): JSX.Element {
                 <p className="text-small text-muted-foreground">{days(period)}</p>
               </div>
               {period.kind === 'final' && <div className="mt-1">{finalPill}</div>}
+              {/* An amount keeps its token on its line; the label wraps first. */}
               <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-small tabular-nums">
                 <dt className="text-muted-foreground">{t('colPaidIn')}</dt>
-                <dd className="text-right text-foreground">{figure(period.net, true)}</dd>
+                <dd className="whitespace-nowrap text-right text-foreground">
+                  {figure(period.net, true)}
+                </dd>
                 <dt className="text-muted-foreground">{t('colSharesCounted')}</dt>
-                <dd className="text-right text-foreground">{formatCount(period.supply, locale)}</dd>
+                <dd className="whitespace-nowrap text-right text-foreground">
+                  {formatCount(period.supply, locale)}
+                </dd>
                 <dt className="text-muted-foreground">{t('colPerShare')}</dt>
-                <dd className="text-right font-medium text-foreground">
+                <dd className="whitespace-nowrap text-right font-medium text-foreground">
                   {figure(perShare(period), true)}
                 </dd>
               </dl>

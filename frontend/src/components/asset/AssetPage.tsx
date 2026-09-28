@@ -168,16 +168,22 @@ export function AssetPage({ id }: { id: string }): JSX.Element {
     // A refetch after a purchase keeps the page on screen instead of flashing the skeleton.
     content = <AssetDetails project={project} onChanged={refetch} />;
   } else if (error) {
+    // The breadcrumb needs the car it can't read, so the way back to the fleet is here.
     content = (
       <Notice
         as="h1"
         title={t('errorTitle')}
         body={t('errorBody')}
         action={
-          <Button variant="secondary" onClick={refetch}>
-            <RotateCw aria-hidden="true" strokeWidth={1.75} />
-            {t('retry')}
-          </Button>
+          <>
+            <Button variant="secondary" onClick={refetch}>
+              <RotateCw aria-hidden="true" strokeWidth={1.75} />
+              {t('retry')}
+            </Button>
+            <Link href="/#vehicles" className={buttonClasses({ variant: 'ghost' })}>
+              {t('backToCatalog')}
+            </Link>
+          </>
         }
       />
     );

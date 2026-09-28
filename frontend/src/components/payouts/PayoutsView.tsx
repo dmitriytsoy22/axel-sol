@@ -3,6 +3,7 @@
 import React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { Link } from '@/i18n/routing';
 import { ArrowUpRight, RotateCw } from 'lucide-react';
 import { usePayoutHistory } from '@/hooks/usePayoutHistory';
 import { INDEXER_URL } from '@/lib/api/indexer';
@@ -11,7 +12,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { ConnectWalletPanel } from '@/components/wallet/ConnectWalletPanel';
 import { useWalletConnecting } from '@/components/wallet/useWalletConnecting';
 import { PayoutHistoryTable } from '@/components/features/payouts/PayoutHistoryTable';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonClasses } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { SummaryStats } from '@/components/ui/SummaryStats';
 import { formatDate, formatNumber, formatTokenAmount, formatTokenTotals } from '@/lib/format';
@@ -36,8 +37,16 @@ export function PayoutsView({
     positions.refetch();
     payouts.refetch();
   };
-  const totals = (list: TokenTotal[]) =>
-    list.length > 0 ? formatTokenTotals(list, locale) : formatNumber(0, locale);
+  const loading = positions.isLoading || payouts.isLoading || connecting;
+  const history = payouts.history;
+  const summary = history?.totals ?? positions.summary;
+  // Every car the wallet has held is in `claimed`, at zero or more, so none there means the
+  // wallet never held a share; otherwise its token names an empty total ("0 tKZT").
+  const [firstCar] = summary.claimed;
+  const totals = (list: TokenTotal[]) => {
+    if (list.length > 0) return formatTokenTotals(list, locale);
+    return firstCar ? formatTokenAmount(0n, firstCar.unit, locale) : formatNumber(0, locale);
+  };
 
   let body: React.ReactNode;
   if (!connected && !connecting) {
@@ -63,10 +72,20 @@ export function PayoutsView({
         }
       />
     );
+  } else if (!loading && !firstCar) {
+    body = (
+      <Notice
+        as="h2"
+        title={t('emptyTitle')}
+        body={t('emptyBody')}
+        action={
+          <Link href="/#vehicles" className={buttonClasses()}>
+            {t('exploreCatalog')}
+          </Link>
+        }
+      />
+    );
   } else {
-    const loading = positions.isLoading || payouts.isLoading || connecting;
-    const history = payouts.history;
-    const summary = history?.totals ?? positions.summary;
     body = (
       <div className="flex flex-col gap-10">
         <SummaryStats

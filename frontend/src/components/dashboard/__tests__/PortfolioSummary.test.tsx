@@ -36,6 +36,17 @@ describe('PortfolioSummary', () => {
     expect(figure('Ready to claim')).toHaveTextContent('44.12 tKZT');
   });
 
+  it("names the token of an empty total from the wallet's cars", () => {
+    renderSummary({
+      value: [{ amount: 450_000_000_000n, unit: TKZT }],
+      shares: 45n,
+      pending: [],
+      claimed: [],
+    });
+
+    expect(figure('Ready to claim')).toHaveTextContent(/^Ready to claim0 tKZT/);
+  });
+
   it('shows a plain zero where no token has anything to total', () => {
     renderSummary({ value: [], shares: 0n, pending: [], claimed: [] });
 

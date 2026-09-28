@@ -28,15 +28,22 @@ export function AssetHeader({ project }: AssetHeaderProps): JSX.Element {
           <span className="tabular-nums text-muted-foreground">{car.year}</span>
         )}
       </h1>
-      <p className="mt-3 flex flex-wrap gap-x-2 text-small text-muted-foreground">
-        <span className="font-mono text-foreground">{car.symbol}</span>
-        {details.map((detail) => (
-          <React.Fragment key={detail}>
-            <span aria-hidden="true">·</span>
-            <span>{detail}</span>
-          </React.Fragment>
-        ))}
-      </p>
+      {/* Each "·" sits in the gap before its detail. The line is pulled left by that gap under
+          a clipping box, so the dot of a detail that wraps to a new line is cut off: no line
+          starts or ends with a separator. */}
+      <div className="mt-3 overflow-hidden">
+        <p className="-ml-5 flex flex-wrap text-small text-muted-foreground">
+          <span className="ml-5 font-mono text-foreground">{car.symbol}</span>
+          {details.map((detail) => (
+            <span key={detail} className="relative ml-5">
+              <span aria-hidden="true" className="absolute -left-3">
+                ·
+              </span>
+              {detail}
+            </span>
+          ))}
+        </p>
+      </div>
     </header>
   );
 }

@@ -10,6 +10,7 @@ import { NavMobileMenu } from './NavMobileMenu';
 import { Logo } from './Logo';
 import { ConnectionStatus } from '../shared/ConnectionStatus';
 import { DemoBanner } from './DemoBanner';
+import { DEMO_PATH } from './constants';
 import { restorePlace } from './place';
 
 const SCROLL_THRESHOLD = 16;
@@ -77,7 +78,7 @@ export const Navbar = (): JSX.Element => {
 
       {/* The home hero sits under the transparent bar and carries the demo note itself. */}
       {!isHome && <div aria-hidden="true" className="h-16" />}
-      {!isHome && <DemoBanner />}
+      {!isHome && <DemoBanner onDemoPage={pathname === DEMO_PATH} />}
     </>
   );
 };

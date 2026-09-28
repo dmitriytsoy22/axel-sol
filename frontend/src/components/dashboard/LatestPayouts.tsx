@@ -8,7 +8,7 @@ import { CarName } from '@/components/catalog/CarName';
 import { Button } from '@/components/ui/Button';
 import { Pill } from '@/components/ui/Pill';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { formatDay, formatTokenAmount, payoutNumber } from '@/lib/format';
+import { formatDayRange, formatTokenAmount, payoutNumber } from '@/lib/format';
 
 /** Deposits shown on the portfolio; the payouts page has them all. */
 const SHOWN = 3;
@@ -70,7 +70,7 @@ export function LatestPayouts({ indexerUrl }: { indexerUrl: string }): JSX.Eleme
                 {row.kind === 'final' && <Pill tone="info">{tPayouts('finalPayout')}</Pill>}
               </span>
               <span className="block text-small text-muted-foreground">
-                {formatDay(row.periodStart, locale)} – {formatDay(row.periodEnd, locale)}
+                {formatDayRange(row.periodStart, row.periodEnd, locale)}
               </span>
             </span>
             <span className="font-semibold tabular-nums text-foreground">

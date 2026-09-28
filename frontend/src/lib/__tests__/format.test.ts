@@ -157,6 +157,12 @@ describe('formatDayRange', () => {
     expect(formatDayRange(20260901, 20260930, 'kk')).toBe('2026 ж. 1–30 қыр.');
   });
 
+  it('writes a one-day period, such as a car sale, as one date', () => {
+    expect(formatDayRange(20260731, 20260731, 'en')).toBe('Jul 31, 2026');
+    expect(formatDayRange(20260731, 20260731, 'ru')).toMatch(/^31 июл\. 2026\sг\.$/);
+    expect(formatDayRange(20260731, 20260731, 'kk')).toBe('2026 ж. 31 шіл.');
+  });
+
   it('writes both months, and both years, when the days differ in them', () => {
     expect(formatDayRange(20260915, 20261014, 'kk')).toBe('2026 ж. 15 қыр. – 14 қаз.');
     expect(formatDayRange(20261215, 20270114, 'kk')).toBe('2026 ж. 15 жел. – 2027 ж. 14 қаң.');

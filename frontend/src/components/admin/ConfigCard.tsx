@@ -9,11 +9,14 @@ import { durationParts, formatBps } from '@/lib/format';
 import type { ConfigAccount } from '@/lib/solana/accounts';
 import { configAddress } from '@/lib/solana/pda';
 
+/* Values are short (an address, "60 days", a fee) and keep their line; the label wraps. */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-h-11 items-center justify-between gap-4 py-2">
-      <dt className="text-small text-muted-foreground">{label}</dt>
-      <dd className="text-right text-small font-medium tabular-nums text-foreground">{children}</dd>
+      <dt className="min-w-0 text-small text-muted-foreground">{label}</dt>
+      <dd className="shrink-0 whitespace-nowrap text-right text-small font-medium tabular-nums text-foreground">
+        {children}
+      </dd>
     </div>
   );
 }

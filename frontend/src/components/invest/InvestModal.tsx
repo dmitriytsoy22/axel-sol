@@ -52,14 +52,18 @@ export function InvestModal({
   const token = project.payment;
   const available = project.totalShares - project.sharesSold;
   const shares = parseShares(text);
-  const cost = shares === null ? 0n : shares * project.pricePerShare;
+  // Only shares that can be bought have a total: 24 typed nines priced a figure that ran off
+  // the dialog. More than the wallet holds still shows what it would cost.
+  const cost = shares === null || shares > available ? null : shares * project.pricePerShare;
 
   let validationError: string | null = null;
-  if (text.trim() !== '' && (shares === null || shares === 0n)) {
+  if (text.trim() !== '' && shares === null) {
     validationError = t('validationWhole');
+  } else if (shares === 0n) {
+    validationError = t('validationMin');
   } else if (shares !== null && shares > available) {
     validationError = t('validationMax', { count: Number(available) });
-  } else if (shares !== null && balance !== null && cost > balance) {
+  } else if (cost !== null && balance !== null && cost > balance) {
     validationError = t('validationBalance', { symbol: token.symbol });
   }
 
@@ -89,7 +93,11 @@ export function InvestModal({
       icon: LockKeyhole,
       text: t('escrow'),
       extra: (
-        <ExplorerLink address={project.escrowVault.toBase58()} srLabel={t('openInExplorer')} />
+        <ExplorerLink
+          address={project.escrowVault.toBase58()}
+          srLabel={t('openInExplorer')}
+          inText
+        />
       ),
     },
     {
@@ -199,10 +207,11 @@ export function InvestModal({
             )}
           </div>
 
-          <div className="flex items-baseline justify-between gap-4 border-t border-border pt-4">
+          {/* A total too wide for the label's row takes the next line, whole and on the right. */}
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border pt-4">
             <span className="text-body text-muted-foreground">{t('totalCost')}</span>
-            <span className="text-h4 font-semibold tabular-nums text-foreground">
-              {formatTokenAmount(cost, token, locale)}
+            <span className="ml-auto whitespace-nowrap text-h4 font-semibold tabular-nums text-foreground">
+              {cost === null ? '—' : formatTokenAmount(cost, token, locale)}
             </span>
           </div>
 
