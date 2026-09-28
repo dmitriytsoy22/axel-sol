@@ -14,15 +14,21 @@ interface MobileInvestBarProps {
   onBuy: () => void;
 }
 
-/** Below md the purchase action stays in thumb reach at the bottom of the screen. */
+/**
+ * Below md the purchase action stays in thumb reach at the bottom of the screen, while the
+ * raise is open. Once shares can no longer be bought the bar would pin a disabled button over
+ * the page; the panel above already says why.
+ */
 export function MobileInvestBar({
   project,
   saleState,
   approval,
   onBuy,
-}: MobileInvestBarProps): JSX.Element {
+}: MobileInvestBarProps): JSX.Element | null {
   const t = useTranslations('Asset');
   const locale = useLocale();
+
+  if (saleState !== 'open') return null;
 
   return (
     <div

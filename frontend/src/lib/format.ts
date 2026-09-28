@@ -42,6 +42,13 @@ export interface TokenUnit {
   symbol: string;
 }
 
+export interface TokenAmountOptions {
+  /** Keeps trailing zeros up to `maxFractionDigits`, so a column's decimals line up: "132,696.00". */
+  padFraction?: boolean;
+  /** False for a column whose header already names the token. */
+  withSymbol?: boolean;
+}
+
 /**
  * A token amount in the reader's number format with its symbol: "1,250.5 tKZT" in English,
  * "1 250,5 tKZT" in Russian. Digits past `maxFractionDigits` are cut, never rounded up, so a
@@ -53,23 +60,22 @@ export function formatTokenAmount(
   unit: TokenUnit,
   locale: string,
   maxFractionDigits = 2,
+  { padFraction = false, withSymbol = true }: TokenAmountOptions = {},
 ): string {
   // BigInt division and remainder keep the sign, so the digits are cut from the magnitude.
   const magnitude = amount < 0n ? -amount : amount;
   const scale = 10n ** BigInt(unit.decimals);
   const whole = magnitude / scale;
   const digits = Math.min(maxFractionDigits, unit.decimals);
-  const fraction = (magnitude % scale)
-    .toString()
-    .padStart(unit.decimals, '0')
-    .slice(0, digits)
-    .replace(/0+$/, '');
+  const cut = (magnitude % scale).toString().padStart(unit.decimals, '0').slice(0, digits);
+  const fraction = padFraction ? cut : cut.replace(/0+$/, '');
   const format = new Intl.NumberFormat(intlLocale(locale));
   const part = (value: number, type: Intl.NumberFormatPartTypes, fallback: string) =>
     format.formatToParts(value).find((p) => p.type === type)?.value ?? fallback;
-  const sign = amount < 0n && (whole > 0n || fraction) ? part(-1, 'minusSign', '-') : '';
+  const sign = amount < 0n && (whole > 0n || /[1-9]/.test(cut)) ? part(-1, 'minusSign', '-') : '';
   const decimals = fraction ? `${part(1.5, 'decimal', '.')}${fraction}` : '';
-  return `${sign}${format.format(whole)}${decimals} ${unit.symbol}`;
+  const text = `${sign}${format.format(whole)}${decimals}`;
+  return withSymbol ? `${text} ${unit.symbol}` : text;
 }
 
 /** Amounts in several tokens, one per token: "1,250 tKZT · 10 USDC". */
@@ -133,13 +139,49 @@ export function formatTime(ms: number, locale: string): string {
   }).format(new Date(ms));
 }
 
-/** A day the program stores as YYYYMMDD, written like any other date. */
-export function formatDay(yyyymmdd: number, locale: string): string {
+/** Noon UTC of a day the program stores as YYYYMMDD: the same calendar day from UTC-11 to UTC+11. */
+function dayToDate(yyyymmdd: number): Date {
   const year = Math.floor(yyyymmdd / 10_000);
   const month = Math.floor(yyyymmdd / 100) % 100;
   const day = yyyymmdd % 100;
-  // Noon UTC is the same calendar day from UTC-11 to UTC+11.
-  return formatDate(Date.UTC(year, month - 1, day, 12) / 1000, locale);
+  return new Date(Date.UTC(year, month - 1, day, 12));
+}
+
+/** A day the program stores as YYYYMMDD, written like any other date. */
+export function formatDay(yyyymmdd: number, locale: string): string {
+  return formatDate(dayToDate(yyyymmdd).getTime() / 1000, locale);
+}
+
+/**
+ * Two YYYYMMDD days as one range, naming the month and year once when they share them:
+ * "Sep 1 – 30, 2026", "1–30 сент. 2026 г.", "2026 ж. 1–30 қыр.". Kazakh follows the CLDR
+ * Kazakh interval patterns, spelled out for the reason given for `formatDate`.
+ */
+export function formatDayRange(start: number, end: number, locale: string): string {
+  const from = dayToDate(start);
+  const to = dayToDate(end);
+  if (locale !== 'kk') {
+    return new Intl.DateTimeFormat(intlLocale(locale), {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).formatRange(from, to);
+  }
+  if (start === end) return formatDay(start, locale);
+  const month = (date: Date) => KAZAKH_MONTHS[date.getMonth()];
+  if (from.getFullYear() !== to.getFullYear()) {
+    return `${formatDay(start, locale)} – ${formatDay(end, locale)}`;
+  }
+  const year = `${from.getFullYear()} ж.`;
+  if (from.getMonth() !== to.getMonth()) {
+    return `${year} ${from.getDate()} ${month(from)} – ${to.getDate()} ${month(to)}`;
+  }
+  return `${year} ${from.getDate()}–${to.getDate()} ${month(to)}`;
+}
+
+/** A payout's number as people count it: the program numbers periods from 0. */
+export function payoutNumber(periodIndex: number): number {
+  return periodIndex + 1;
 }
 
 export function shortAddress(address: string): string {

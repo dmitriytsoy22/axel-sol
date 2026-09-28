@@ -18,7 +18,7 @@ import {
   type VerificationState,
 } from '@/hooks/useTelemetryVerification';
 import { PUBLISHED_DATA_URL } from '@/lib/api/published';
-import { formatDay, formatNumber } from '@/lib/format';
+import { formatDay, formatNumber, payoutNumber } from '@/lib/format';
 import type {
   DepositCheck,
   DocumentStatus,
@@ -135,7 +135,7 @@ function DepositRow({ deposit, behind }: { deposit: DepositCheck; behind: boolea
   return (
     <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <span className="shrink-0 text-small font-medium text-foreground">
-        {t('payout', { index: deposit.period.index })}
+        {t('payout', { index: payoutNumber(deposit.period.index) })}
       </span>
       <span className="flex flex-wrap gap-2 sm:justify-end">
         <Pill tone={REPORT_TONE[deposit.report]} wrap>

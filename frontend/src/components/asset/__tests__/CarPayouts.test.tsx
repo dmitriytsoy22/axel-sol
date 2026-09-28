@@ -31,13 +31,17 @@ describe('CarPayouts', () => {
 
     const table = await screen.findByRole('table');
     const [, newest, , oldest] = within(table).getAllByRole('row');
-    // 555 555 557 gross, 15% fee, over 100 shares.
-    expect(within(newest).getByText('#2')).toBeInTheDocument();
-    expect(within(newest).getByText('472.22 tKZT')).toBeInTheDocument();
-    expect(within(newest).getByText('4.72 tKZT')).toBeInTheDocument();
-    expect(within(newest).getByText(/Dec 1, 2026 – Dec 31, 2026/)).toBeInTheDocument();
-    expect(within(oldest).getByText('#0')).toBeInTheDocument();
-    expect(within(oldest).getByText('1,049.38 tKZT')).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Paid in tKZT' })).toBeInTheDocument();
+    // 555 555 557 gross, 15% fee, over 100 shares; the program's third period is payout #3.
+    expect(within(newest).getByRole('link', { name: /^#3/ })).toHaveAttribute(
+      'href',
+      expect.stringContaining('explorer'),
+    );
+    expect(within(newest).getByText('472.22')).toBeInTheDocument();
+    expect(within(newest).getByText('4.72')).toBeInTheDocument();
+    expect(within(newest).getByText(/^Dec 1\s–\s31, 2026$/)).toBeInTheDocument();
+    expect(within(oldest).getByRole('link', { name: /^#1/ })).toBeInTheDocument();
+    expect(within(oldest).getByText('1,049.38')).toBeInTheDocument();
   });
 
   it('offers a retry when the payouts cannot be read', async () => {

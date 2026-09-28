@@ -28,11 +28,12 @@ import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { Pill } from '@/components/ui/Pill';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { TrailingIcon } from '@/components/ui/TrailingIcon';
 import { demoProgress, type DemoStep, type StepState } from './progress';
 import { Turnstile } from './Turnstile';
 
 const linkClasses =
-  'inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 hover:underline';
+  'inline-flex min-h-11 items-center text-small font-medium text-primary underline-offset-4 hover:underline';
 
 function TxLink({ signature }: { signature: string | undefined }): JSX.Element | null {
   const t = useTranslations('DemoAccess');
@@ -160,8 +161,7 @@ function OpenRaises({ raises }: { raises: Project[] }): JSX.Element {
             </span>
           </span>
           <Link href={`/assets/${project.shareMint.toBase58()}`} className={linkClasses}>
-            {t('openRaise')}
-            <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+            <TrailingIcon icon={ArrowRight}>{t('openRaise')}</TrailingIcon>
           </Link>
         </li>
       ))}
@@ -389,8 +389,7 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
       >
         {fleetMint && (
           <Link href={`/assets/${fleetMint}#verify-data-title`} className={linkClasses}>
-            {t('verifyAction', { car: fleetName })}
-            <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+            <TrailingIcon icon={ArrowRight}>{t('verifyAction', { car: fleetName })}</TrailingIcon>
           </Link>
         )}
       </Step>
@@ -403,8 +402,7 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
         body={t('solvencyBody')}
       >
         <Link href={fleetMint ? `/solvency#${fleetMint}` : '/solvency'} className={linkClasses}>
-          {t('solvencyAction')}
-          <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+          <TrailingIcon icon={ArrowRight}>{t('solvencyAction')}</TrailingIcon>
         </Link>
       </Step>
     </ol>

@@ -12,6 +12,7 @@ import { Notice } from '@/components/ui/Notice';
 import { Pill } from '@/components/ui/Pill';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { SummaryStats } from '@/components/ui/SummaryStats';
+import { TrailingIcon } from '@/components/ui/TrailingIcon';
 import { SOLVENCY_REFRESH_MS, useSolvency } from '@/hooks/useSolvency';
 import { Link } from '@/i18n/routing';
 import {
@@ -159,10 +160,11 @@ function ProjectLedger({ project, solvency }: Entry): JSX.Element {
         <div className="border-t border-border px-5 py-3 md:px-6">
           <Link
             href={`/assets/${mint}`}
-            className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary underline-offset-4 hover:underline lg:min-h-0"
+            className="inline-flex min-h-11 items-center text-small font-medium text-primary underline-offset-4 hover:underline lg:min-h-0"
           >
-            {t('viewCar', { car: carLabel(project.car) })}
-            <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+            <TrailingIcon icon={ArrowRight}>
+              {t('viewCar', { car: carLabel(project.car) })}
+            </TrailingIcon>
           </Link>
         </div>
       </details>

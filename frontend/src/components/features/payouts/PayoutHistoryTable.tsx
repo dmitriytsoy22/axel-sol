@@ -5,7 +5,7 @@ import { DataTable, ColumnDef } from '@/components/ui/DataTable';
 import { Pill } from '@/components/ui/Pill';
 import { Skeleton } from '@/components/ui/Skeleton';
 import type { PayoutRow } from '@/hooks/usePayoutHistory';
-import { formatDate, formatDay, formatTokenAmount } from '@/lib/format';
+import { formatDate, formatDay, formatTokenAmount, payoutNumber } from '@/lib/format';
 import { getExplorerUrl } from '@/lib/solana/connection';
 import { carTitle, type PaymentToken } from '@/lib/solana/tokens';
 
@@ -82,7 +82,7 @@ export function PayoutHistoryTable({
               {item.car} <span className="font-mono text-muted-foreground">{item.symbol}</span>
             </span>
             <span className="block text-muted-foreground">
-              {t('payoutNumber', { index: item.index })}
+              {t('payoutNumber', { index: payoutNumber(item.index) })}
               {item.final && (
                 <>
                   {' '}

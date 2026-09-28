@@ -163,9 +163,10 @@ describe('DashboardView', () => {
       );
       expect((await latest.findAllByRole('listitem')).map((item) => item.textContent)).toEqual([
         // The share symbol tells apart two cars of one model.
-        expect.stringMatching(/^Kia Rio AXKR017Payout #3.*Your part: \+4 tKZT$/),
-        expect.stringMatching(/Payout #2.*Your part: \+3 tKZT$/),
-        expect.stringMatching(/Payout #1.*Your part: \+2 tKZT$/),
+        // The program's periods 3, 2 and 1 are the fourth, third and second payouts.
+        expect.stringMatching(/^Kia Rio AXKR017Payout #4.*Your part: \+4 tKZT$/),
+        expect.stringMatching(/Payout #3.*Your part: \+3 tKZT$/),
+        expect.stringMatching(/Payout #2.*Your part: \+2 tKZT$/),
       ]);
       expect(fetchMock).toHaveBeenCalledWith(
         `${INDEXER}/v2/wallets/${alice.toBase58()}/payouts`,

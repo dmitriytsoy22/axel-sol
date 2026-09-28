@@ -254,7 +254,8 @@ describe('DepositDraftPanel', () => {
 
     expect(await screen.findByText('Income deposited')).toBeInTheDocument();
     expect(
-      screen.getByText(`Deposited as payout #${car.project.periodCount}.`),
+      // The program numbers periods from 0; people count payouts from 1.
+      screen.getByText(`Deposited as payout #${car.project.periodCount + 1}.`),
     ).toBeInTheDocument();
     expect(onDeposited).toHaveBeenCalledTimes(1);
     const [sent] = car.node.sent;

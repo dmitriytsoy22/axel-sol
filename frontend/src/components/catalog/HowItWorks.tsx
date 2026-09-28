@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { ArrowRight } from 'lucide-react';
 import { Link } from '@/i18n/routing';
+import { TrailingIcon } from '@/components/ui/TrailingIcon';
 
 const STEPS = ['verify', 'buy', 'earn', 'claim'] as const;
 
@@ -47,10 +48,9 @@ export function HowItWorks(): JSX.Element {
                 {step === 'claim' && (
                   <Link
                     href="/dashboard"
-                    className="mt-3 inline-flex min-h-11 items-center gap-1 text-body font-medium text-primary no-underline transition-colors duration-fast ease-move hover:text-primary-hover"
+                    className="mt-3 inline-flex min-h-11 items-center text-body font-medium text-primary no-underline transition-colors duration-fast ease-move hover:text-primary-hover"
                   >
-                    {t('portfolioLink')}
-                    <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+                    <TrailingIcon icon={ArrowRight}>{t('portfolioLink')}</TrailingIcon>
                   </Link>
                 )}
               </div>

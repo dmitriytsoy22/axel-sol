@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { SummaryStats } from '@/components/ui/SummaryStats';
+import { TrailingIcon } from '@/components/ui/TrailingIcon';
 import { shortAddress } from '@/lib/format';
 import { NETWORK_NAME } from '@/lib/network';
 import { PortfolioSummary } from './PortfolioSummary';
@@ -104,10 +105,9 @@ export function DashboardView({
         {indexerUrl && <LatestPayouts indexerUrl={indexerUrl} />}
         <Link
           href="/payouts"
-          className="inline-flex min-h-11 items-center gap-1 self-start text-small font-medium text-primary underline-offset-4 hover:underline"
+          className="inline-flex min-h-11 items-center self-start text-small font-medium text-primary underline-offset-4 hover:underline"
         >
-          {t('fullHistory')}
-          <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+          <TrailingIcon icon={ArrowRight}>{t('fullHistory')}</TrailingIcon>
         </Link>
       </div>
     );

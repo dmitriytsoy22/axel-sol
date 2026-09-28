@@ -195,7 +195,9 @@ v1 devnet data is in SOL; v2 moves prices to the tenge stablecoin (tKZT on devne
 
 `lucide-react` only. Sizes 16 (inline, tables), 20 (controls), 24 (navigation). One stroke width,
 1.75, everywhere. Color through `currentColor`. Icons next to text are `aria-hidden`; icon-only
-buttons carry an `aria-label` and a 44×44 hit area.
+buttons carry an `aria-label` and a 44×44 hit area. An arrow after a link's label is glued to
+the label's last word (`ui/TrailingIcon`): as its own flex item it floated at the far right,
+between the lines, whenever the label wrapped.
 
 ### Motion
 
@@ -220,11 +222,12 @@ buttons carry an `aria-label` and a 44×44 hit area.
 
 ### Mobile rules
 
-- Breakpoints: Tailwind sm 640, md 768 and lg 1024, `min-width` only. Two local exceptions:
+- Breakpoints: Tailwind sm 640, md 768 and lg 1024, `min-width` only. Three local exceptions:
   the asset page's bottom bar hides its price below 360 px (`min-[360px]`), since at 320 px
-  the 48 px button needs the whole row; and the payouts ledger is a table only from `xl`
-  (1280 px), since its seven columns of Russian amounts and dates need the full 1200 px
-  container.
+  the 48 px button needs the whole row; the payout calculator's results share a row only from
+  360 px, since half its card at 320 px is narrower than "18,000,000" at `text-title`; and the
+  payouts ledger is a table only from `xl` (1280 px), since its seven columns of Russian
+  amounts and dates need the full 1200 px container.
 - Type steps down one level below `md`: hero `text-h2` (40) instead of `text-display`, section
   headings `text-h3` (32) instead of `text-h2`.
 - Sections: 56 px vertical padding, 24 px gutters.
@@ -234,9 +237,11 @@ buttons carry an `aria-label` and a 44×44 hit area.
   card's edge. In a stacked row the
   label takes what the value leaves, so a narrow row wraps the label's words ("Сіздің /
   бөлігіңіз") before an amount or a date, and a value's lines stay aligned to the right.
-- The invest action on the asset page becomes a sticky bottom bar with a 48 px button. The
-  body reserves the bar's height below `md` (`[data-mobile-invest-bar]` in `globals.css`), so
-  the bar never covers the end of the footer.
+- The invest action on the asset page becomes a sticky bottom bar with a 48 px button while
+  the raise is open. Once shares can't be bought the bar is gone: it only held a disabled
+  button over 8 % of the screen, and the panel already says why. The body reserves the bar's
+  height below `md` (`[data-mobile-invest-bar]` in `globals.css`), so the bar never covers the
+  end of the footer.
 - Tap targets are at least 44×44 with 8 px between them. Text links (Explorer addresses,
   record links, "Published files") keep a 44 px tall box up to `lg`, since a 768 px tablet is
   touched too; from `lg` they are as tall as their text. The demo banner's links sit in running
@@ -254,7 +259,10 @@ product rule, never a placeholder.
   shows the RPC state and any state but "connected" is spelled out, except a first check that
   answers within 1.5 s, whose "Connecting…" would widen the pill for a moment on every load),
   language menu (click, not
-  hover; Escape and outside click close it), "Connect wallet" as an outline button, since the
+  hover; Escape, an outside click and focus tabbing past its last item close it, and Escape
+  gives focus back to the toggle; the wallet chip's menu does the same; below `lg` the menu
+  drops its globe, so the RU bar fits 720 px beside "Подключить кошелёк"; switching opens the
+  same page at the same place, #section included), "Connect wallet" as an outline button, since the
   page's primary action lives in the content. Below `md` the right side is a 44 px menu button;
   the menu is a full-height panel under the bar with focus trap, Escape, scroll lock, large nav
   rows, a three-way language switch, the wallet block and the network pill. Footer on ink:
@@ -282,9 +290,13 @@ product rule, never a placeholder.
   sentence saying why the button is what it is (connect, not approved, paused, closed, sold out,
   approved), then the devnet note. Below the photo: terms on Solana (a two-column ledger:
   numbers on the left, the share token, income vault, operator wallet and trip-data oracle as
-  Explorer links on the right) → payout history (every period account of the car: number, date,
-  paid in, shares counted, per share, record link; empty, loading, partial and error states) →
-  payout calculator (the reader's shares and their own monthly assumption; results stay "—"
+  Explorer links on the right) → payout history (every period account of the car: its number
+  counted from 1 and linking to the record on Solana, the period as one range, "Sep 1 – 30,
+  2026", with the deposit date under it, paid in, shares counted, per share; amounts keep two
+  decimals so the column lines up, and the table names the token in its headers; empty,
+  loading, partial and error states) →
+  payout calculator (the reader's shares and their own monthly assumption, which may not pass
+  the car's whole price; results stay "—"
   until they type) → trip data (the telemetry widget, whose honest empty state says the tracker
   is not connected yet; its figures are a day's, so the day's status reads "That day: Worked",
   never like the car's badge, and a day turns stale 30 h after it ends in the fleet's zone,
@@ -293,7 +305,9 @@ product rule, never a placeholder.
   keeps showing the car while it re-reads after a purchase.
   **v2 screens (frontend stage 2):** the panel's bar is `asset/RaiseProgress`, a track with a
   2 px tick at the soft cap and the goal in words under it ("Goal: 1,173", "Goal of 1,173 met");
-  raising cards in the catalog use the same bar at `sm`. While the escrow holds money
+  raising cards in the catalog use the same bar at `sm`. Above a card's bar "21% sold" and
+  "1,550,000 / 7,220,000 tKZT" never break inside: a narrow card puts the amounts on the next
+  line. While the escrow holds money
   (raising, funded, failed) the panel shows `asset/EscrowBalance`, the escrow's token balance
   read every 15 s with a green "Live" dot and "sold × price: exactly what buyers paid" under
   it; until the balance is read, a shimmer the shape of that line holds its place. The raise
@@ -449,7 +463,8 @@ product rule, never a placeholder.
     gone: the page shows only token metadata and project accounts. The projection became a
     labelled calculator on the reader's own monthly figure, applying the program's split rule
     (each payout divided by the shares sold at that moment; the calculator assumes a fully sold
-    car). Results read "—" until the reader types. ← anti-slop "fake and pressure", decision 10.
+    car). Results read "—" until the reader types, and a monthly payout above the car's whole
+    price is flagged rather than worked out. ← anti-slop "fake and pressure", decision 10.
 15. **The purchase button always tells the truth.** It is primary only when pressing it does
     something (connect, or buy with an approved wallet). Paused, closed, sold out, checking, not
     approved and "couldn't check" are disabled buttons that name the reason in two words, with
@@ -545,6 +560,10 @@ product rule, never a placeholder.
 36. **A day is not a status.** Trip data shows the car's last recorded day, which for a paused or
     sold car is weeks old, so its status reads as that day ("That day: Worked", "Didn't work",
     "In maintenance") and never repeats the project badge ("On the road"). ← decision 10.
+37. **People count payouts from 1.** The program numbers a car's revenue periods from 0, and the
+    car page showed "#0" while its terms said "9 payouts". Every screen (car page, portfolio,
+    payouts, verify panel, console) shows `payoutNumber(index)`, so the last number is the
+    count. ← review rubric "consistency".
 
 ## Constraints
 
@@ -570,7 +589,14 @@ product rule, never a placeholder.
   so Back restores the offset over them, and anchoring then followed whatever sat at that
   offset while the content above arrived. A link to a section of a car page
   (`#verify-data-title`) is scrolled to by the page once the car is read, and held there
-  while the sections above fill in, until the reader scrolls.
+  while the sections above fill in, until the reader scrolls. A language switch does the same
+  for the reader's place (`layout/place.ts`): it notes the element with an id nearest the bar
+  and holds it at the same height on the reloaded page, and it puts back the #section that
+  the redirect to an unprefixed English address drops. The first hold wins, so a kept place
+  outranks the section in the address. "Skip to content" moves focus to `main`
+  (`tabIndex={-1}`), not only the scroll.
+- `<html>` carries `suppressHydrationWarning`: the reveal gate sets `data-reveal` on it before
+  React hydrates, on purpose.
 - The wallet pages (portfolio, payouts, verification, demo, console) show their loading state, not
   "Connect wallet", during hydration and while a wallet remembered from an earlier visit
   reconnects (`wallet/useWalletConnecting`). The wallet picker gives focus back to what opened

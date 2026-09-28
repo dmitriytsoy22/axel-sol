@@ -9,6 +9,7 @@ import { Copy, LogOut, ShieldCheck, Wallet } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { buttonClasses } from '@/components/ui/Button';
 import { formatNumber } from '@/lib/format';
+import { useMenuDismiss } from './useMenuDismiss';
 
 export function useCopyAddress(publicKey: string | null): {
   copied: boolean;
@@ -47,26 +48,12 @@ export const NavWalletMenu = (): JSX.Element => {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  useMenuDismiss(open, setOpen, rootRef, toggleRef);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
 
   const handleDisconnect = useCallback(async () => {
     await disconnect();
@@ -94,6 +81,7 @@ export const NavWalletMenu = (): JSX.Element => {
   return (
     <div ref={rootRef} className="relative hidden md:block">
       <button
+        ref={toggleRef}
         id="wallet-chip"
         type="button"
         aria-expanded={open}

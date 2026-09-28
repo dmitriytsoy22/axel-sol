@@ -41,6 +41,27 @@ describe('PayoutCalculator', () => {
     expect(screen.getByText('Costs 100,000 tKZT at the current price')).toBeInTheDocument();
   });
 
+  it("flags a monthly payout above the whole car's price instead of working it out", async () => {
+    renderCalculator();
+
+    const income = screen.getByLabelText('Monthly payout from the car, tKZT');
+    await userEvent.type(income, '1000000,01');
+
+    expect(income).toHaveAttribute('aria-invalid', 'true');
+    expect(income).toHaveAccessibleDescription('Up to 1,000,000 tKZT, the price of the whole car');
+    expect(result('Per year, 12 payouts')).toHaveTextContent('—');
+  });
+
+  it("works out a monthly payout equal to the whole car's price", async () => {
+    renderCalculator();
+
+    const income = screen.getByLabelText('Monthly payout from the car, tKZT');
+    await userEvent.type(income, '1000000');
+
+    expect(income).toHaveAttribute('aria-invalid', 'false');
+    expect(result('Per month')).toHaveTextContent('10,000 tKZT');
+  });
+
   it('flags more shares than the car has', async () => {
     renderCalculator();
 

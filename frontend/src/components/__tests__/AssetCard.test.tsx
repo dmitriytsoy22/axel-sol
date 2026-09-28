@@ -36,7 +36,7 @@ describe('AssetCard', () => {
 
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Toyota Camry');
     expect(screen.getByText('10,000 tKZT')).toBeInTheDocument();
-    expect(screen.getByText('500,000 tKZT of 1,000,000 tKZT')).toBeInTheDocument();
+    expect(screen.getByText('500,000 / 1,000,000 tKZT')).toBeInTheDocument();
     expect(screen.getByText('50% sold')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveStyle('width: 50%');
     expect(screen.getByText('3')).toBeInTheDocument();

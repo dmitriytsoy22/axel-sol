@@ -19,7 +19,14 @@ import { Pill, type PillTone } from '@/components/ui/Pill';
 import { useTransactionSender } from '@/hooks/useTransactionSender';
 import { DepositDraftError, requestDepositDraft } from '@/lib/api/deposits';
 import { TELEMETRY_API_URL } from '@/lib/api/telemetry';
-import { formatBps, formatDay, formatNumber, formatTenge, formatTokenAmount } from '@/lib/format';
+import {
+  formatBps,
+  formatDay,
+  formatNumber,
+  formatTenge,
+  formatTokenAmount,
+  payoutNumber,
+} from '@/lib/format';
 import {
   checkDepositDraft,
   DraftCheckError,
@@ -208,7 +215,7 @@ function DraftReview({
       <div className="flex flex-wrap items-center gap-3">
         <p className="text-body font-semibold text-foreground">
           {t('payoutOf', {
-            index: draft.periodIndex,
+            index: payoutNumber(draft.periodIndex),
             start: formatDay(draft.depositParams.periodStart, locale),
             end: formatDay(draft.depositParams.periodEnd, locale),
           })}
@@ -427,7 +434,7 @@ export function DepositDraftPanel({
         {sent && (
           <p className="inline-flex flex-wrap items-center gap-2 text-body text-foreground">
             <CircleCheck aria-hidden="true" className="h-5 w-5 text-success" strokeWidth={1.75} />
-            {t('deposited', { index: sent.index })}
+            {t('deposited', { index: payoutNumber(sent.index) })}
             <a
               href={getExplorerUrl(sent.signature, 'tx')}
               target="_blank"

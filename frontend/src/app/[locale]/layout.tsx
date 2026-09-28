@@ -50,7 +50,8 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={fontVariables}>
+    // The reveal gate below sets <html data-reveal> before React hydrates the page.
+    <html lang={locale} className={fontVariables} suppressHydrationWarning>
       <body className="font-sans bg-background text-foreground min-h-screen flex flex-col">
         <script dangerouslySetInnerHTML={{ __html: REVEAL_GATE_SCRIPT }} />
         <NextIntlClientProvider messages={messages}>
@@ -59,8 +60,13 @@ export default async function RootLayout({
               <Navbar />
               {/* At least a screen under the bar: pages read the chain and the wallet after they
                   render, and a footer on the first screen jumped each time a placeholder gave
-                  way to longer or shorter content. */}
-              <main id="main" className="min-h-[calc(100svh-4rem)] flex-1">
+                  way to longer or shorter content. Focusable, so "Skip to content" moves focus
+                  here and not only the scroll. */}
+              <main
+                id="main"
+                tabIndex={-1}
+                className="min-h-[calc(100svh-4rem)] flex-1 focus:outline-none"
+              >
                 {children}
               </main>
               <Footer />

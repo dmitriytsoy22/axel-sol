@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, ArrowUpRight, FlaskConical } from 'lucide-react';
 import { Link } from '@/i18n/routing';
+import { TrailingIcon } from '@/components/ui/TrailingIcon';
 import { DEMO_ACCESS_SHOWN } from '@/lib/demo/config';
 import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
 import { DEMO_PATH, SEED_URL } from './constants';
@@ -45,10 +46,9 @@ export function DemoBanner({
   const demoAccess = DEMO_ACCESS_SHOWN && (
     <Link
       href={DEMO_PATH}
-      className={`inline-flex shrink-0 items-center gap-1 font-semibold underline decoration-current/40 underline-offset-4 transition-colors duration-fast ease-move hover:decoration-current md:whitespace-nowrap ${TOUCH_TARGET}`}
+      className={`inline-flex shrink-0 items-center font-semibold underline decoration-current/40 underline-offset-4 transition-colors duration-fast ease-move hover:decoration-current md:whitespace-nowrap ${TOUCH_TARGET}`}
     >
-      {t('demoAccess')}
-      <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+      <TrailingIcon icon={ArrowRight}>{t('demoAccess')}</TrailingIcon>
     </Link>
   );
 

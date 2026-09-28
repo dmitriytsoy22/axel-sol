@@ -4,11 +4,13 @@ import {
   formatCount,
   formatDate,
   formatDay,
+  formatDayRange,
   formatNumber,
   formatPercent,
   formatTenge,
   formatTokenAmount,
   formatTokenTotals,
+  payoutNumber,
   shortAddress,
 } from '../format';
 
@@ -41,6 +43,19 @@ describe('formatTokenAmount', () => {
     expect(formatTokenAmount(-554_484_800_000n, TKZT, 'ru')).toBe(`-554${NBSP}484,8 tKZT`);
     expect(formatTokenAmount(-500_000n, TKZT, 'en')).toBe('-0.5 tKZT');
     expect(formatTokenAmount(-1_000n, TKZT, 'en')).toBe('0 tKZT');
+  });
+
+  it('keeps trailing zeros for a column whose decimals line up', () => {
+    const padded = { padFraction: true };
+    expect(formatTokenAmount(132_696_000_000n, TKZT, 'en', 2, padded)).toBe('132,696.00 tKZT');
+    expect(formatTokenAmount(115_863_900_000n, TKZT, 'ru', 2, padded)).toBe(
+      `115${NBSP}863,90 tKZT`,
+    );
+    expect(formatTokenAmount(-1_000n, TKZT, 'en', 2, padded)).toBe('0.00 tKZT');
+  });
+
+  it('leaves the symbol to a header that names it', () => {
+    expect(formatTokenAmount(1_250_500_000n, TKZT, 'en', 2, { withSymbol: false })).toBe('1,250.5');
   });
 
   it('stays exact beyond the precision of a JavaScript number', () => {
@@ -132,6 +147,32 @@ describe('formatDay', () => {
   it('writes a YYYYMMDD day from the chain as a calendar date', () => {
     expect(formatDay(20261031, 'en')).toBe('Oct 31, 2026');
     expect(formatDay(20260107, 'kk')).toBe('2026 ж. 7 қаң.');
+  });
+});
+
+describe('formatDayRange', () => {
+  it('names a month and year the two days share once', () => {
+    expect(formatDayRange(20260901, 20260930, 'en')).toMatch(/^Sep 1\s–\s30, 2026$/);
+    expect(formatDayRange(20260901, 20260930, 'ru')).toMatch(/^1–30 сент\. 2026\sг\.$/);
+    expect(formatDayRange(20260901, 20260930, 'kk')).toBe('2026 ж. 1–30 қыр.');
+  });
+
+  it('writes both months, and both years, when the days differ in them', () => {
+    expect(formatDayRange(20260915, 20261014, 'kk')).toBe('2026 ж. 15 қыр. – 14 қаз.');
+    expect(formatDayRange(20261215, 20270114, 'kk')).toBe('2026 ж. 15 жел. – 2027 ж. 14 қаң.');
+    expect(formatDayRange(20261215, 20270114, 'en')).toMatch(/^Dec 15, 2026\s–\sJan 14, 2027$/);
+  });
+
+  it('writes a one-day range as that day', () => {
+    expect(formatDayRange(20260107, 20260107, 'kk')).toBe('2026 ж. 7 қаң.');
+    expect(formatDayRange(20261031, 20261031, 'en')).toBe('Oct 31, 2026');
+  });
+});
+
+describe('payoutNumber', () => {
+  it('counts payouts from 1 where the program counts periods from 0', () => {
+    expect(payoutNumber(0)).toBe(1);
+    expect(payoutNumber(8)).toBe(9);
   });
 });
 

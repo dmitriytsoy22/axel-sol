@@ -68,7 +68,7 @@ describe('PayoutsView', () => {
 
     const rows = await bodyRows();
     expect(rows).toHaveLength(3);
-    expect(within(rows[0]).getByText('Payout #2')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('Payout #3')).toBeInTheDocument();
     expect(within(rows[0]).getByText('4.72 tKZT')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Your part/ })).not.toBeInTheDocument();
     expect(screen.getByText(/Read straight from Solana/)).toBeInTheDocument();
@@ -150,7 +150,7 @@ describe('PayoutsView', () => {
       expect.anything(),
     );
     expect(screen.getByRole('columnheader', { name: /Your part/ })).toBeInTheDocument();
-    expect(within(latest).getByText('Payout #1')).toBeInTheDocument();
+    expect(within(latest).getByText('Payout #2')).toBeInTheDocument();
     expect(within(latest).getByText('—')).toBeInTheDocument();
     expect(within(first).getByText('+524.69 tKZT')).toBeInTheDocument();
     expect(within(first).getByRole('link')).toHaveAttribute(

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, RotateCw } from 'lucide-react';
 import { Link } from '@/i18n/routing';
+import { holdInPlace } from '@/components/layout/place';
 import { useInvestor } from '@/hooks/useInvestor';
 import { usePosition } from '@/hooks/usePosition';
 import { useProject } from '@/hooks/useProject';
@@ -26,6 +27,7 @@ import { InvestModal } from '@/components/invest/InvestModal';
 import { Button, buttonClasses } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { TrailingIcon } from '@/components/ui/TrailingIcon';
 import { NETWORK_NAME } from '@/lib/network';
 
 function AssetSkeleton(): JSX.Element {
@@ -53,17 +55,10 @@ function useSectionFromHash(): void {
     const id = decodeURIComponent(window.location.hash.slice(1));
     const target = id ? document.getElementById(id) : null;
     if (!target) return;
-    const align = () => target.scrollIntoView({ behavior: 'instant' });
-    align();
-    const observer = new ResizeObserver(align);
-    observer.observe(document.body);
-    const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
-    const release = () => {
-      observer.disconnect();
-      for (const type of inputs) window.removeEventListener(type, release);
-    };
-    for (const type of inputs) window.addEventListener(type, release, { passive: true });
-    return release;
+    return holdInPlace(
+      () => target,
+      (element) => element.scrollIntoView({ behavior: 'instant' }),
+    );
   }, []);
 }
 
@@ -132,10 +127,9 @@ function AssetDetails({ project, onChanged }: { project: Project; onChanged: () 
             <ProjectTerms project={project} />
             <Link
               href={`/solvency#${project.shareMint.toBase58()}`}
-              className="inline-flex min-h-11 items-center gap-1 self-start text-small font-medium text-primary underline-offset-4 hover:underline"
+              className="inline-flex min-h-11 items-center self-start text-small font-medium text-primary underline-offset-4 hover:underline"
             >
-              {tAsset('solvencyLink')}
-              <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+              <TrailingIcon icon={ArrowRight}>{tAsset('solvencyLink')}</TrailingIcon>
             </Link>
             <BlinkLinks project={project} saleState={saleState} />
           </div>

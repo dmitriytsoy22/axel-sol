@@ -4,6 +4,7 @@ import React, { useId, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { Project } from '@/types/project';
 import { formatNumber, formatPercent, formatTokenAmount } from '@/lib/format';
+import { sharesValue } from '@/lib/solana/math';
 import { estimatePayout, parseAmount } from './payoutMath';
 
 interface PayoutCalculatorProps {
@@ -29,16 +30,24 @@ export function PayoutCalculator({ project }: PayoutCalculatorProps): JSX.Elemen
   const { symbol, decimals } = project.payment;
   const price = Number(project.pricePerShare) / 10 ** decimals;
   const inToken = (value: number) => `${formatNumber(value, locale, 2)} ${symbol}`;
-  const estimate = estimatePayout({
-    shares: parseAmount(shares),
-    monthlyPayout: parseAmount(income),
-    totalShares: total,
-    pricePerShare: price,
-  });
 
   const sharesCount = parseAmount(shares);
   const sharesValid = Number.isInteger(sharesCount) && sharesCount >= 1 && sharesCount <= total;
   const sharesInvalid = shares.trim() !== '' && !sharesValid;
+  // No car pays out more than its whole price in a month; the bound also keeps every result
+  // a figure that fits its cell.
+  const carValue = sharesValue(project.totalShares, project.pricePerShare);
+  const monthly = parseAmount(income);
+  const incomeInvalid = monthly > total * price;
+
+  const estimate = incomeInvalid
+    ? null
+    : estimatePayout({
+        shares: sharesCount,
+        monthlyPayout: monthly,
+        totalShares: total,
+        pricePerShare: price,
+      });
 
   const results = [
     { label: t('calcPart'), value: estimate && formatPercent(estimate.part, 1, locale) },
@@ -94,29 +103,39 @@ export function PayoutCalculator({ project }: PayoutCalculatorProps): JSX.Elemen
               autoComplete="off"
               value={income}
               onChange={(e) => setIncome(e.target.value)}
+              aria-invalid={incomeInvalid}
               aria-describedby={`${incomeId}-hint`}
               className={`mt-2 ${inputClass}`}
             />
-            <p id={`${incomeId}-hint`} className="mt-2 text-small text-muted-foreground">
-              {t('calcIncomeHint')}
+            <p
+              id={`${incomeId}-hint`}
+              className={`mt-2 text-small ${incomeInvalid ? 'text-destructive' : 'text-muted-foreground'}`}
+            >
+              {incomeInvalid
+                ? t('calcIncomeMax', { max: formatTokenAmount(carValue, project.payment, locale) })
+                : t('calcIncomeHint')}
             </p>
           </div>
         </div>
 
+        {/* Below 360 px half the card is narrower than "18,000,000" at this size, so the
+            results take a row each. A figure wraps inside its cell, never into the next. */}
         <dl
           aria-live="polite"
-          className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-border pt-6"
+          className="mt-6 grid gap-x-6 gap-y-5 border-t border-border pt-6 min-[360px]:grid-cols-2"
         >
           {results.map(({ label, value }) => (
-            <div key={label} className="flex flex-col gap-1">
+            <div key={label} className="flex min-w-0 flex-col gap-1">
               <dt className="text-small text-muted-foreground">{label}</dt>
-              <dd className="text-title font-semibold tabular-nums text-foreground">
+              <dd className="text-title font-semibold tabular-nums text-foreground [overflow-wrap:anywhere]">
                 {value ?? <span className="text-subtle-foreground">—</span>}
               </dd>
             </div>
           ))}
         </dl>
-        {!estimate && <p className="mt-5 text-small text-muted-foreground">{t('calcEmpty')}</p>}
+        {!estimate && !incomeInvalid && (
+          <p className="mt-5 text-small text-muted-foreground">{t('calcEmpty')}</p>
+        )}
         <p className="mt-5 max-w-[65ch] text-small text-muted-foreground">
           {t('calcAssumption', { total: formatNumber(total, locale) })}
         </p>

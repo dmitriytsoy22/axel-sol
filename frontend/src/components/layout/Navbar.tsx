@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/routing';
 import { NavDesktopLinks } from './NavDesktopLinks';
 import { NavLanguageSwitcher } from './NavLanguageSwitcher';
@@ -10,12 +10,14 @@ import { NavMobileMenu } from './NavMobileMenu';
 import { Logo } from './Logo';
 import { ConnectionStatus } from '../shared/ConnectionStatus';
 import { DemoBanner } from './DemoBanner';
+import { restorePlace } from './place';
 
 const SCROLL_THRESHOLD = 16;
 
 export const Navbar = (): JSX.Element => {
   const t = useTranslations('Navigation');
   const pathname = usePathname();
+  const locale = useLocale();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isHome = pathname === '/';
@@ -30,6 +32,9 @@ export const Navbar = (): JSX.Element => {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
+
+  // A language switch loads the page again; this puts the reader back where they were reading.
+  useEffect(() => restorePlace(pathname), [locale, pathname]);
 
   // The home hero is a dark photo: until the page scrolls, the bar sits on it in the ink theme.
   const overHero = isHome && !scrolled && !mobileMenuOpen;
@@ -48,7 +53,7 @@ export const Navbar = (): JSX.Element => {
           overHero ? 'theme-ink border-transparent bg-transparent' : 'border-border bg-background'
         }`}
       >
-        <div className="page-container flex h-16 items-center gap-4 lg:gap-8">
+        <div className="page-container flex h-16 items-center gap-3 lg:gap-8">
           <Link
             href="/"
             aria-label={t('home')}

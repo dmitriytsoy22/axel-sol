@@ -93,17 +93,20 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
         </dl>
 
         <div className="mt-5">
-          <div className="mb-2 flex items-baseline justify-between gap-4 text-small">
-            <span className="text-muted-foreground">
+          {/* Two figures that never break: where they don't fit side by side, the amounts
+              take the next line instead of "Продано / 65 %" or a dangling "of". */}
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-small">
+            <span className="whitespace-nowrap text-muted-foreground">
               {t('percentSold', { percent: formatPercent(sold, total, locale) })}
             </span>
-            <span className="text-right font-medium tabular-nums text-foreground">
+            <span className="ml-auto whitespace-nowrap font-medium tabular-nums text-foreground">
               {t('raisedOf', {
                 raised: formatTokenAmount(
                   sharesValue(project.sharesSold, project.pricePerShare),
                   payment,
                   locale,
                   0,
+                  { withSymbol: false },
                 ),
                 goal: formatTokenAmount(
                   sharesValue(project.totalShares, project.pricePerShare),

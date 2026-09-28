@@ -68,7 +68,7 @@ export function AdminMetrics({ project, projects, onSelect }: AdminMetricsProps)
                 id={selectId}
                 value={project.address.toBase58()}
                 onChange={(e) => onSelect(e.target.value)}
-                className="h-10 min-w-0 max-w-full rounded-control border border-border bg-card px-3 text-small text-foreground"
+                className="h-11 min-w-0 max-w-full rounded-control border border-border bg-card px-3 text-body text-foreground md:h-10 md:text-small"
               >
                 {projects.map((entry) => (
                   <option key={entry.address.toBase58()} value={entry.address.toBase58()}>
