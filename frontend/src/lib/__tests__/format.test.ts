@@ -5,6 +5,7 @@ import {
   formatDate,
   formatDay,
   formatDayRange,
+  keepDashWithDayBefore,
   formatNumber,
   formatPercent,
   formatTenge,
@@ -187,6 +188,15 @@ describe('formatDayRange', () => {
     ]);
 
     expect(ranges.filter((range) => /[ \u2009]–/.test(range))).toEqual([]);
+  });
+
+  it('keeps an em dash with the day before it too, as WebKit writes Russian ranges across months', () => {
+    expect('15 сент. — 14 окт. 2026 г.'.replace(/[ \u2009][–—]/g, keepDashWithDayBefore)).toBe(
+      `15 сент.${NBSP}— 14 окт. 2026 г.`,
+    );
+    expect('Sep 15\u2009– Oct 14'.replace(/[ \u2009][–—]/g, keepDashWithDayBefore)).toBe(
+      'Sep 15\u202f– Oct 14',
+    );
   });
 
   it('writes a one-day range as that day', () => {

@@ -65,7 +65,9 @@ export function PayoutCalculator({ project }: PayoutCalculatorProps): JSX.Elemen
   const cost = (sharesValid ? BigInt(sharesCount) : 0n) * project.pricePerShare;
   const sharesHint = sharesInvalid
     ? t('calcSharesHint', { max: formatNumber(total, locale) })
-    : t('calcCostHint', { cost: formatTokenAmount(cost, project.payment, locale) });
+    : t('calcCostHint', {
+        cost: formatTokenAmount(cost, project.payment, locale, 2, { keepUnit: true }),
+      });
 
   return (
     <section aria-labelledby="calc-title">

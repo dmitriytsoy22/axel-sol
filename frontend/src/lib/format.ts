@@ -163,6 +163,15 @@ export function formatDay(yyyymmdd: number, locale: string): string {
 }
 
 /**
+ * Glues a range dash to the day before it: a space becomes a no-break space and a thin space a
+ * narrow no-break one. Browsers differ in the dash they emit (WebKit's Russian data uses "—"
+ * between months), so both dashes are handled.
+ */
+export function keepDashWithDayBefore(gap: string): string {
+  return `${gap[0] === '\u2009' ? '\u202f' : '\u00a0'}${gap[1]}`;
+}
+
+/**
  * Two YYYYMMDD days as one range, naming the month and year once when they share them:
  * "Sep 1 – 30, 2026", "1–30 сент. 2026 г.", "2026 ж. 1–30 қыр.". Kazakh follows the CLDR
  * Kazakh interval patterns, spelled out for the reason given for `formatDate`. The dash keeps
@@ -179,8 +188,7 @@ export function formatDayRange(start: number, end: number, locale: string): stri
       year: 'numeric',
     })
       .formatRange(from, to)
-      .replace(' –', '\u00a0–')
-      .replace('\u2009–', '\u202f–');
+      .replace(/[ \u2009][–—]/g, keepDashWithDayBefore);
   }
   if (start === end) return formatDay(start, locale);
   const month = (date: Date) => KAZAKH_MONTHS[date.getMonth()];
