@@ -16,8 +16,7 @@ interface ModalProps {
   footer?: React.ReactNode;
 }
 
-/* What Tab can reach: a disabled control is skipped by the browser, so it must not be the
-   trap's first or last stop either, or the trap never wraps. */
+/* What Tab can reach inside the dialog: enabled controls and links. */
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -53,17 +52,18 @@ export function Modal({
       }
       if (e.key !== 'Tab') return;
 
+      // The dialog moves focus itself rather than letting the browser step and catching it at
+      // the ends: Safari's Tab skips links, and WebKit left the purchase dialog for the page
+      // when its last control was disabled, so the ends the trap watched were never reached.
+      e.preventDefault();
       const stops = tabStops(modalRef.current);
       if (stops.length === 0) return;
-      const first = stops[0];
-      const last = stops[stops.length - 1];
-      const active = document.activeElement;
-      const inside = active instanceof Node && modalRef.current?.contains(active);
-
-      if (!inside || (e.shiftKey && active === first) || (!e.shiftKey && active === last)) {
-        e.preventDefault();
-        (e.shiftKey ? last : first).focus();
-      }
+      const at = stops.findIndex((stop) => stop === document.activeElement);
+      const step = e.shiftKey ? -1 : 1;
+      // From the dialog itself, or from outside it, Tab starts at the first stop and
+      // Shift+Tab at the last.
+      const next = at === -1 ? (e.shiftKey ? stops.length - 1 : 0) : at + step;
+      stops[(next + stops.length) % stops.length].focus();
     };
 
     document.addEventListener('keydown', handleKeyDown);
@@ -110,7 +110,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="-mr-3 ml-auto inline-flex h-11 w-11 items-center justify-center rounded-control text-muted-foreground transition-colors duration-fast ease-move hover:bg-secondary hover:text-foreground"
+            className="-mr-3 ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-muted-foreground transition-colors duration-fast ease-move hover:bg-secondary hover:text-foreground"
             aria-label={closeLabel}
           >
             <X aria-hidden="true" className="h-5 w-5" strokeWidth={1.75} />

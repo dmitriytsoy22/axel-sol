@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, RotateCw } from 'lucide-react';
 import { Link } from '@/i18n/routing';
-import { holdInPlace } from '@/components/layout/place';
+import { holdSectionInAddress } from '@/components/layout/place';
 import { useInvestor } from '@/hooks/useInvestor';
 import { usePosition } from '@/hooks/usePosition';
 import { useProject } from '@/hooks/useProject';
@@ -51,15 +51,7 @@ function AssetSkeleton(): JSX.Element {
  * their own reads, until the reader scrolls or presses a key.
  */
 function useSectionFromHash(): void {
-  useEffect(() => {
-    const id = decodeURIComponent(window.location.hash.slice(1));
-    const target = id ? document.getElementById(id) : null;
-    if (!target) return;
-    return holdInPlace(
-      () => target,
-      (element) => element.scrollIntoView({ behavior: 'instant' }),
-    );
-  }, []);
+  useEffect(() => holdSectionInAddress(), []);
 }
 
 function AssetDetails({ project, onChanged }: { project: Project; onChanged: () => void }) {

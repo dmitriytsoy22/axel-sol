@@ -21,7 +21,7 @@ import { DepositDraftError, requestDepositDraft } from '@/lib/api/deposits';
 import { TELEMETRY_API_URL } from '@/lib/api/telemetry';
 import {
   formatBps,
-  formatDay,
+  formatDayRange,
   formatNumber,
   formatTenge,
   formatTokenAmount,
@@ -47,6 +47,11 @@ import type { Project } from '@/types/project';
 import { textInputClass } from './inputs';
 
 const plainInputClass = textInputClass.replace('font-mono ', '');
+
+/* WebKit puts focus on the month, day or year inside a date field, and the field itself then
+   matches :focus but never :focus-visible, so its ring follows :focus. A date field takes
+   typing, which shows the ring on a click as well. */
+const dateInputClass = `${plainInputClass} focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30`;
 
 function fileText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -222,8 +227,11 @@ function DraftReview({
         <p className="text-body font-semibold text-foreground">
           {t('payoutOf', {
             index: payoutNumber(draft.periodIndex),
-            start: formatDay(draft.depositParams.periodStart, locale),
-            end: formatDay(draft.depositParams.periodEnd, locale),
+            period: formatDayRange(
+              draft.depositParams.periodStart,
+              draft.depositParams.periodEnd,
+              locale,
+            ),
           })}
         </p>
         {report.kind === 'final' && <Pill tone="info">{t('kind_final')}</Pill>}
@@ -542,7 +550,7 @@ export function DepositDraftPanel({
               type="date"
               value={form.start}
               onChange={(e) => set({ start: e.target.value })}
-              className={`${plainInputClass} mt-2`}
+              className={`${dateInputClass} mt-2`}
             />
           </div>
           <div>
@@ -554,7 +562,7 @@ export function DepositDraftPanel({
               type="date"
               value={form.end}
               onChange={(e) => set({ end: e.target.value })}
-              className={`${plainInputClass} mt-2`}
+              className={`${dateInputClass} mt-2`}
             />
           </div>
         </div>

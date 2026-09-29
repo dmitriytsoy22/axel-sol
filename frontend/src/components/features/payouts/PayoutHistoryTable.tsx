@@ -5,7 +5,7 @@ import { DataTable, ColumnDef } from '@/components/ui/DataTable';
 import { Pill } from '@/components/ui/Pill';
 import { Skeleton } from '@/components/ui/Skeleton';
 import type { PayoutRow } from '@/hooks/usePayoutHistory';
-import { formatDate, formatDay, formatTokenAmount, payoutNumber } from '@/lib/format';
+import { formatDate, formatDayRange, formatTokenAmount, payoutNumber } from '@/lib/format';
 import { getExplorerUrl } from '@/lib/solana/connection';
 import { carTitle, type PaymentToken } from '@/lib/solana/tokens';
 
@@ -23,9 +23,8 @@ interface PayoutView {
   symbol: string;
   index: number;
   final: boolean;
-  /** First and last day of the period, as two lines in the table; one day is one date. */
-  from: string;
-  to: string | null;
+  /** The period as one range, "Sep 1 – 30, 2026"; a one-day period is one date. */
+  period: string;
   /** Sorts the rows; 0 when the block time is unknown. */
   depositedAt: number;
   date: string;
@@ -43,8 +42,7 @@ function toView(row: PayoutRow, locale: string): PayoutView {
     symbol: row.project.car.symbol,
     index: row.index,
     final: row.kind === 'final',
-    from: formatDay(row.periodStart, locale),
-    to: row.periodEnd === row.periodStart ? null : formatDay(row.periodEnd, locale),
+    period: formatDayRange(row.periodStart, row.periodEnd, locale),
     depositedAt: row.depositedAt ?? 0,
     date: row.depositedAt === null ? '—' : formatDate(row.depositedAt, locale),
     net: row.net,
@@ -68,7 +66,9 @@ export function PayoutHistoryTable({
   const data = useMemo(() => rows.map((row) => toView(row, locale)), [rows, locale]);
 
   const columns = useMemo<ColumnDef<PayoutView>[]>(() => {
-    const amount = (value: bigint, unit: PaymentToken) => formatTokenAmount(value, unit, locale);
+    // Two decimals on every amount, so the figures of a column line up.
+    const amount = (value: bigint, unit: PaymentToken) =>
+      formatTokenAmount(value, unit, locale, 2, { padFraction: true });
     const all: (ColumnDef<PayoutView> | null)[] = [
       {
         header: t('tablePeriod'),
@@ -97,16 +97,8 @@ export function PayoutHistoryTable({
       },
       {
         header: t('tableDays'),
-        accessorKey: 'from',
-        cell: (item) =>
-          item.to === null ? (
-            <span className="text-muted-foreground">{item.from}</span>
-          ) : (
-            <span className="flex flex-col text-muted-foreground">
-              <span>{item.from} –</span>
-              <span>{item.to}</span>
-            </span>
-          ),
+        accessorKey: 'period',
+        cell: (item) => <span className="text-muted-foreground">{item.period}</span>,
       },
       {
         header: t('tableDate'),

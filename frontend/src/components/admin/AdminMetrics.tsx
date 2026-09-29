@@ -41,7 +41,12 @@ export function AdminMetrics({ project, projects, onSelect }: AdminMetricsProps)
         whole: formatCount(project.totalShares, locale),
       }),
     },
-    { label: t('inEscrow'), value: formatTokenAmount(escrowed, project.payment, locale) },
+    // The label names the token: beside the figure in a 124 px column at 320 it took a line
+    // of its own.
+    {
+      label: t('inEscrow', { symbol: project.payment.symbol }),
+      value: formatTokenAmount(escrowed, project.payment, locale, 2, { withSymbol: false }),
+    },
     { label: t('revenuePeriods'), value: formatNumber(project.periodCount, locale) },
   ];
 

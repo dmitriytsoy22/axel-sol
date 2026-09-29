@@ -76,7 +76,9 @@ export function ChainStats({ projects, isLoading, error, onRetry }: CatalogFeed)
             >
               <dt className="text-small text-muted-foreground">{label}</dt>
               <dd className="text-balance break-words text-title font-semibold tabular-nums text-foreground md:text-h4">
-                {isLoading ? <Skeleton className="h-8 w-24" /> : value}
+                {/* One line of the figure: a 32 px placeholder over a 28 px line made each
+                    row 4 px taller on phones, and the hero 12 px shorter once they filled in. */}
+                {isLoading ? <Skeleton className="h-[1lh] w-24" /> : value}
               </dd>
             </div>
           ))}

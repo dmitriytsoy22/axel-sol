@@ -308,7 +308,7 @@ product rule, never a placeholder.
   loading, partial and error states) →
   payout calculator (the reader's shares and their own monthly assumption, which may not pass
   the car's whole price; results stay "—"
-  until they type) → trip data (the telemetry widget, whose honest empty state says the tracker
+  until they type, and the amounts' labels name the token, "Per month, tKZT", decision 41) → trip data (the telemetry widget, whose honest empty state says the tracker
   is not connected yet; its figures are a day's, so the day's status reads "That day: Worked",
   never like the car's badge, and a day turns stale 30 h after it ends in the fleet's zone,
   once the next one should have been collected). Below `md` the purchase button moves to a fixed bottom bar with the
@@ -330,7 +330,8 @@ product rule, never a placeholder.
   screen readers. A raise whose outcome is certain gets an outline "Settle the raise" button for any
   connected wallet. The details column now opens with `asset/StateTimeline` (a vertical list
   of milestones: filled check = done, ringed dot = current, hollow = next, amber cross =
-  missed; amber ring while paused) and adds, after the payout history, "Check the car's data
+  missed; amber ring while paused; a car that closed on the day it went on the road shows
+  that one date, not a range from it to itself) and adds, after the payout history, "Check the car's data
   yourself" (`asset/VerifyData`): four figures from the project account, one outline
   "Verify in this browser" button, a progress line that counts the months downloaded so far
   ("Months downloaded: 0 of 8…", never "month 0"), then a verdict line with a check, amber triangle or red
@@ -346,7 +347,8 @@ product rule, never a placeholder.
   "Claim all" (the page's one primary action) only when something is claimable. Disconnected:
   a two-part panel (why a wallet is needed + "Connect wallet", and what the page shows once
   connected). Empty: "This wallet holds no shares yet" with "Browse the cars". A total with
-  nothing in it names the token of the wallet's cars ("0 tKZT"), like every other amount.
+  nothing in it names the token of the wallet's cars ("0.00 tKZT"), like every other amount;
+  amounts keep two decimals (decision 39).
   Loading keeps the summary labels with placeholder values. Error: retry. A pending recovery of the wallet's shares
   is the first block: an amber panel naming the car, the shares and the new wallet, with a red
   outline "Veto the recovery" until the delay ends. A refund opens a dialog (amount, shares
@@ -355,12 +357,12 @@ product rule, never a placeholder.
   the refunded row. The send dialog checks the
   recipient while the address is typed and says in green or red what the hook will do.
 - **Payouts (built, stage 3):** page header → the same ruled summary (claimed so far, not
-  claimed yet, payouts) → a sortable ledger (payout, period on two lines, date, paid in, per
-  share, your part, record link; stacked label/value rows below `xl`; a one-day period, a car
-  sale, is one date). Disconnected, loading and error states as on the dashboard; the old
+  claimed yet, payouts) → a sortable ledger (payout, the period as one range, "Sep 1 – 30,
+  2026", date, paid in, per share, your part, record link; stacked label/value rows below
+  `xl`; a one-day period, a car sale, is one date; amounts keep two decimals, decision 39). Disconnected, loading and error states as on the dashboard; the old
   endless "Loading payout history…" with no wallet is gone. A wallet that never held a share
   gets "No payouts for this wallet yet" with "Browse the cars" instead of three bare zeros; one
-  whose cars haven't paid yet sees "0 tKZT" totals over the empty ledger.
+  whose cars haven't paid yet sees "0.00 tKZT" totals over the empty ledger.
 - **Admin (built, stage 3):** an ink header naming the managed car (overline "Operator
   console", serif H1, share token link) with four figures (status, shares sold, payouts made,
   income vault) → paper cards in an 8 + 4 grid: deposit income (three amounts in SOL, the
@@ -369,7 +371,10 @@ product rule, never a placeholder.
   that asks for confirmation inline before sending). Disconnected and wrong-wallet visitors stay
   on the page with an explanation instead of being redirected home.
 - **Proof of solvency (`/solvency`, frontend stage 2):** page header with "Check now" and the
-  time of the last check → a verdict panel (green, or red naming how many cars fail) → three
+  time of the last check, both in place while the first check runs (the button spinning, the
+  time a shimmer), since their arrival pushed the page down on phones and narrowed the lead
+  beside them from `md`; until the report is read, placeholders for the verdict and the
+  totals hold the page → a verdict panel (green, or red naming how many cars fail) → three
   ruled totals (income vaults, owed to holders now, raise escrows) → "What is checked", four
   numbered rule cards → one card per car, failing cars first and open, passing cars folded
   into a `<details>` whose summary is the car, its state and a "Passes" pill. The summary's
@@ -392,7 +397,9 @@ product rule, never a placeholder.
   header over the registry card, which shows the wallet's current record before approve and
   revoke, and stops the demo key before a record it may not change. In the car header the car
   picker drops under its label when both don't fit (320 px in Russian) and the status pill wraps
-  inside its column. Irreversible confirmations and the recovery list name the car with its
+  inside its column; "In escrow, tKZT" names the token in its label (decision 41). The console's tab title is "Console |
+  AXEL" in the reader's language, set by `app/[locale]/admin/layout.tsx`, since the page is a
+  client component. Irreversible confirmations and the recovery list name the car with its
   share symbol (decision 34). Each recovery field says under itself what is wrong with it
   (`aria-invalid`, `aria-describedby`), and the release step's hash rule turns red with an
   invalid hash. The car-status actions keep their own width, like the other console forms; the
@@ -403,7 +410,10 @@ product rule, never a placeholder.
   control spoke its language inside a Russian form. The operator's expense rows have labels,
   not placeholders: column heads from `md`, a label over each field below it; below `md` each
   item is a bordered group that ends in a worded "Remove this item", from `md` one row with a
-  48 px icon button as tall as its fields. In the draft review, trips and distance are two
+  48 px icon button as tall as its fields. The period's date fields draw the focus ring on
+  `:focus`: WebKit focuses the month, day or year inside the field, and the field then never
+  matches `:focus-visible`. The draft review opens with "Payout #3: Sep 1 – 30, 2026", one
+  range like every period. In the draft review, trips and distance are two
   rows of bare figures, since "361 поездок" needs a plural and ICU's "#" writes "1,250" for
   Kazakh in Chrome; the checks' icons keep their 16 px and sit on the first line of a
   sentence that wraps.
@@ -416,7 +426,9 @@ product rule, never a placeholder.
   Explorer link; later steps stay readable with a secondary button, disabled with the reason where
   it can't work yet (no session, a cooldown that counts down its seconds). The steps appear
   once the wallet's record, the cars and its positions are read; until then seven placeholders
-  hold the page, so no step flips from "to do" to "done" or grows while the reader looks.
+  hold the page, so no step flips from "to do" to "done" or grows while the reader looks. The
+  fine print (what the demo's keys may do) follows content that has loaded, never the
+  placeholders, which gave way to the shorter connect panel and pulled it up the screen.
   Disconnected: the shared connect panel with what the demo gives the wallet. Unavailable (faucet empty, keys missing): a notice
   naming why. The Turnstile widget sits above the access button only when the deployment asks for
   it.
@@ -426,9 +438,13 @@ product rule, never a placeholder.
   On a demo deployment it ends with "Judging? Get demo access →" (a line of its own below `md`;
   right-aligned from `md`, wrapping within 18rem until `lg`, where the Kazakh link would
   otherwise take 405 of 720 px, and on one line from `lg`), which is how every page reaches
-  `/demo`. On `/demo` itself the banner and the mobile menu leave that call out.
+  `/demo`. On `/demo` itself the banner and the mobile menu leave that call out. Below `lg`
+  both links get a 44 px tap target from a pseudo-element 12 px above and below them; the
+  link's own box, and so its focus ring, stays the size of its text, clear of the bar (padding
+  drew the ring 12 px up, under the bar at 768–1023).
 - **Shared states:** `ui/Notice` (empty, error, not found), `wallet/ConnectWalletPanel`
-  (disconnected), `ui/SummaryStats` (ruled figures with placeholders), `ui/Pill` (status dot +
+  (disconnected), `ui/SummaryStats` (ruled figures with placeholders, three columns from `md`
+  at `text-title` until `lg`, each amount kept with its token, decision 41), `ui/Pill` (status dot +
   word; `Badge` maps project status onto it; `wrap` lets a sentence-long result wrap in
   balanced lines with the dot on the first), `layout/PageHeader`, `ui/Select` (a native select
   with the browser's arrow replaced by one chevron, so Safari and Chrome draw the fleet
@@ -438,9 +454,11 @@ product rule, never a placeholder.
   middleware never sees get an English one (`app/not-found.tsx`). Modal is a paper dialog and a
   bottom sheet below `sm`, never taller than the screen. Its optional `footer` holds the
   dialog's action outside the scrolling content, so the purchase button is in view when the
-  sheet opens on a phone and nothing, keyboard focus included, slides under it. Tab moves only
-  through the dialog's enabled controls, and closing it returns focus to the control that
-  opened it. Toasts sit under the bar (top-right from `sm`, centred below) and above modals,
+  sheet opens on a phone and nothing, keyboard focus included, slides under it. The dialog
+  moves focus itself: Tab and Shift+Tab go through its enabled controls and links and wrap at
+  either end, in every browser (Safari's own Tab skips links, and WebKit left the purchase
+  dialog for the page when its button was disabled). Closing it returns focus to the control
+  that opened it. Its close button keeps 44 px however long the title. Toasts sit under the bar (top-right from `sm`, centred below) and above modals,
   so the bar's menu, language and wallet buttons stay in reach while one shows; transaction
   progress reads
   "Approve it in your wallet → Sending to Solana → Waiting for confirmation → Confirmed on
@@ -608,7 +626,31 @@ product rule, never a placeholder.
 38. **A Russian or Kazakh dash stays with the word before it.** Messages put a no-break space
     before "—", so no line starts with a dash ("…каждого зачисления / — ваши доли"), and no
     sentence opens with the lowercase network name ("localnet желісіне…"). A test rejects
-    " —" and a leading `{network}` in either language. ← anti-slop "typographic dirt", decision 33.
+    " —" and a leading `{network}` in either language, and " –" in all three: a date range
+    keeps its en dash with the first date, in messages ("{from} – {to}") and in
+    `formatDayRange`, which also swaps English's thin space for a narrow no-break one. A range
+    from a day to the same day is that one date. ← anti-slop "typographic dirt", decision 33.
+39. **Amounts on the portfolio and payouts pages keep two decimals.** "119 365,6" sat above
+    "133,81" in the payouts ledger and "38,595.5" beside "0" in the holdings. Every token amount
+    there, totals, rows, claims and the refund included, is written with two decimals
+    (`padFraction`), as the car's payout history already was: "0.00 tKZT", "220,000.00 tKZT".
+    ← review rubric "consistency", decision 13.
+40. **Counts agree with their nouns.** Russian messages choose the noun's form with ICU plural
+    cases for every form the language has (one, few, many, other): "не продадут 1 173 доли",
+    "из 1 956 долей", "Цель сбора (1 173 доли) достигнута", "Осталось только 669 долей". The
+    figure itself is passed already formatted (`formatCount`), and only the case is chosen by
+    the number, since ICU's "#" writes "1,250" for Kazakh in Chrome. Kazakh nouns keep one form
+    after a number, so Kazakh messages print the formatted figure and need no cases, and a test
+    checks that every plural a message has covers all the forms of its language. ← review
+    rubric "untranslated text", decisions 19 and 32.
+41. **An amount never leaves its token on a line of its own.** Where a figure sits in a narrow
+    column, the label names the token and the figure is bare: the car card's "Price per share,
+    tKZT" (half a card at 320 px), the calculator's "Per month, tKZT" (half the card at 390),
+    the console's "In escrow, tKZT" (124 px at 320). Where the token must stay with the figure,
+    a no-break space joins them (`keepUnit`): the summaries of the portfolio, payouts and
+    solvency pages, whose three columns start at `md` for that, and the payouts page's claims,
+    whose link takes the next line instead. A label's token keeps to the word before it.
+    ← review rubric "typographic dirt", decision 39.
 
 ## Constraints
 
@@ -651,7 +693,11 @@ product rule, never a placeholder.
 - The fixed bar (64 px and a 1 px border) is cleared once, by `scroll-padding-top` on `html`:
   the bar plus 24 px of focus room (`--focus-room`), so the 4 px focus ring shows below it, and
   WebKit, which brings a focused text field's line of text rather than its box to that edge,
-  keeps the field's top in view. A section heading that links point to adds only its breathing
+  keeps the field's top in view. The home page holds a #section of its address
+  (`/#vehicles`, `/#how-it-works`) where the browser scrolled to it while the fleet's cards
+  fill in above (`holdSectionInAddress` in `layout/place.ts`, which the car page uses too), and
+  its stat placeholders are one line of their figure tall (`h-[1lh]`): 32 px over a 28 px line
+  left `/#vehicles` 12 px under the bar at 390 once they filled in. A section heading that links point to adds only its breathing
   room (`scroll-mt-2`, landing at 96 px); a full-bleed section (`#vehicles`, `#how-it-works`,
   `#verify`) takes the focus room back (`scroll-mt-flush`) and sits flush under the bar. A row
   that fills a card with clipped corners (solvency cars, the home ledger) draws its focus ring

@@ -75,7 +75,9 @@ export function LatestPayouts({ indexerUrl }: { indexerUrl: string }): JSX.Eleme
             </span>
             <span className="font-semibold tabular-nums text-foreground">
               <span className="sr-only">{tPayouts('tableEarned')}: </span>+
-              {formatTokenAmount(row.earned ?? 0n, row.project.payment, locale)}
+              {formatTokenAmount(row.earned ?? 0n, row.project.payment, locale, 2, {
+                padFraction: true,
+              })}
             </span>
           </li>
         ))}

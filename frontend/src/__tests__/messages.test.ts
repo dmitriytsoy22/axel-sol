@@ -14,14 +14,37 @@ function flatten(messages: Messages, prefix = ''): Record<string, string> {
   }, {});
 }
 
-const placeholders = (text: string): string[] => (text.match(/\{\w+\}/g) ?? []).sort();
+// The values a message prints, "{shares}", and not the text of a plural's case, "one {share}".
+const placeholders = (text: string): string[] =>
+  (text.match(/(?<!(?:zero|one|two|few|many|other|=\d+) )\{\w+\}/g) ?? []).sort();
+
+/** The case names of each plural in a message: "{n, plural, one {…} other {…}}" is one, other. */
+function pluralCases(text: string): string[][] {
+  return Array.from(text.matchAll(/\{\w+, plural,/g), (match) => {
+    const cases: string[] = [];
+    let depth = 1;
+    let name = '';
+    for (let i = match.index + match[0].length; i < text.length && depth > 0; i++) {
+      if (text[i] === '{') {
+        if (depth === 1) cases.push(name.trim());
+        depth++;
+        name = '';
+      } else if (text[i] === '}') {
+        depth--;
+      } else if (depth === 1) {
+        name += text[i];
+      }
+    }
+    return cases;
+  });
+}
 
 const english = flatten(en);
 
 describe.each([
   ['ru', flatten(ru)],
   ['kk', flatten(kk)],
-])('%s messages', (_locale, translated) => {
+])('%s messages', (locale, translated) => {
   it('have exactly the English keys', () => {
     expect(Object.keys(translated).sort()).toEqual(Object.keys(english).sort());
   });
@@ -32,6 +55,15 @@ describe.each([
     );
 
     expect(mismatched).toEqual([]);
+  });
+
+  it("give every plural a case for each of the language's plural forms", () => {
+    const forms = new Intl.PluralRules(locale).resolvedOptions().pluralCategories;
+    const incomplete = Object.keys(translated).filter((key) =>
+      pluralCases(translated[key]).some((cases) => forms.some((form) => !cases.includes(form))),
+    );
+
+    expect(incomplete).toEqual([]);
   });
 
   it('never end a sentence right after a date, which already ends in a dot ("2026 г.", "қыр.")', () => {
@@ -52,5 +84,17 @@ describe.each([
     const lowercase = Object.keys(translated).filter((key) => /^\{network\}/.test(translated[key]));
 
     expect(lowercase).toEqual([]);
+  });
+});
+
+describe.each([
+  ['en', english],
+  ['ru', flatten(ru)],
+  ['kk', flatten(kk)],
+])('%s messages, in every language', (_locale, messages) => {
+  it('glue an en dash to the date before it, so no line starts with "–"', () => {
+    const loose = Object.keys(messages).filter((key) => / –/.test(messages[key]));
+
+    expect(loose).toEqual([]);
   });
 });

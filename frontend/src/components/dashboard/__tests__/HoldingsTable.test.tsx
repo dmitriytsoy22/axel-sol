@@ -76,7 +76,7 @@ describe('HoldingsTable', () => {
     );
     expect(within(row).getByText('Toyota Camry')).toBeInTheDocument();
     expect(within(row).getByText('50% of the car')).toBeInTheDocument();
-    expect(within(row).getByText('1,000,000 tKZT')).toBeInTheDocument();
+    expect(within(row).getByText('1,000,000.00 tKZT')).toBeInTheDocument();
     expect(within(row).getByText('1,234.56 tKZT')).toBeInTheDocument();
     expect(within(row).getByText('On the road')).toBeInTheDocument();
   });
@@ -95,7 +95,7 @@ describe('HoldingsTable', () => {
         .queryAllByRole('button')
         .map((button) => button.textContent),
     );
-    expect(actions).toEqual([['Claim', 'Send'], [], ['Get 50,000 tKZT back'], ['Claim'], []]);
+    expect(actions).toEqual([['Claim', 'Send'], [], ['Get 50,000.00 tKZT back'], ['Claim'], []]);
   });
 
   it('opens the transfer of the car whose Send was pressed', async () => {

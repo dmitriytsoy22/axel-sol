@@ -35,7 +35,8 @@ describe('AssetCard', () => {
     renderCard(project);
 
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Toyota Camry');
-    expect(screen.getByText('10,000 tKZT')).toBeInTheDocument();
+    // The label names the token, so the price never leaves it on a line of its own.
+    expect(screen.getByText('Price per share, tKZT').nextSibling).toHaveTextContent(/^10,000$/);
     expect(screen.getByText('500,000 / 1,000,000 tKZT')).toBeInTheDocument();
     expect(screen.getByText('50% sold')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveStyle('width: 50%');

@@ -30,10 +30,13 @@ export function RaiseProgress({ project, size = 'lg' }: RaiseProgressProps): JSX
   // Keep the label inside the bar's width near either end.
   const labelAlign =
     capAt < 18 ? 'translate-x-0' : capAt > 82 ? '-translate-x-full' : '-translate-x-1/2';
+  // Figures in the reader's format, and the numbers Russian agrees its nouns with.
   const counts = {
     sold: formatCount(sharesSold, locale),
     total: formatCount(totalShares, locale),
     goal: formatCount(softCapShares, locale),
+    totalCount: Number(totalShares),
+    goalCount: Number(softCapShares),
   };
 
   return (

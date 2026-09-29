@@ -89,8 +89,11 @@ export function formatTokenAmount(
 export function formatTokenTotals(
   totals: { amount: bigint; unit: TokenUnit }[],
   locale: string,
+  options: TokenAmountOptions = {},
 ): string {
-  return totals.map(({ amount, unit }) => formatTokenAmount(amount, unit, locale)).join(' · ');
+  return totals
+    .map(({ amount, unit }) => formatTokenAmount(amount, unit, locale, 2, options))
+    .join(' · ');
 }
 
 /** Tenge with the narrow sign in the reader's order: "₸1,250" in English, "1 250 ₸" in Russian. */
@@ -162,7 +165,9 @@ export function formatDay(yyyymmdd: number, locale: string): string {
 /**
  * Two YYYYMMDD days as one range, naming the month and year once when they share them:
  * "Sep 1 – 30, 2026", "1–30 сент. 2026 г.", "2026 ж. 1–30 қыр.". Kazakh follows the CLDR
- * Kazakh interval patterns, spelled out for the reason given for `formatDate`.
+ * Kazakh interval patterns, spelled out for the reason given for `formatDate`. The dash keeps
+ * to the day before it, so a wrapped range never opens a line with "–": the space before it
+ * is a no-break one (English's thin space a narrow no-break one).
  */
 export function formatDayRange(start: number, end: number, locale: string): string {
   const from = dayToDate(start);
@@ -172,16 +177,19 @@ export function formatDayRange(start: number, end: number, locale: string): stri
       day: 'numeric',
       month: 'short',
       year: 'numeric',
-    }).formatRange(from, to);
+    })
+      .formatRange(from, to)
+      .replace(' –', '\u00a0–')
+      .replace('\u2009–', '\u202f–');
   }
   if (start === end) return formatDay(start, locale);
   const month = (date: Date) => KAZAKH_MONTHS[date.getMonth()];
   if (from.getFullYear() !== to.getFullYear()) {
-    return `${formatDay(start, locale)} – ${formatDay(end, locale)}`;
+    return `${formatDay(start, locale)}\u00a0– ${formatDay(end, locale)}`;
   }
   const year = `${from.getFullYear()} ж.`;
   if (from.getMonth() !== to.getMonth()) {
-    return `${year} ${from.getDate()} ${month(from)} – ${to.getDate()} ${month(to)}`;
+    return `${year} ${from.getDate()} ${month(from)}\u00a0– ${to.getDate()} ${month(to)}`;
   }
   return `${year} ${from.getDate()}–${to.getDate()} ${month(to)}`;
 }

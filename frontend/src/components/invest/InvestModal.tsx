@@ -62,7 +62,10 @@ export function InvestModal({
   } else if (shares === 0n) {
     validationError = t('validationMin');
   } else if (shares !== null && shares > available) {
-    validationError = t('validationMax', { count: Number(available) });
+    validationError = t('validationMax', {
+      count: Number(available),
+      shares: formatCount(available, locale),
+    });
   } else if (cost !== null && balance !== null && cost > balance) {
     validationError = t('validationBalance', { symbol: token.symbol });
   }
@@ -104,6 +107,7 @@ export function InvestModal({
       icon: Undo2,
       text: t('refundRule', {
         goal: formatCount(project.softCapShares, locale),
+        count: Number(project.softCapShares),
         date: formatDate(project.raiseDeadline, locale),
         window: tCommon(`duration_${activation.unit}`, { count: activation.count }),
       }),
@@ -131,7 +135,10 @@ export function InvestModal({
           {status === 'success' && (
             <div className="flex w-full flex-col items-center gap-6">
               <p className="max-w-[36ch] text-center text-body text-muted-foreground">
-                {t('successBody', { count: Number(shares ?? 0n) })}
+                {t('successBody', {
+                  count: Number(shares ?? 0n),
+                  shares: formatCount(shares ?? 0n, locale),
+                })}
               </p>
               {/* flex-1 only in the row: in the column a zero basis would squash the
                   buttons to one line of text. */}
@@ -162,7 +169,10 @@ export function InvestModal({
             <div className="flex flex-col gap-1">
               <dt className="text-muted-foreground">{t('availableLabel')}</dt>
               <dd className="font-medium tabular-nums text-foreground">
-                {t('available', { count: Number(available) })}
+                {t('available', {
+                  count: Number(available),
+                  shares: formatCount(available, locale),
+                })}
               </dd>
             </div>
           </dl>

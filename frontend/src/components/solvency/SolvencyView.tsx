@@ -189,7 +189,9 @@ function Totals({ report }: { report: SolvencyReport }): JSX.Element {
         token: project.payment,
       })),
     );
-    return sums.length > 0 ? formatTokenTotals(sums, locale) : formatNumber(0, locale);
+    return sums.length > 0
+      ? formatTokenTotals(sums, locale, { keepUnit: true })
+      : formatNumber(0, locale);
   };
   return (
     <SummaryStats
@@ -240,21 +242,25 @@ export function SolvencyView(): JSX.Element {
       title={t('title')}
       lead={t('lead', { network: NETWORK_NAME, seconds: SOLVENCY_REFRESH_MS / 1000 })}
     >
-      {report && (
-        <div className="flex flex-col items-start gap-2 md:items-end">
-          <Button variant="secondary" onClick={refetch} disabled={isFetching}>
-            {isFetching ? (
-              <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
-            ) : (
-              <RotateCw aria-hidden="true" strokeWidth={1.75} />
-            )}
-            {t('checkNow')}
-          </Button>
+      {/* In place while the first check runs: the button and the time appearing only once it
+          answered pushed the page down, and beside the lead from md narrowed it by a line. */}
+      <div className="flex flex-col items-start gap-2 md:items-end">
+        <Button variant="secondary" onClick={refetch} disabled={isFetching || isLoading}>
+          {isFetching || isLoading ? (
+            <Loader2 aria-hidden="true" className="animate-spin" strokeWidth={1.75} />
+          ) : (
+            <RotateCw aria-hidden="true" strokeWidth={1.75} />
+          )}
+          {t('checkNow')}
+        </Button>
+        {report ? (
           <p className="text-small tabular-nums text-muted-foreground">
             {t('checkedAt', { time: formatTime(report.checkedAt * 1000, locale) })}
           </p>
-        </div>
-      )}
+        ) : (
+          !error && <Skeleton className="h-5 w-40" />
+        )}
+      </div>
     </PageHeader>
   );
 
@@ -274,10 +280,19 @@ export function SolvencyView(): JSX.Element {
       />
     );
   } else if (!report || isLoading) {
+    // The verdict and the totals, the shapes the first screen fills with.
     body = (
-      <div aria-busy="true" className="flex flex-col gap-6">
-        <Skeleton className="h-24 w-full rounded-card" />
-        <Skeleton className="h-64 w-full rounded-card" />
+      <div aria-busy="true" className="flex flex-col gap-10 md:gap-12">
+        <Skeleton className="h-36 w-full rounded-card md:h-28" />
+        <SummaryStats
+          label={t('totalsLabel')}
+          isLoading
+          items={[
+            { label: t('totalIncome'), value: null },
+            { label: t('totalOwed'), value: null },
+            { label: t('totalEscrow'), value: null },
+          ]}
+        />
       </div>
     );
   } else if (report.projects.length === 0) {

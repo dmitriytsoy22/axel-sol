@@ -30,7 +30,7 @@ describe('PortfolioSummary', () => {
       claimed: [],
     });
 
-    expect(figure('Value at current price')).toHaveTextContent('450,000 tKZT · 25 USDC');
+    expect(figure('Value at current price')).toHaveTextContent('450,000.00 tKZT · 25.00 USDC');
     expect(figure('Shares held')).toHaveTextContent('250');
     expect(figure('Shares held')).toHaveTextContent('in 2 cars');
     expect(figure('Ready to claim')).toHaveTextContent('44.12 tKZT');
@@ -44,7 +44,7 @@ describe('PortfolioSummary', () => {
       claimed: [],
     });
 
-    expect(figure('Ready to claim')).toHaveTextContent(/^Ready to claim0 tKZT/);
+    expect(figure('Ready to claim')).toHaveTextContent(/^Ready to claim0\.00 tKZT/);
   });
 
   it('shows a plain zero where no token has anything to total', () => {

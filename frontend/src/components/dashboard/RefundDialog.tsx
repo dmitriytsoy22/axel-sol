@@ -55,6 +55,8 @@ export function RefundDialog({
     sharesValue(shares, project.pricePerShare),
     project.payment,
     locale,
+    2,
+    { padFraction: true },
   );
   const settlesFirst = project.status !== 'failed' && finalizeOutcome(project, now) === 'failed';
   const busy = status !== 'idle' && status !== 'error';

@@ -30,6 +30,8 @@ export function RefundButton({
     sharesValue(shares, project.pricePerShare),
     project.payment,
     locale,
+    2,
+    { padFraction: true },
   );
 
   return (

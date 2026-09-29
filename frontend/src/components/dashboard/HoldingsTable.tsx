@@ -125,8 +125,10 @@ export function HoldingsTable({
         sharesValue(position.shares, project.pricePerShare),
         project.payment,
         locale,
+        2,
+        { padFraction: true },
       ),
-      pending: formatTokenAmount(pending, project.payment, locale),
+      pending: formatTokenAmount(pending, project.payment, locale, 2, { padFraction: true }),
     };
   });
 

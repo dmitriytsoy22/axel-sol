@@ -53,6 +53,7 @@ function RecoveryAlert({
           <p className="mt-1 max-w-[62ch] text-body text-muted-foreground">
             {t('alertBody', {
               shares: formatCount(request.shares, locale),
+              count: Number(request.shares),
               car: project ? carLabel(project.car) : t('unknownCar'),
               to: shortAddress(request.toOwner.toBase58()),
             })}

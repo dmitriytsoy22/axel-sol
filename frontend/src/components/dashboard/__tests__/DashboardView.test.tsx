@@ -116,7 +116,7 @@ describe('DashboardView', () => {
     expect(within(row).getByText('Kia Rio')).toBeInTheDocument();
     // Alice bought 50 and sent 7; the program paid her 203 055 556 base units on the claim.
     expect(within(row).getByText('43')).toBeInTheDocument();
-    expect(within(row).getByText('430,000 tKZT')).toBeInTheDocument();
+    expect(within(row).getByText('430,000.00 tKZT')).toBeInTheDocument();
     expect(within(row).getByText('203.05 tKZT')).toBeInTheDocument();
     expect(figure('Ready to claim')).toHaveTextContent('203.05 tKZT');
     expect(screen.getByRole('button', { name: 'Claim all' })).toBeEnabled();
@@ -164,9 +164,9 @@ describe('DashboardView', () => {
       expect((await latest.findAllByRole('listitem')).map((item) => item.textContent)).toEqual([
         // The share symbol tells apart two cars of one model.
         // The program's periods 3, 2 and 1 are the fourth, third and second payouts.
-        expect.stringMatching(/^Kia Rio AXKR017Payout #4.*Your part: \+4 tKZT$/),
-        expect.stringMatching(/Payout #3.*Your part: \+3 tKZT$/),
-        expect.stringMatching(/Payout #2.*Your part: \+2 tKZT$/),
+        expect.stringMatching(/^Kia Rio AXKR017Payout #4.*Your part: \+4\.00 tKZT$/),
+        expect.stringMatching(/Payout #3.*Your part: \+3\.00 tKZT$/),
+        expect.stringMatching(/Payout #2.*Your part: \+2\.00 tKZT$/),
       ]);
       expect(fetchMock).toHaveBeenCalledWith(
         `${INDEXER}/v2/wallets/${alice.toBase58()}/payouts`,

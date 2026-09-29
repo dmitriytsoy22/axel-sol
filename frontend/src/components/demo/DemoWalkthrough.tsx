@@ -126,6 +126,19 @@ function StepsLoading(): JSX.Element {
 }
 
 /**
+ * What the demo's keys can and cannot do, under content that has loaded: under the
+ * placeholders it moved up the page as they gave way to the shorter connect panel.
+ */
+function FinePrint(): JSX.Element {
+  const t = useTranslations('DemoAccess');
+  return (
+    <p className="mt-10 max-w-[65ch] text-small text-muted-foreground">
+      {t('fineprint', { network: NETWORK_NAME })}
+    </p>
+  );
+}
+
+/**
  * "The next month can be simulated in 42 s", counted down to the end the demo route gave.
  * The status is read again once it ends; until that answer lands, the last second stays.
  */
@@ -232,180 +245,185 @@ function Walkthrough({ demo }: { demo: DemoAccess }): JSX.Element {
   };
 
   return (
-    <ol className="flex flex-col gap-4">
-      <Step
-        index={1}
-        step="access"
-        state={progress.access}
-        title={t('accessTitle')}
-        body={
-          progress.access === 'done' && kyc.investor
-            ? t('accessDoneBody', { date: formatDate(kyc.investor.expiresAt, locale) })
-            : t('accessBody', {
-                amount:
-                  status.access.dripAmount && fleet
-                    ? amount(BigInt(status.access.dripAmount))
-                    : '—',
-              })
-        }
-      >
-        {progress.access === 'done' && fleet && <Balance project={fleet} version={chainVersion} />}
-        {needsTurnstile &&
-          (TURNSTILE_SITE_KEY ? (
-            <Turnstile
-              key={turnstileRound}
-              siteKey={TURNSTILE_SITE_KEY}
-              onToken={(token) => {
-                setTurnstileFailed(false);
-                setTurnstileToken(token);
-              }}
-              onError={() => setTurnstileFailed(true)}
-            />
-          ) : (
-            <p className="text-small text-destructive">{tErrors('misconfigured')}</p>
-          ))}
-        {turnstileFailed && <p className="text-small text-destructive">{t('turnstileFailed')}</p>}
-        {(progress.access !== 'done' || !demo.session) && (
-          <Button
-            variant={progress.access === 'done' ? 'secondary' : 'primary'}
-            wrap
-            onClick={access}
-            disabled={demo.busy !== null || (needsTurnstile && !turnstileToken)}
-          >
-            <Spinner on={demo.busy === 'access'} />
-            {progress.access === 'done' ? t('signInAgain') : t('accessAction')}
-          </Button>
-        )}
-        {progress.access === 'done' && !demo.session && (
-          <p className="text-small text-muted-foreground">{t('signInAgainHint')}</p>
-        )}
-        <StepError message={demo.errors.access} />
-        <TxLink signature={demo.signatures.access} />
-      </Step>
-
-      <Step
-        index={2}
-        step="buy"
-        state={progress.buy}
-        title={t('buyTitle')}
-        body={progress.buy === 'done' ? t('buyDoneBody') : t('buyBody')}
-      >
-        {progress.buy !== 'done' && <OpenRaises raises={raises} />}
-      </Step>
-
-      <Step
-        index={3}
-        step="shares"
-        state={progress.shares}
-        title={t('sharesTitle')}
-        body={
-          progress.shares === 'done'
-            ? t('sharesDoneBody', {
-                count: formatCount(fleetHolding?.position.shares ?? 0n, locale),
-                car: fleetName,
-              })
-            : t('sharesBody', { count: formatCount(sharesPerWallet, locale), car: fleetName })
-        }
-      >
-        {progress.shares !== 'done' && (
-          <Button
-            variant={progress.shares === 'current' ? 'primary' : 'secondary'}
-            wrap
-            onClick={shares}
-            disabled={demo.busy !== null || !verified || !demo.session}
-          >
-            <Spinner on={demo.busy === 'shares'} />
-            {t('sharesAction', { count: formatCount(sharesPerWallet, locale) })}
-          </Button>
-        )}
-        <StepError message={demo.errors.shares} />
-        <TxLink signature={demo.signatures.shares} />
-      </Step>
-
-      <Step
-        index={4}
-        step="simulate"
-        state={progress.simulate}
-        title={t('simulateTitle')}
-        body={t('simulateBody')}
-      >
-        {fleetHolding && fleetHolding.pending > 0n && (
-          <p className="text-body text-foreground">
-            {t('pending', { amount: amount(fleetHolding.pending) })}
-          </p>
-        )}
-        <Button
-          variant={progress.simulate === 'current' ? 'primary' : 'secondary'}
-          wrap
-          onClick={simulate}
-          disabled={
-            demo.busy !== null ||
-            progress.shares !== 'done' ||
-            !demo.session ||
-            demo.cooldownEndsAt !== null
+    <>
+      <ol className="flex flex-col gap-4">
+        <Step
+          index={1}
+          step="access"
+          state={progress.access}
+          title={t('accessTitle')}
+          body={
+            progress.access === 'done' && kyc.investor
+              ? t('accessDoneBody', { date: formatDate(kyc.investor.expiresAt, locale) })
+              : t('accessBody', {
+                  amount:
+                    status.access.dripAmount && fleet
+                      ? amount(BigInt(status.access.dripAmount))
+                      : '—',
+                })
           }
         >
-          <Spinner on={demo.busy === 'simulate'} />
-          {progress.simulate === 'done' ? t('simulateAgain') : t('simulateAction')}
-        </Button>
-        {demo.cooldownEndsAt !== null && <Cooldown endsAt={demo.cooldownEndsAt} />}
-        <StepError message={demo.errors.simulate} />
-        <TxLink signature={demo.signatures.simulate} />
-      </Step>
+          {progress.access === 'done' && fleet && (
+            <Balance project={fleet} version={chainVersion} />
+          )}
+          {needsTurnstile &&
+            (TURNSTILE_SITE_KEY ? (
+              <Turnstile
+                key={turnstileRound}
+                siteKey={TURNSTILE_SITE_KEY}
+                onToken={(token) => {
+                  setTurnstileFailed(false);
+                  setTurnstileToken(token);
+                }}
+                onError={() => setTurnstileFailed(true)}
+              />
+            ) : (
+              <p className="text-small text-destructive">{tErrors('misconfigured')}</p>
+            ))}
+          {turnstileFailed && <p className="text-small text-destructive">{t('turnstileFailed')}</p>}
+          {(progress.access !== 'done' || !demo.session) && (
+            <Button
+              variant={progress.access === 'done' ? 'secondary' : 'primary'}
+              wrap
+              onClick={access}
+              disabled={demo.busy !== null || (needsTurnstile && !turnstileToken)}
+            >
+              <Spinner on={demo.busy === 'access'} />
+              {progress.access === 'done' ? t('signInAgain') : t('accessAction')}
+            </Button>
+          )}
+          {progress.access === 'done' && !demo.session && (
+            <p className="text-small text-muted-foreground">{t('signInAgainHint')}</p>
+          )}
+          <StepError message={demo.errors.access} />
+          <TxLink signature={demo.signatures.access} />
+        </Step>
 
-      <Step
-        index={5}
-        step="claim"
-        state={progress.claim}
-        title={t('claimTitle')}
-        body={
-          progress.claim === 'done' && fleetHolding
-            ? t('claimDoneBody', { amount: amount(fleetHolding.position.totalClaimed) })
-            : t('claimBody')
-        }
-      >
-        {fleetHolding && fleetHolding.pending > 0n && (
+        <Step
+          index={2}
+          step="buy"
+          state={progress.buy}
+          title={t('buyTitle')}
+          body={progress.buy === 'done' ? t('buyDoneBody') : t('buyBody')}
+        >
+          {progress.buy !== 'done' && <OpenRaises raises={raises} />}
+        </Step>
+
+        <Step
+          index={3}
+          step="shares"
+          state={progress.shares}
+          title={t('sharesTitle')}
+          body={
+            progress.shares === 'done'
+              ? t('sharesDoneBody', {
+                  count: formatCount(fleetHolding?.position.shares ?? 0n, locale),
+                  car: fleetName,
+                })
+              : t('sharesBody', { count: formatCount(sharesPerWallet, locale), car: fleetName })
+          }
+        >
+          {progress.shares !== 'done' && (
+            <Button
+              variant={progress.shares === 'current' ? 'primary' : 'secondary'}
+              wrap
+              onClick={shares}
+              disabled={demo.busy !== null || !verified || !demo.session}
+            >
+              <Spinner on={demo.busy === 'shares'} />
+              {t('sharesAction', { count: formatCount(sharesPerWallet, locale) })}
+            </Button>
+          )}
+          <StepError message={demo.errors.shares} />
+          <TxLink signature={demo.signatures.shares} />
+        </Step>
+
+        <Step
+          index={4}
+          step="simulate"
+          state={progress.simulate}
+          title={t('simulateTitle')}
+          body={t('simulateBody')}
+        >
+          {fleetHolding && fleetHolding.pending > 0n && (
+            <p className="text-body text-foreground">
+              {t('pending', { amount: amount(fleetHolding.pending) })}
+            </p>
+          )}
           <Button
-            variant={progress.claim === 'current' ? 'primary' : 'secondary'}
+            variant={progress.simulate === 'current' ? 'primary' : 'secondary'}
             wrap
-            onClick={claimFleet}
+            onClick={simulate}
             disabled={
-              claimStatus === 'preflight' ||
-              claimStatus === 'awaiting_wallet' ||
-              claimStatus === 'confirming'
+              demo.busy !== null ||
+              progress.shares !== 'done' ||
+              !demo.session ||
+              demo.cooldownEndsAt !== null
             }
           >
-            {t('claimAction', { amount: amount(fleetHolding.pending) })}
+            <Spinner on={demo.busy === 'simulate'} />
+            {progress.simulate === 'done' ? t('simulateAgain') : t('simulateAction')}
           </Button>
-        )}
-      </Step>
+          {demo.cooldownEndsAt !== null && <Cooldown endsAt={demo.cooldownEndsAt} />}
+          <StepError message={demo.errors.simulate} />
+          <TxLink signature={demo.signatures.simulate} />
+        </Step>
 
-      <Step
-        index={6}
-        step="verify"
-        state={progress.verify}
-        title={t('verifyTitle')}
-        body={t('verifyBody')}
-      >
-        {fleetMint && (
-          <Link href={`/assets/${fleetMint}#verify-data-title`} className={linkClasses}>
-            <TrailingIcon icon={ArrowRight}>{t('verifyAction', { car: fleetName })}</TrailingIcon>
+        <Step
+          index={5}
+          step="claim"
+          state={progress.claim}
+          title={t('claimTitle')}
+          body={
+            progress.claim === 'done' && fleetHolding
+              ? t('claimDoneBody', { amount: amount(fleetHolding.position.totalClaimed) })
+              : t('claimBody')
+          }
+        >
+          {fleetHolding && fleetHolding.pending > 0n && (
+            <Button
+              variant={progress.claim === 'current' ? 'primary' : 'secondary'}
+              wrap
+              onClick={claimFleet}
+              disabled={
+                claimStatus === 'preflight' ||
+                claimStatus === 'awaiting_wallet' ||
+                claimStatus === 'confirming'
+              }
+            >
+              {t('claimAction', { amount: amount(fleetHolding.pending) })}
+            </Button>
+          )}
+        </Step>
+
+        <Step
+          index={6}
+          step="verify"
+          state={progress.verify}
+          title={t('verifyTitle')}
+          body={t('verifyBody')}
+        >
+          {fleetMint && (
+            <Link href={`/assets/${fleetMint}#verify-data-title`} className={linkClasses}>
+              <TrailingIcon icon={ArrowRight}>{t('verifyAction', { car: fleetName })}</TrailingIcon>
+            </Link>
+          )}
+        </Step>
+
+        <Step
+          index={7}
+          step="solvency"
+          state={progress.solvency}
+          title={t('solvencyTitle')}
+          body={t('solvencyBody')}
+        >
+          <Link href={fleetMint ? `/solvency#${fleetMint}` : '/solvency'} className={linkClasses}>
+            <TrailingIcon icon={ArrowRight}>{t('solvencyAction')}</TrailingIcon>
           </Link>
-        )}
-      </Step>
-
-      <Step
-        index={7}
-        step="solvency"
-        state={progress.solvency}
-        title={t('solvencyTitle')}
-        body={t('solvencyBody')}
-      >
-        <Link href={fleetMint ? `/solvency#${fleetMint}` : '/solvency'} className={linkClasses}>
-          <TrailingIcon icon={ArrowRight}>{t('solvencyAction')}</TrailingIcon>
-        </Link>
-      </Step>
-    </ol>
+        </Step>
+      </ol>
+      <FinePrint />
+    </>
   );
 }
 
@@ -443,7 +461,10 @@ export function DemoWalkthrough({ api }: { api?: DemoApi }): JSX.Element {
   const demo = useDemoAccess(api);
 
   let body: React.ReactNode;
+  // The walkthrough adds the fine print under its own steps once they are read.
+  let finePrint = true;
   if (!connected) {
+    finePrint = !connecting;
     body = connecting ? (
       <StepsLoading />
     ) : (
@@ -469,6 +490,7 @@ export function DemoWalkthrough({ api }: { api?: DemoApi }): JSX.Element {
       />
     );
   } else if (!demo.status) {
+    finePrint = false;
     body = <StepsLoading />;
   } else if (!demo.status.available && demo.status.code) {
     body = (
@@ -485,6 +507,7 @@ export function DemoWalkthrough({ api }: { api?: DemoApi }): JSX.Element {
       />
     );
   } else {
+    finePrint = false;
     body = <Walkthrough demo={demo} />;
   }
 
@@ -496,9 +519,7 @@ export function DemoWalkthrough({ api }: { api?: DemoApi }): JSX.Element {
         lead={t('lead', { network: NETWORK_NAME })}
       />
       <div className="mt-10">{body}</div>
-      <p className="mt-10 max-w-[65ch] text-small text-muted-foreground">
-        {t('fineprint', { network: NETWORK_NAME })}
-      </p>
+      {finePrint && <FinePrint />}
     </>
   );
 }

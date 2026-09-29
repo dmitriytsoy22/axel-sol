@@ -29,7 +29,6 @@ export function PayoutCalculator({ project }: PayoutCalculatorProps): JSX.Elemen
   const total = Number(project.totalShares);
   const { symbol, decimals } = project.payment;
   const price = Number(project.pricePerShare) / 10 ** decimals;
-  const inToken = (value: number) => `${formatNumber(value, locale, 2)} ${symbol}`;
 
   const sharesCount = parseAmount(shares);
   const sharesValid = Number.isInteger(sharesCount) && sharesCount >= 1 && sharesCount <= total;
@@ -49,10 +48,18 @@ export function PayoutCalculator({ project }: PayoutCalculatorProps): JSX.Elemen
         pricePerShare: price,
       });
 
+  // The token is named in the amounts' labels: beside "18 000 000" in half the card at 390 px
+  // it took a line of its own.
   const results = [
     { label: t('calcPart'), value: estimate && formatPercent(estimate.part, 1, locale) },
-    { label: t('calcPerMonth'), value: estimate && inToken(estimate.perMonth) },
-    { label: t('calcPerYear'), value: estimate && inToken(estimate.perYear) },
+    {
+      label: t('calcPerMonth', { symbol }),
+      value: estimate && formatNumber(estimate.perMonth, locale, 2),
+    },
+    {
+      label: t('calcPerYear', { symbol }),
+      value: estimate && formatNumber(estimate.perYear, locale, 2),
+    },
     { label: t('calcYield'), value: estimate && formatPercent(estimate.yearlyOnPrice, 1, locale) },
   ];
   const cost = (sharesValid ? BigInt(sharesCount) : 0n) * project.pricePerShare;
@@ -137,7 +144,7 @@ export function PayoutCalculator({ project }: PayoutCalculatorProps): JSX.Elemen
           <p className="mt-5 text-small text-muted-foreground">{t('calcEmpty')}</p>
         )}
         <p className="mt-5 max-w-[65ch] text-small text-muted-foreground">
-          {t('calcAssumption', { total: formatNumber(total, locale) })}
+          {t('calcAssumption', { total: formatNumber(total, locale), count: total })}
         </p>
       </div>
     </section>

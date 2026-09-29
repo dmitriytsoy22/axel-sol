@@ -6,8 +6,16 @@ import type { Project } from '@/types/project';
 import type { SaleState } from './saleState';
 import { timelineOf, type TimelineStep } from './timeline';
 
-/** The translation keys of a step's title and detail line. */
-function copyOf(step: TimelineStep, status: Project['status'], saleState: SaleState) {
+/**
+ * The translation keys of a step's title and detail line. `oneDay` is a car that closed on
+ * the day it went on the road, whose time on the road is that one date, not a range.
+ */
+function copyOf(
+  step: TimelineStep,
+  status: Project['status'],
+  saleState: SaleState,
+  oneDay: boolean,
+) {
   switch (step.key) {
     case 'opened':
       return { title: 'openedTitle', detail: 'onDate' };
@@ -27,7 +35,8 @@ function copyOf(step: TimelineStep, status: Project['status'], saleState: SaleSt
       return { title: 'activatedTitle', detail: 'activationWindow' };
     case 'operating':
       if (status === 'paused') return { title: 'pausedTitle', detail: 'pausedBody' };
-      if (step.state === 'done') return { title: 'operatingTitle', detail: 'betweenDates' };
+      if (step.state === 'done')
+        return { title: 'operatingTitle', detail: oneDay ? 'onDate' : 'betweenDates' };
       if (step.state === 'current') return { title: 'operatingTitle', detail: 'sinceDate' };
       return { title: 'operatingTitle', detail: 'operatingNext' };
     case 'closed':
@@ -81,6 +90,7 @@ export function StateTimeline({
   const steps = timelineOf(project);
   const activation = durationParts(project.activationWindow);
   const date = (seconds: number | null) => (seconds ? formatDate(seconds, locale) : '');
+  const oneDay = date(project.activatedAt) === date(project.closedAt);
 
   return (
     <section aria-labelledby="timeline-title">
@@ -91,7 +101,7 @@ export function StateTimeline({
 
       <ol className="mt-6 rounded-card border border-border bg-card px-5 py-5 md:px-6">
         {steps.map((step, i) => {
-          const copy = copyOf(step, project.status, saleState);
+          const copy = copyOf(step, project.status, saleState, oneDay);
           const warn = project.status === 'paused' && step.key === 'operating';
           const last = i === steps.length - 1;
           return (

@@ -140,14 +140,16 @@ describe('RefundButton', () => {
     );
 
     // Five shares at 10 000 tKZT.
-    await userEvent.click(screen.getByRole('button', { name: 'Get 50,000 tKZT back' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Get 50,000.00 tKZT back' }));
     const dialog = screen.getByRole('dialog', { name: 'Get your money back' });
-    expect(within(dialog).getByText('You get back').nextSibling).toHaveTextContent('50,000 tKZT');
+    expect(within(dialog).getByText('You get back').nextSibling).toHaveTextContent(
+      '50,000.00 tKZT',
+    );
     expect(sent).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm refund' }));
 
     expect(await screen.findByText('Refund received')).toBeInTheDocument();
-    expect(screen.getByText('50,000 tKZT is back in your wallet.')).toBeInTheDocument();
+    expect(screen.getByText('50,000.00 tKZT is back in your wallet.')).toBeInTheDocument();
     const [refund] = axelInstructions(sent[0]);
     expect(refund.data).toEqual(instructionDiscriminator('refund'));
     expect(refund.keys[0].pubkey.equals(refunder)).toBe(true);
@@ -171,10 +173,10 @@ describe('RefundButton', () => {
     }
     renderWith(new FixtureNode(), refunder, <Row />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Get 50,000 tKZT back' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Get 50,000.00 tKZT back' }));
     await userEvent.click(screen.getByRole('button', { name: 'Confirm refund' }));
 
-    expect(await screen.findByText('50,000 tKZT is back in your wallet.')).toBeInTheDocument();
+    expect(await screen.findByText('50,000.00 tKZT is back in your wallet.')).toBeInTheDocument();
     const dialog = screen.getByRole('dialog', { name: 'Get your money back' });
     await userEvent.click(within(dialog).getAllByRole('button', { name: 'Close' }).at(-1)!);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -193,7 +195,7 @@ describe('RefundButton', () => {
       <RefundButton project={project} shares={2n} onRefunded={vi.fn()} />,
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Get 20,000 tKZT back' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Get 20,000.00 tKZT back' }));
     expect(screen.getByText(/the same transaction settles it first/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Confirm refund' }));
 

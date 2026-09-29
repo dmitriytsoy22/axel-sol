@@ -13,11 +13,15 @@ export function PortfolioSummary({ summary, carCount }: PortfolioSummaryProps): 
   const t = useTranslations('Dashboard');
   const locale = useLocale();
   // Every holding is in `value`, so its token names a total with nothing in it yet, such as
-  // nothing to claim ("0 tKZT"); totals in no token at all are a plain zero.
+  // nothing to claim ("0.00 tKZT"); totals in no token at all are a plain zero. Amounts keep
+  // two decimals, like every amount on the portfolio and payouts pages, and their token.
   const [firstCar] = summary.value;
+  const options = { padFraction: true, keepUnit: true };
   const totals = (list: Summary['value']) => {
-    if (list.length > 0) return formatTokenTotals(list, locale);
-    return firstCar ? formatTokenAmount(0n, firstCar.unit, locale) : formatNumber(0, locale);
+    if (list.length > 0) return formatTokenTotals(list, locale, options);
+    return firstCar
+      ? formatTokenAmount(0n, firstCar.unit, locale, 2, options)
+      : formatNumber(0, locale);
   };
 
   return (

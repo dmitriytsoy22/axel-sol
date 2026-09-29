@@ -149,6 +149,7 @@ export function InvestPanel({
             {t('sharesSold', {
               sold: formatCount(project.sharesSold, locale),
               total: formatCount(project.totalShares, locale),
+              count: Number(project.totalShares),
             })}
           </span>
           <span className="font-medium tabular-nums text-foreground">

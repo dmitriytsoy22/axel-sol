@@ -172,9 +172,21 @@ describe('formatDayRange', () => {
   });
 
   it('writes both months, and both years, when the days differ in them', () => {
-    expect(formatDayRange(20260915, 20261014, 'kk')).toBe('2026 ж. 15 қыр. – 14 қаз.');
-    expect(formatDayRange(20261215, 20270114, 'kk')).toBe('2026 ж. 15 жел. – 2027 ж. 14 қаң.');
+    expect(formatDayRange(20260915, 20261014, 'kk')).toBe(`2026 ж. 15 қыр.${NBSP}– 14 қаз.`);
+    expect(formatDayRange(20261215, 20270114, 'kk')).toBe(
+      `2026 ж. 15 жел.${NBSP}– 2027 ж. 14 қаң.`,
+    );
     expect(formatDayRange(20261215, 20270114, 'en')).toMatch(/^Dec 15, 2026\s–\sJan 14, 2027$/);
+  });
+
+  it('keeps the dash with the day before it, so a wrapped range never opens a line with "–"', () => {
+    const ranges = ['en', 'ru', 'kk'].flatMap((locale) => [
+      formatDayRange(20260901, 20260930, locale),
+      formatDayRange(20260915, 20261014, locale),
+      formatDayRange(20261215, 20270114, locale),
+    ]);
+
+    expect(ranges.filter((range) => /[ \u2009]–/.test(range))).toEqual([]);
   });
 
   it('writes a one-day range as that day', () => {

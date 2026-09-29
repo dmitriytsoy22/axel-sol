@@ -41,11 +41,16 @@ export function PayoutsView({
   const history = payouts.history;
   const summary = history?.totals ?? positions.summary;
   // Every car the wallet has held is in `claimed`, at zero or more, so none there means the
-  // wallet never held a share; otherwise its token names an empty total ("0 tKZT").
+  // wallet never held a share; otherwise its token names an empty total ("0.00 tKZT").
+  // Amounts keep two decimals, like every amount on the portfolio and payouts pages, and
+  // their token on their line.
   const [firstCar] = summary.claimed;
+  const options = { padFraction: true, keepUnit: true };
   const totals = (list: TokenTotal[]) => {
-    if (list.length > 0) return formatTokenTotals(list, locale);
-    return firstCar ? formatTokenAmount(0n, firstCar.unit, locale) : formatNumber(0, locale);
+    if (list.length > 0) return formatTokenTotals(list, locale, options);
+    return firstCar
+      ? formatTokenAmount(0n, firstCar.unit, locale, 2, options)
+      : formatNumber(0, locale);
   };
 
   let body: React.ReactNode;
@@ -131,9 +136,9 @@ export function PayoutsView({
                       {claim.claimedAt === null ? '—' : formatDate(claim.claimedAt, locale)}
                     </span>
                   </span>
-                  <span className="flex items-center gap-4">
+                  <span className="flex flex-wrap items-center gap-x-4">
                     <span className="font-semibold tabular-nums text-foreground">
-                      +{formatTokenAmount(claim.amount, claim.project.payment, locale)}
+                      +{formatTokenAmount(claim.amount, claim.project.payment, locale, 2, options)}
                     </span>
                     <a
                       href={getExplorerUrl(claim.signature, 'tx')}

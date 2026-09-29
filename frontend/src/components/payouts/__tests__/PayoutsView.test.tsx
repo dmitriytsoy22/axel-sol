@@ -153,12 +153,14 @@ describe('PayoutsView', () => {
     expect(within(latest).getByText('Payout #2')).toBeInTheDocument();
     expect(within(latest).getByText('—')).toBeInTheDocument();
     expect(within(first).getByText('+524.69 tKZT')).toBeInTheDocument();
+    // The period is one range that names its month and year once.
+    expect(within(first).getByText(/^Oct 1\s–\s31, 2026$/)).toBeInTheDocument();
     expect(within(first).getByRole('link')).toHaveAttribute(
       'href',
       expect.stringContaining('/tx/DepositSig'),
     );
     expect(figure('Claimed so far')).toHaveTextContent('524.69 tKZT');
-    expect(figure('Ready to claim')).toHaveTextContent('10 tKZT');
+    expect(figure('Ready to claim')).toHaveTextContent('10.00 tKZT');
     expect(figure('Payouts')).toHaveTextContent('2');
     expect(screen.getByText(/as of Solana slot 3,120,560/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Your claims' })).toBeInTheDocument();
@@ -253,6 +255,6 @@ describe('PayoutsView', () => {
         /No deposits for this wallet's cars yet/,
       ),
     ).toBeInTheDocument();
-    expect(figure('Ready to claim')).toHaveTextContent(/^Ready to claim0 tKZT$/);
+    expect(figure('Ready to claim')).toHaveTextContent(/^Ready to claim0\.00 tKZT$/);
   });
 });

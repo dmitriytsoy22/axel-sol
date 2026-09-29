@@ -70,9 +70,13 @@ export function AssetCard({ project }: AssetCardProps): JSX.Element {
             balanced lines, rather than run into its neighbour or out of the card. */}
         <dl className="mt-5 grid grid-cols-2 gap-x-3 gap-y-4">
           <div className="flex min-w-0 flex-col-reverse justify-end gap-1">
-            <dt className="text-small text-muted-foreground">{t('pricePerToken')}</dt>
+            {/* The label names the token: in half the card "10 000 tKZT" left it on a line of
+                its own. */}
+            <dt className="text-small text-muted-foreground">
+              {t('pricePerToken', { symbol: payment.symbol })}
+            </dt>
             <dd className="text-balance break-words text-title font-semibold tabular-nums text-foreground">
-              {formatTokenAmount(project.pricePerShare, payment, locale)}
+              {formatTokenAmount(project.pricePerShare, payment, locale, 2, { withSymbol: false })}
             </dd>
           </div>
           {project.status === 'fundraising' ? (

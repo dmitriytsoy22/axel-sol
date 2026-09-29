@@ -287,8 +287,12 @@ export function KycVerification({
     if (standing === 'verified') {
       action = (
         <div className="flex flex-col items-start gap-4">
-          <p className="inline-flex items-center gap-2 text-body text-foreground">
-            <CircleCheck aria-hidden="true" className="h-5 w-5 text-success" strokeWidth={1.75} />
+          <p className="flex items-start gap-2 text-body text-foreground">
+            <CircleCheck
+              aria-hidden="true"
+              className="mt-0.5 h-5 w-5 shrink-0 text-success"
+              strokeWidth={1.75}
+            />
             {t('nothingToDo')}
           </p>
           <Link href="/#vehicles" className={buttonClasses({ variant: 'outline' })}>

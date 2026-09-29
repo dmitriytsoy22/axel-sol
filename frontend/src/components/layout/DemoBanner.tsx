@@ -8,11 +8,12 @@ import { NETWORK_NAME, ON_TEST_NETWORK } from '@/lib/network';
 import { DEMO_PATH, SEED_URL } from './constants';
 
 /*
- * Both links sit in running text at 14 px. Below lg, where a finger taps them, padding grows
- * each one to a 44 px target and an equal negative margin keeps the lines where they are;
- * the gap between the two lines keeps the targets apart.
+ * Both links sit in running text at 14 px. Below lg, where a finger taps them, a pseudo-element
+ * 12 px above and below grows each one to a 44 px target; the link's own box, and so its focus
+ * ring, stays the size of its text. Padding did the same, but drew the ring 12 px up, under the
+ * fixed bar at 768–1023. The gap between the two lines keeps the targets apart.
  */
-const TOUCH_TARGET = '-my-3 py-3 lg:my-0 lg:py-0';
+const TOUCH_TARGET = 'relative after:absolute after:inset-x-0 after:-inset-y-3 lg:after:hidden';
 
 /**
  * Says on every page of a test-network deployment that the cars, parks and investors are the

@@ -36,6 +36,22 @@ export function holdInPlace(
   return stop;
 }
 
+/**
+ * Holds the section the address names (`#vehicles`, `#verify-data-title`) where the browser
+ * or a link put it, while what is above it fills in from the chain: the fleet's cards alone
+ * moved "How it works" 2 000 px down after the browser had scrolled to it. Call it once the
+ * section is on the page.
+ */
+export function holdSectionInAddress(): () => void {
+  const id = decodeURIComponent(window.location.hash.slice(1));
+  const target = id ? document.getElementById(id) : null;
+  if (!target) return () => {};
+  return holdInPlace(
+    () => target,
+    (element) => element.scrollIntoView({ behavior: 'instant' }),
+  );
+}
+
 const PLACE_KEY = 'axel:place';
 
 interface Place {

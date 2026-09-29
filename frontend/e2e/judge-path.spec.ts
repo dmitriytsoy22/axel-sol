@@ -63,7 +63,6 @@ test('a judge gets demo access, buys into a raise, claims a simulated month, the
     const ready = simulate.getByText(/^Ready to claim: \d/);
     await expect(ready).toBeVisible();
     const amount = (await ready.innerText()).replace('Ready to claim: ', '');
-    claimed = amount;
     await expect
       .poll(
         async () =>
@@ -76,6 +75,10 @@ test('a judge gets demo access, buys into a raise, claims a simulated month, the
     const [, fleetBefore] = (await indexedPayouts(request, wallet.publicKey)).projects;
     expect(fleetBefore).toMatchObject({ mint: stack.fleet.mint, shares: '5', claimed: '0' });
     expect(formatTokenAmount(BigInt(fleetBefore.pending), stack.payment, 'en')).toBe(amount);
+    // The payouts and portfolio pages write every amount with two decimals.
+    claimed = formatTokenAmount(BigInt(fleetBefore.pending), stack.payment, 'en', 2, {
+      padFraction: true,
+    });
     const balanceBefore = await paymentBalance(stack, wallet.publicKey);
 
     await claim.getByRole('button', { name: `Claim ${amount}` }).click();
