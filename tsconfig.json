@@ -10,5 +10,5 @@
     "rootDir": "."
   },
   "include": ["tests/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["node_modules", "target", "dist", "scripts/seed-devnet"]
+  "exclude": ["node_modules", "target", "dist", "scripts/seed-devnet", "scripts/demo-video"]
 }
